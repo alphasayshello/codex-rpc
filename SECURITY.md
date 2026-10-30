@@ -37,3 +37,7 @@ macOS uses a LaunchAgent; Linux uses `systemd --user`; Windows uses a Startup co
 ## Reporting
 
 Please report vulnerabilities privately to the maintainer through the repository's private vulnerability reporting mechanism when available. Do not include transcripts, config backups, local paths or tokens in public issues. Until a repository is published with private reporting enabled, contact the distributor privately rather than opening a public exploit report. There is no invented security email address. Supported security fixes target the latest released version; see VERSIONING.md.
+
+## Conversation selection and tool timelines
+
+`selection.json` stores a locally pinned session ID and source. Pin/unpin requests use the same localhost Host, Origin and request-token protections as settings changes. Pinning never changes the underlying Codex chat or uploads its transcript. Private mode applies to the picker and timeline as well as presence. Timelines retain bounded metadata (name, call ID, timestamps, outcome and numeric exit code), without raw arguments, stdout or error bodies. Missing/interrupted outcomes stay unknown. Download this project from its GitHub repository: the unscoped npm name belongs to another project.

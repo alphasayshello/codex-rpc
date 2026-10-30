@@ -13,18 +13,27 @@ Your chat. Your tools. Your little pet. Everything local.
 
 ## install
 
-```sh
-npx codex-rpc@latest setup
-```
+This project releases through **GitHub downloads**. The npm name `codex-rpc` belongs to an unrelated project; do not install this repository with `npx codex-rpc@latest`.
 
-That is the release install command. This source checkout is **not published to npm** by this project yet; use the verified source path until a release exists:
+From source, available now:
 
 ```sh
-npm install
+git clone https://github.com/alphasayshello/codex-rpc.git
+cd codex-rpc
+npm ci
 npm link
 codex-rpc setup
 codex-rpc serve
 ```
+
+After **v0.2.0** is published, install its archive with Node 18+:
+
+```sh
+npm install -g https://github.com/alphasayshello/codex-rpc/releases/download/v0.2.0/codex-rpc-0.2.0.tgz
+codex-rpc setup
+```
+
+Native downloads and checksums are prepared by the release workflow. See [release instructions](docs/RELEASE.md); no GitHub release or registry package is published automatically.
 
 Setup refreshes running code and old bundled asset URLs while preserving custom URLs. It copies a stable runtime into `~/.codex-rpc/runtime/`, registers the user-level Codex `notify` command, enables lightweight ChatGPT detection, installs login autostart, and starts the daemon. Existing notifiers are preserved; setup explains how to use the wrapper instead. No administrator access required. `setup --no-service --no-start` writes only integration files.
 
@@ -124,6 +133,10 @@ No subscription quota requests or credential reads. `usage` means recorded local
 
 ## on your machine
 
+Choose a conversation in **Conversation on Discord**, then press **Pin to Discord**. Pinning persists across restarts and applies to the card, current-chat dashboard, timeline and CLI status. Other chats keep collecting data. **Follow latest** returns to automatic selection; an idle pinned chat stays idle rather than switching to another conversation.
+
+The **Tool timeline** shows up to 50 recent observed calls with live durations, completed/failed/unknown outcomes, and numeric exit codes when available. It never displays arguments, stdout or raw error bodies. Older history may have fewer events or unknown outcomes.
+
 A ChatGPT-inspired workspace with neutral dark and light themes, a collapsible sidebar, and a mobile navigation drawer. Switch appearance at the bottom of the sidebar; appearance stays in this browser. Settings support keyboard navigation and all seven categories.
 
 The **THIS CHAT** headline counts output tokens only. Its separate breakdown follows the selected live conversation: input/output/reasoning/cached tokens, cache reuse, latest request/context window when reported, prompts, tool calls, active time, line changes and API-equivalent cost. Running and recent tools show names and recorded durations, never raw arguments. Unknown values show **—**, not a lifetime total.
@@ -136,7 +149,7 @@ The chat panel is independent of this range; switching chats switches its identi
 
 Seven settings tabs: **Presence · Discord · Codex Pet Assets · Timing · Daemon Controls · Privacy · Stats**. Save locally, no cloud account. The daemon controls start, pause, resume, restart and stop the background process. The dashboard itself remains open after stop.
 
-Local read-only JSON endpoints include `/api/state`, `/api/aggregate?range=30d`, and **`/api/chat`**. The chat endpoint returns the current conversation summary, with `null` for unavailable metrics; it never substitutes all-time usage.
+Local read-only JSON endpoints include `/api/state`, `/api/aggregate?range=30d`, **`/api/chat`**, `/api/chats`, and `/api/timeline`. The chat endpoint returns the current conversation summary, with `null` for unavailable metrics; it never substitutes all-time usage.
 
 Local SVG endpoints update from the latest aggregate on every request:
 
