@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { replaceFile } from "./atomic.js";
 import os from "node:os";
 import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
@@ -55,7 +56,7 @@ export function registerHook() {
   const block = `# codex-rpc notify begin\n${line}\n# codex-rpc notify end\n`;
   const temp = target + ".codex-rpc.tmp";
   fs.writeFileSync(temp, block + text, { mode: 0o600 });
-  fs.renameSync(temp, target);
+  replaceFile(temp, target);
   return line;
 }
 export function unregisterHook() {

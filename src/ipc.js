@@ -30,12 +30,14 @@ export function socketPaths(platform = process.platform, env = process.env) {
   const all = [
     ...dirs,
     ...dirs.flatMap((d) => [
-      path.join(d, "app/com.discordapp.Discord"),
-      path.join(d, "snap.discord"),
+      path.posix.join(d, "app/com.discordapp.Discord"),
+      path.posix.join(d, "snap.discord"),
     ]),
   ];
   return [...new Set(all)].flatMap((d) =>
-    Array.from({ length: 10 }, (_, i) => path.join(d, `discord-ipc-${i}`)),
+    Array.from({ length: 10 }, (_, i) =>
+      path.posix.join(d, `discord-ipc-${i}`),
+    ),
   );
 }
 export class DiscordIPC extends EventEmitter {

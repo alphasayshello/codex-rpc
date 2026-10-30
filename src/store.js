@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { replaceFile } from "./atomic.js";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -45,7 +46,7 @@ export function writeJSON(name, value) {
     fs.writeFileSync(temp, JSON.stringify(value, null, 2) + "\n", {
       mode: 0o600,
     });
-    fs.renameSync(temp, target);
+    replaceFile(temp, target);
   } finally {
     try {
       fs.unlinkSync(temp);
