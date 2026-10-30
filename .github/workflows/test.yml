@@ -17,5 +17,5 @@ jobs:
       - run: npm run assets
       - run: git diff --exit-code -- assets/pet
       - run: npm run check
-      - run: npm test
+      - run: node scripts/ci-check.js
       - run: npm pack --dry-run

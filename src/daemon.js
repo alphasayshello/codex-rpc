@@ -63,9 +63,10 @@ export async function runDaemon() {
     lastPayload = "",
     lastClientId = "",
     tickBusy = false;
+  const startedAt = Date.now();
   writeJSON("daemon.json", {
     pid: process.pid,
-    startedAt: Date.now(),
+    startedAt,
     connected: false,
   });
   rotateLog("daemon started");
@@ -73,6 +74,10 @@ export async function runDaemon() {
   let lastWatch = 0;
   async function tick() {
     if (stopped || tickBusy) return;
+    if (stopRequested()) {
+      await stop();
+      return;
+    }
     tickBusy = true;
     try {
       const c = config(),
@@ -165,7 +170,19 @@ export async function runDaemon() {
     }
   }
   const timer = setInterval(tick, 1000);
+  function stopRequested() {
+    const request = readJSON("control.json");
+    return (
+      request.action === "stop" &&
+      request.pid === process.pid &&
+      request.startedAt === startedAt
+    );
+  }
   const watcher = fs.watch(home(), (_, name) => {
+    if (name === "control.json" && stopRequested()) {
+      stop().catch((e) => rotateLog(e.message));
+      return;
+    }
     if (["state.json", "config.json", "aggregate.json"].includes(name)) tick();
   });
   async function stop() {

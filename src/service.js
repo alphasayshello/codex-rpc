@@ -5,6 +5,7 @@ import { spawn, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   home,
+  defaults,
   file,
   codexHome,
   readJSON,
@@ -166,15 +167,45 @@ export async function startDaemon() {
 export async function stopDaemon() {
   const d = readJSON("daemon.json");
   if (alive(d.pid)) {
-    process.kill(d.pid, "SIGTERM");
-    for (let i = 0; i < 120 && alive(d.pid); i++) await delay(50);
-    if (alive(d.pid)) throw Error("Daemon did not stop within 6 seconds");
+    // JSON control works on Windows too, where SIGTERM force-kills Node before
+    // it can clear Discord presence and remove its PID/lock files.
+    writeJSON("control.json", {
+      action: "stop",
+      pid: d.pid,
+      startedAt: d.startedAt,
+      requestedAt: Date.now(),
+    });
+    for (let i = 0; i < 160 && alive(d.pid); i++) await delay(50);
+    if (alive(d.pid))
+      throw Error("Daemon did not acknowledge stop within 8 seconds");
   }
   return { stopped: true };
 }
 export async function setup({ noService = false, noStart = false } = {}) {
   fs.mkdirSync(home(), { recursive: true, mode: 0o700 });
-  writeJSON("config.json", config());
+  if (alive(readJSON("daemon.json").pid)) await stopDaemon();
+  const settings = config();
+  // Migrate only our own old bundled URLs. User-hosted URLs and asset keys stay.
+  const oldEmpty =
+    settings.clientId === defaults.clientId &&
+    ["working", "thinking", "waiting", "idle"].every(
+      (k) => !settings.assets[k],
+    );
+  for (const state of ["working", "thinking", "waiting", "idle"])
+    if (
+      oldEmpty ||
+      settings.assets[state] === defaults.assets[state].split("?")[0] ||
+      settings.assets[state].startsWith(
+        defaults.assets[state].split("?")[0] + "?v=",
+      )
+    )
+      settings.assets[state] = defaults.assets[state];
+  if (
+    settings.assets.badge ===
+    "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-badge.png"
+  )
+    settings.assets.badge = "";
+  writeJSON("config.json", settings);
   const runtime = path.join(home(), "runtime");
   fs.mkdirSync(runtime, { recursive: true });
   for (const name of ["src", "bin", "web", "assets", "package.json"])
