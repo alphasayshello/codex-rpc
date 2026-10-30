@@ -154,6 +154,7 @@ test("six visual states plus legacy aliases are deterministic, transparent anima
 test("full-body motion preserves every translated original mascot pixel without cropping or recoloring", async () => {
   const { motionOffset, moveSprite } = await import("../src/assets/pixel-effects.js");
   for (const [state, spec] of Object.entries(states)) {
+    if (state === "writing" || state === "working") continue; // Articulated paws have their own invariant below.
     let additions = 0;
     const variations = new Set(), offsets = new Set();
     for (let i = 0; i < spec.animation.length; i++) {
@@ -207,7 +208,7 @@ test("optional animated badges are transparent 96px GIFs on an exact 4x pixel gr
     }
   }
   const manifest = JSON.parse(fs.readFileSync(new URL("../assets/pet/manifest.json", import.meta.url)));
-  assert.equal(manifest.effects.version, "pixel-fx-2");
+  assert.equal(manifest.effects.version, "pixel-fx-3");
   assert.match(manifest.effects.policy, /alpha zero/);
   assert.ok(fs.existsSync(new URL("../assets/pet/animation-gallery.html", import.meta.url)));
   const gallery = fs.readFileSync(new URL("../assets/pet/animation-gallery.html", import.meta.url), "utf8");
@@ -233,8 +234,8 @@ test("mascot pixels come from the official blue Codex atlas, not a substitute dr
     ),
   );
   for (const [state, row, frames] of [
-    ["working", 7, 2],
-    ["writing", 7, 2],
+    ["working", 7, 1],
+    ["writing", 7, 1],
     ["patching", 4, 4],
     ["error", 5, 1],
     ["done", 8, 3],
@@ -272,7 +273,7 @@ test("mascot pixels come from the official blue Codex atlas, not a substitute dr
 });
 
 test("high-movement loops maintain one expression family per state and legacy compatibility", () => {
-  assert.deepEqual(states.writing.sourceFrames, [0, 4]);
+  assert.deepEqual(states.writing.sourceFrames, [0]);
   assert.deepEqual(states.thinking.sourceFrames, [0, 3, 4, 3]);
   assert.deepEqual(states.error.sourceFrames, [1]);
   assert.deepEqual(states.done.sourceFrames, [1, 2, 1]);
@@ -310,5 +311,47 @@ test("ten status badges use exact 4x pixel blocks and binary alpha", async () =>
         new URL(`../assets/pet/codex-status-${kind}.svg`, import.meta.url),
       ),
     );
+  }
+});
+
+// The user-visible requirement: typing moves both paws, not the seated mascot.
+test("writing alternates both hands while the face, body and laptop stay fixed", async () => {
+  const { motionOffset } = await import("../src/assets/pixel-effects.js");
+  for (const state of ["writing", "working"]) {
+    const base = sprite(state, 0), left = new Set(), right = new Set();
+    for (let n = 0; n < states[state].frameCount; n++) {
+      const frame = animatedSprite(state, n);
+      assert.deepEqual(motionOffset(base, state, n * 100), {dx: 0, dy: 0});
+      const hands = [[], []];
+      let changed = 0;
+      for (let y = 0; y < 208; y++) {
+        const row = y * 192 * 4;
+        if (y < 144 || y > 172) assert.ok(frame.subarray(row, row + 192 * 4).equals(base.subarray(row, row + 192 * 4)));
+        else {
+          assert.ok(frame.subarray(row, row + 67 * 4).equals(base.subarray(row, row + 67 * 4)));
+          assert.ok(frame.subarray(row + 104 * 4, row + 192 * 4).equals(base.subarray(row + 104 * 4, row + 192 * 4)));
+          for (let x = 67; x <= 103; x++) {
+            const i = row + x * 4;
+            if (!frame.subarray(i, i + 4).equals(base.subarray(i, i + 4))) changed++;
+            hands[x < 84 ? 0 : 1].push(...frame.subarray(i, i + 4));
+          }
+        }
+      }
+      assert.ok(changed > 20, "hands visibly change, not just a blinking key");
+      left.add(Buffer.from(hands[0]).toString("base64")); right.add(Buffer.from(hands[1]).toString("base64"));
+    }
+    assert.ok(left.size >= 3, "near paw presses and releases");
+    assert.ok(right.size >= 3, "far paw presses and releases");
+    const parsed = decode(gif(state));
+    assert.equal(parsed.frames.length, states[state].frameCount);
+    assert.ok(parsed.controls.every(c => c.transparent && c.disposal === 2));
+    for (const decoded of parsed.frames) for (let y = 0; y < 208; y++) {
+      const row = y * 192, reference = parsed.frames[0];
+      if (y < 144 || y > 172) assert.ok(decoded.subarray(row, row + 192).equals(reference.subarray(row, row + 192)), "encoded body must not jitter");
+      else {
+        assert.ok(decoded.subarray(row, row + 67).equals(reference.subarray(row, row + 67)));
+        assert.ok(decoded.subarray(row + 104, row + 192).equals(reference.subarray(row + 104, row + 192)));
+      }
+    }
   }
 });

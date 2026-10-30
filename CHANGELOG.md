@@ -2,6 +2,8 @@
 
 ## 0.2.0
 
+- Writing now alternates articulated paw presses while the face, body and laptop stay fixed; remove writing bounce and flying-card effects.
+
 - Suppress recurring Windows detector console flashes; hide scanner/daemon/helper launches and migrate owned Startup launchers to a hidden path with engine diagnostics.
 - Summarize newly observed turns with output-only usage deltas, tool counts, duration and outcome.
 - Add six 10 fps full-body animation scenes around the original pet, animated status badges, a CSP-safe preview gallery, stepped UI indicators and persisted reduced-motion preferences.

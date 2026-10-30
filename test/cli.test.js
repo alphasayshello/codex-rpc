@@ -163,6 +163,8 @@ test("setup refreshes bundled GIF URLs and restarts an existing daemon without c
     assets: {
       ...config().assets,
       working: oldBase + "/codex-pet-working.gif",
+      writing: oldBase + "/codex-pet-writing.gif?v=motion-2",
+      patching: "https://my-assets.example/patching.gif",
       thinking: "https://my-assets.example/thinking.gif",
       badge: oldBase + "/codex-badge.png",
     },
@@ -176,7 +178,9 @@ test("setup refreshes bundled GIF URLs and restarts an existing daemon without c
     timeout: 20000,
   });
   assert.notEqual(readJSON("daemon.json").pid, original);
-  assert.match(config().assets.working, /\?v=motion-2$/);
+  assert.match(config().assets.working, /\?v=typing-1$/);
+  assert.match(config().assets.writing, /\?v=typing-1$/);
+  assert.equal(config().assets.patching, "https://my-assets.example/patching.gif");
   assert.equal(
     config().assets.thinking,
     "https://my-assets.example/thinking.gif",

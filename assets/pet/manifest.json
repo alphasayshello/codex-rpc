@@ -559,13 +559,12 @@
     "writing": {
       "row": 7,
       "sourceFrames": [
-        0,
-        4
+        0
       ],
       "frameCount": 32,
       "sourceEvery": 2,
-      "sourceState": "running, consistent neutral laptop typing poses",
-      "frames": 2,
+      "sourceState": "running, fixed original neutral laptop pose, articulated alternating paw presses",
+      "frames": 1,
       "fps": 10,
       "animation": [
         {
@@ -577,11 +576,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
@@ -593,11 +592,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
@@ -609,11 +608,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
@@ -625,11 +624,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
@@ -641,11 +640,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
@@ -657,11 +656,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
@@ -673,11 +672,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
@@ -689,11 +688,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         }
       ],
@@ -1325,14 +1324,13 @@
     "working": {
       "row": 7,
       "sourceFrames": [
-        0,
-        4
+        0
       ],
       "frameCount": 32,
       "sourceEvery": 2,
       "aliasOf": "writing",
-      "sourceState": "legacy working alias for neutral laptop writing",
-      "frames": 2,
+      "sourceState": "legacy working alias for steady neutral laptop typing",
+      "frames": 1,
       "fps": 10,
       "animation": [
         {
@@ -1344,11 +1342,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
@@ -1360,11 +1358,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
@@ -1376,11 +1374,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
@@ -1392,11 +1390,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
@@ -1408,11 +1406,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
@@ -1424,11 +1422,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
@@ -1440,11 +1438,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
@@ -1456,11 +1454,11 @@
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         },
         {
-          "sourceFrame": 1,
+          "sourceFrame": 0,
           "delay": 10
         }
       ],
@@ -1719,14 +1717,14 @@
     }
   },
   "effects": {
-    "version": "pixel-fx-2",
+    "version": "pixel-fx-3",
     "authorship": "codex-rpc original pixel effects, not OpenAI source artwork",
-    "policy": "Whole original source poses translate at integer coordinates, clamped to alpha bounds so no mascot pixels crop; effects only occupy alpha zero space after translation. Source pixels are not redrawn or recolored before GIF palette quantization",
+    "policy": "Non-writing poses translate at integer coordinates without cropping, with FX in alpha zero transparent space. Writing holds the original laptop pose fixed outside x67..103,y144..172 and articulates sampled paw pixels above a reconstructed keyboard/chest underlay; the face, body outline, feet and laptop remain unchanged before palette quantization",
     "states": {
       "idle": "Original closed-eye pose breathes while Z pixels rise in a slow snoozing loop",
       "thinking": "Chin-stroking pet paces with a rotating planning gear and floating question glyphs",
-      "writing": "Energetic whole-body key taps, flying code cards, terminal pixels and speed lines",
-      "working": "Legacy alias of writing: whole-body typing with code cards and speed lines",
+      "writing": "Stationary head and laptop with alternating articulated paw presses on the keyboard",
+      "working": "Legacy alias of writing: steady seated keyboard typing",
       "patching": "Focused arms and body stamp sliding plus/minus file cards onto a pixel workbench",
       "error": "Consistent original panic squint shakes beneath rising smoke and an alert glyph",
       "done": "Original smiling victory poses jump through confetti, then briefly settle",

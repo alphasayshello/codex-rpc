@@ -1,12 +1,12 @@
 // codex-rpc motion composition uses the original blue pet as an unchanged sprite.
 // Integer translation preserves its identity; independent FX never cover pixels.
-export const effectsVersion = "pixel-fx-2";
+export const effectsVersion = "pixel-fx-3";
 const blue = [116, 161, 245], pale = [229, 240, 255], mint = [126, 232, 188], pink = [247, 139, 153];
 export function motionOffset(original, state, elapsedMs, width = 192, height = 208) {
   const step = Math.floor(elapsedMs / 100), t = elapsedMs / 1000;
   let dx = 0, dy = 0;
   if (state === "working" || state === "writing") {
-    dx = [-3, 0, 3, 0][step % 4]; dy = [-2, -8, -3, -11][step % 4];
+    dx = 0; dy = 0;
   } else if (state === "thinking") {
     dx = Math.round(Math.sin(t * Math.PI * 2 / 2) * 8); dy = Math.round(-Math.abs(Math.sin(t * Math.PI * 2)) * 4);
   } else if (state === "patching") {
@@ -58,15 +58,8 @@ export function petEffects(original, state, elapsedMs, width = 192, height = 208
     } else { rect(x + 4, y + 6, 8, 2, blue); rect(x + 4, y + 11, 6, 2, blue); }
   };
   if (state === "working" || state === "writing") {
-    // Energetic whole-body key taps, flying code cards and lateral speed marks.
-    glyph(["#..", ".#.", "..#", ".#.", "#.."], 157, 5 + step % 3, 2, blue);
-    rect(170, 14, step % 4 < 2 ? 10 : 5, 2, mint);
-    card(8 + (step * 7) % 22, 7 + (step % 5) * 3, pale);
-    for (let i = 0; i < 3; i++) {
-      rect(1 + (step + i) % 3 * 2, 100 + i * 17, 9 + step % 3 * 3, 2, i === 1 ? mint : blue);
-      rect(177, 92 + i * 18, 9 - step % 3, 2, blue);
-    }
-    if (step % 4 === 1) spark(179, 57, mint);
+    // Writing motion is confined to articulated paws and keyboard contact.
+    return rgba;
   } else if (state === "thinking") {
     // Pacing plus a rotating pixel gear / planning glyph constellation.
     const angle = step * Math.PI / 8;
@@ -111,8 +104,8 @@ export function petEffects(original, state, elapsedMs, width = 192, height = 208
 export const effectDescriptions = {
   idle: "Original closed-eye pose breathes while Z pixels rise in a slow snoozing loop",
   thinking: "Chin-stroking pet paces with a rotating planning gear and floating question glyphs",
-  writing: "Energetic whole-body key taps, flying code cards, terminal pixels and speed lines",
-  working: "Legacy alias of writing: whole-body typing with code cards and speed lines",
+  writing: "Stationary head and laptop with alternating articulated paw presses on the keyboard",
+  working: "Legacy alias of writing: steady seated keyboard typing",
   patching: "Focused arms and body stamp sliding plus/minus file cards onto a pixel workbench",
   error: "Consistent original panic squint shakes beneath rising smoke and an alert glyph",
   done: "Original smiling victory poses jump through confetti, then briefly settle",

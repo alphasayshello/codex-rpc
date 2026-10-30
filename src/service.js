@@ -250,9 +250,9 @@ export async function setup({ noService = false, noStart = false } = {}) {
     ["working", "thinking", "waiting", "idle"].every(
       (k) => !settings.assets[k],
     );
-  for (const state of ["working", "thinking", "waiting", "idle"])
+  for (const state of ["working", "thinking", "waiting", "idle", "writing", "patching", "error", "done"])
     if (
-      oldEmpty ||
+      (oldEmpty && ["working", "thinking", "waiting", "idle"].includes(state)) ||
       settings.assets[state] === defaults.assets[state].split("?")[0] ||
       settings.assets[state].startsWith(
         defaults.assets[state].split("?")[0] + "?v=",

@@ -17,13 +17,13 @@ export const defaults = {
   presence: { type: 3, showTask: true, stats: "telemetry", showChurn: true, timer: "operation" },
   assets: {
     working:
-      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-working.gif?v=motion-2",
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-working.gif?v=typing-1",
     thinking:
       "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-thinking.gif?v=motion-2",
     waiting:
       "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-waiting.gif?v=motion-2",
     idle: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-idle.gif?v=motion-2",
-    writing: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-writing.gif?v=motion-2",
+    writing: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-writing.gif?v=typing-1",
     patching: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-patching.gif?v=motion-2",
     error: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-error.gif?v=motion-2",
     done: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-done.gif?v=motion-2",
