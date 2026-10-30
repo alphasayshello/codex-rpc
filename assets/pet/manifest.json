@@ -7,31 +7,336 @@
     "width": 192,
     "height": 208
   },
+  "visualStates": [
+    "idle",
+    "thinking",
+    "writing",
+    "patching",
+    "error",
+    "done"
+  ],
+  "pipeline": {
+    "fps": 10,
+    "aliases": {
+      "working": "writing",
+      "waiting": "approval attention, distinct from done"
+    }
+  },
   "states": {
-    "working": {
-      "row": 7,
+    "idle": {
+      "row": 0,
       "sourceFrames": [
-        0,
-        4,
-        0,
-        4,
-        0,
-        2,
-        0,
-        4
+        1
+      ],
+      "frameCount": 60,
+      "sourceEvery": 10,
+      "sourceState": "idle, original closed-eye sleeping pose",
+      "frames": 1,
+      "fps": 10,
+      "animation": [
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        }
       ],
       "delays": [
-        70,
-        70,
-        70,
-        70,
-        90,
-        12,
-        70,
-        70
-      ],
-      "sourceState": "running (steady laptop work with one blink)",
-      "frames": 8
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10
+      ]
     },
     "thinking": {
       "row": 6,
@@ -41,62 +346,1394 @@
         4,
         3
       ],
-      "delays": [
-        100,
-        90,
-        110,
-        90
+      "frameCount": 40,
+      "sourceEvery": 4,
+      "sourceState": "waiting, consistent neutral chin-stroking poses",
+      "frames": 4,
+      "fps": 10,
+      "animation": [
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        }
       ],
-      "sourceState": "waiting (calm pondering)",
-      "frames": 4
+      "delays": [
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10
+      ]
+    },
+    "writing": {
+      "row": 7,
+      "sourceFrames": [
+        0,
+        4
+      ],
+      "frameCount": 32,
+      "sourceEvery": 2,
+      "sourceState": "running, consistent neutral laptop typing poses",
+      "frames": 2,
+      "fps": 10,
+      "animation": [
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        }
+      ],
+      "delays": [
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10
+      ]
+    },
+    "patching": {
+      "row": 4,
+      "sourceFrames": [
+        0,
+        1,
+        2,
+        1
+      ],
+      "frameCount": 36,
+      "sourceEvery": 3,
+      "sourceState": "jumping, neutral focused arms-in-motion poses",
+      "frames": 4,
+      "fps": 10,
+      "animation": [
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        }
+      ],
+      "delays": [
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10
+      ]
+    },
+    "error": {
+      "row": 5,
+      "sourceFrames": [
+        1
+      ],
+      "frameCount": 32,
+      "sourceEvery": 2,
+      "sourceState": "scared, consistent original panic squint pose",
+      "frames": 1,
+      "fps": 10,
+      "animation": [
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        }
+      ],
+      "delays": [
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10
+      ]
+    },
+    "done": {
+      "row": 8,
+      "sourceFrames": [
+        1,
+        2,
+        1
+      ],
+      "frameCount": 40,
+      "sourceEvery": 4,
+      "sourceState": "happy, consistent original smiling victory jump poses",
+      "frames": 3,
+      "fps": 10,
+      "animation": [
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        }
+      ],
+      "delays": [
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10
+      ]
+    },
+    "working": {
+      "row": 7,
+      "sourceFrames": [
+        0,
+        4
+      ],
+      "frameCount": 32,
+      "sourceEvery": 2,
+      "aliasOf": "writing",
+      "sourceState": "legacy working alias for neutral laptop writing",
+      "frames": 2,
+      "fps": 10,
+      "animation": [
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        }
+      ],
+      "delays": [
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10
+      ]
     },
     "waiting": {
       "row": 3,
       "sourceFrames": [
         0,
-        0,
         1,
         2,
-        1,
-        3,
-        0
+        1
+      ],
+      "frameCount": 40,
+      "sourceEvery": 4,
+      "sourceState": "waving, consistent neutral approval/attention poses",
+      "frames": 4,
+      "fps": 10,
+      "animation": [
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 2,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 3,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 0,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        },
+        {
+          "sourceFrame": 1,
+          "delay": 10
+        }
       ],
       "delays": [
-        100,
-        100,
-        25,
-        35,
-        25,
-        100,
-        100
-      ],
-      "sourceState": "waving (occasional attention wave)",
-      "frames": 7
-    },
-    "idle": {
-      "row": 0,
-      "sourceFrames": [
-        0,
-        2,
-        3,
-        4,
-        0,
-        1,
-        0
-      ],
-      "delays": [
-        90,
-        90,
-        90,
-        90,
-        90,
-        12,
-        90
-      ],
-      "sourceState": "idle (relaxed breathing and a rare blink)",
-      "frames": 7
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10
+      ]
     }
   },
+  "effects": {
+    "version": "pixel-fx-2",
+    "authorship": "codex-rpc original pixel effects, not OpenAI source artwork",
+    "policy": "Whole original source poses translate at integer coordinates, clamped to alpha bounds so no mascot pixels crop; effects only occupy alpha zero space after translation. Source pixels are not redrawn or recolored before GIF palette quantization",
+    "states": {
+      "idle": "Original closed-eye pose breathes while Z pixels rise in a slow snoozing loop",
+      "thinking": "Chin-stroking pet paces with a rotating planning gear and floating question glyphs",
+      "writing": "Energetic whole-body key taps, flying code cards, terminal pixels and speed lines",
+      "working": "Legacy alias of writing: whole-body typing with code cards and speed lines",
+      "patching": "Focused arms and body stamp sliding plus/minus file cards onto a pixel workbench",
+      "error": "Consistent original panic squint shakes beneath rising smoke and an alert glyph",
+      "done": "Original smiling victory poses jump through confetti, then briefly settle",
+      "waiting": "Approval/attention wave with accumulating speech-bubble dots, distinct from success"
+    }
+  },
+  "previews": "Pet PNG/SVG files contain exact original source pixels without effects; animated GIFs add the separately authored effects",
   "badges": {
     "grid": 24,
     "scale": 4,
@@ -181,6 +1818,23 @@
         ],
         "label": "Error"
       }
+    },
+    "aliases": {
+      "done": "waiting"
+    },
+    "animation": {
+      "delays": [
+        55,
+        25,
+        25,
+        25,
+        25,
+        25,
+        25,
+        65
+      ],
+      "transparent": true,
+      "authorship": "codex-rpc original status UI glyphs"
     }
   }
 }

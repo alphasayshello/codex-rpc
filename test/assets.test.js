@@ -7,6 +7,10 @@ import {
   pixels,
   sprite,
   states,
+  animatedSprite,
+  statusGIF,
+  encodeGIF,
+  visualStates,
 } from "../src/assets/generate-pet-gifs.js";
 // Independent GIF container + LZW reader validates decoded pixel counts and
 // frame differences, rather than merely looking for a GIF header.
@@ -16,10 +20,12 @@ function decode(data) {
     height = data.readUInt16LE(pos + 2),
     packed = data[pos + 4];
   pos += 7;
+  const palette = packed & 128 ? Array.from({ length: 2 ** ((packed & 7) + 1) }, (_, i) => [...data.subarray(pos + i * 3, pos + i * 3 + 3)]) : [];
   if (packed & 128) pos += 3 * 2 ** ((packed & 7) + 1);
   const frames = [],
-    delays = [];
+    delays = [], controls = [];
   let delay = 0;
+  let control;
   let loops = false;
   const blocks = () => {
     const chunks = [];
@@ -37,7 +43,10 @@ function decode(data) {
     if (type === 0x21) {
       const label = data[pos++];
       const b = blocks();
-      if (label === 0xf9) delay = b.readUInt16LE(1);
+      if (label === 0xf9) {
+        delay = b.readUInt16LE(1);
+        control = { transparent: !!(b[0] & 1), disposal: (b[0] >> 2) & 7, transparentIndex: b[3] };
+      }
       if (label === 0xff && b.includes(Buffer.from("NETSCAPE2.0")))
         loops = true;
       continue;
@@ -94,18 +103,38 @@ function decode(data) {
     assert.equal(decoded.length, w * h);
     frames.push(Buffer.from(decoded));
     delays.push(delay);
+    controls.push(control);
   }
-  return { width, height, frames, loops, delays };
+  return { width, height, frames, loops, delays, controls, palette };
 }
-test("four deterministic GIF89a files contain decoded original-sprite looping animation frames; SVG previews exist", () => {
-  for (const state of ["working", "thinking", "waiting", "idle"]) {
+test("LZW dictionary growth and resets preserve independently decoded color pixels", () => {
+  for (const count of [255, 256, 257, 511, 512, 1024, 20000]) {
+    const rgba = Buffer.alloc(count * 4);
+    let seed = 123456789;
+    for (let i = 0; i < count; i++) {
+      seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+      const color = (seed >>> 0) % 32;
+      rgba.set([color * 8, color * 4, color * 2, 255], i * 4);
+    }
+    const parsed = decode(encodeGIF([rgba], count, 1, [20]));
+    assert.equal(parsed.frames[0].length, count);
+    for (let i = 0; i < count; i++)
+      assert.deepEqual(parsed.palette[parsed.frames[0][i]], [...rgba.subarray(i * 4, i * 4 + 3)]);
+  }
+});
+test("six visual states plus legacy aliases are deterministic, transparent animated GIFs with original SVG previews", () => {
+  assert.deepEqual(visualStates, ["idle", "thinking", "writing", "patching", "error", "done"]);
+  for (const state of Object.keys(states)) {
     const data = gif(state),
       parsed = decode(data);
     assert.equal(parsed.width, 192);
     assert.equal(parsed.height, 208);
-    assert.equal(parsed.frames.length, states[state].frames);
-    assert.deepEqual(parsed.delays, states[state].delays);
+    assert.equal(parsed.frames.length, states[state].animation.length);
+    assert.deepEqual(parsed.delays, states[state].animation.map((frame) => frame.delay));
+    assert.equal(parsed.delays.reduce((n, d) => n + d, 0), states[state].delays.reduce((n, d) => n + d, 0));
     assert.ok(parsed.loops);
+    assert.ok(data.length <= 1000000, `${state} GIF stays below 1 MB`);
+    assert.ok(parsed.delays.every((delay) => delay >= 8 && delay <= 12));
     assert.ok(new Set(parsed.frames.map((b) => b.toString("base64"))).size > 1);
     assert.deepEqual(
       data,
@@ -120,6 +149,72 @@ test("four deterministic GIF89a files contain decoded original-sprite looping an
       ),
     );
   }
+});
+
+test("full-body motion preserves every translated original mascot pixel without cropping or recoloring", async () => {
+  const { motionOffset, moveSprite } = await import("../src/assets/pixel-effects.js");
+  for (const [state, spec] of Object.entries(states)) {
+    let additions = 0;
+    const variations = new Set(), offsets = new Set();
+    for (let i = 0; i < spec.animation.length; i++) {
+      const elapsed = i * 100, base = sprite(state, spec.animation[i].sourceFrame), frame = animatedSprite(state, i);
+      const moved = moveSprite(base, state, elapsed), { dx, dy } = motionOffset(base, state, elapsed);
+      variations.add(frame.toString("base64"));
+      offsets.add(`${dx}:${dy}`);
+      let sourcePixels = 0, movedPixels = 0;
+      for (let y = 0; y < 208; y++) for (let x = 0; x < 192; x++) {
+        const p = (y * 192 + x) * 4;
+        if (base[p + 3]) {
+          sourcePixels++;
+          assert.ok(x + dx >= 0 && x + dx < 192 && y + dy >= 0 && y + dy < 208);
+          const to = ((y + dy) * 192 + x + dx) * 4;
+          assert.deepEqual(frame.subarray(to, to + 4), base.subarray(p, p + 4));
+        }
+        if (moved[p + 3]) movedPixels++;
+        else if (frame[p + 3]) { assert.equal(frame[p + 3], 255); additions++; }
+      }
+      assert.equal(movedPixels, sourcePixels, `${state} source pixels never crop`);
+    }
+    assert.ok(additions > 0, `${state} has distinct FX`);
+    assert.ok(offsets.size > 1, `${state} moves the whole body`);
+    assert.ok(variations.size >= spec.animation.length / 2, state);
+    const parsed = decode(gif(state));
+    assert.ok(parsed.controls.every((c) => c.transparent && c.disposal === 2 && c.transparentIndex === 0));
+    assert.ok(parsed.frames.every((f) => f[0] === 0));
+  }
+});
+
+test("optional animated badges are transparent 96px GIFs on an exact 4x pixel grid", async () => {
+  const { badgeSpecs, badgeDelays, statusAnimationPixels, statusAnimationFrame } = await import("../src/assets/status-icons.js");
+  for (const kind of Object.keys(badgeSpecs)) {
+    const gifBytes = statusGIF(kind), parsed = decode(gifBytes);
+    assert.equal(parsed.width, 96);
+    assert.equal(parsed.height, 96);
+    assert.equal(parsed.frames.length, badgeDelays.length);
+    assert.deepEqual(parsed.delays, badgeDelays);
+    assert.ok(parsed.loops);
+    assert.ok(parsed.controls.every((c) => c.transparent && c.disposal === 2));
+    assert.ok(new Set(parsed.frames.map((f) => f.toString("base64"))).size > 1, kind);
+    assert.deepEqual(gifBytes, fs.readFileSync(new URL(`../assets/pet/codex-status-${kind}.gif`, import.meta.url)));
+    for (let frame = 0; frame < badgeDelays.length; frame++) {
+      const small = statusAnimationPixels(kind, frame), full = statusAnimationFrame(kind, frame);
+      for (let y = 0; y < 96; y++) for (let x = 0; x < 96; x++) {
+        const src = (Math.floor(y / 4) * 24 + Math.floor(x / 4)) * 4, dst = (y * 96 + x) * 4;
+        assert.deepEqual(full.subarray(dst, dst + 4), small.subarray(src, src + 4));
+        assert.ok(full[dst + 3] === 0 || full[dst + 3] === 255);
+        assert.equal(parsed.frames[frame][y * 96 + x] === 0, full[dst + 3] === 0);
+      }
+    }
+  }
+  const manifest = JSON.parse(fs.readFileSync(new URL("../assets/pet/manifest.json", import.meta.url)));
+  assert.equal(manifest.effects.version, "pixel-fx-2");
+  assert.match(manifest.effects.policy, /alpha zero/);
+  assert.ok(fs.existsSync(new URL("../assets/pet/animation-gallery.html", import.meta.url)));
+  const gallery = fs.readFileSync(new URL("../assets/pet/animation-gallery.html", import.meta.url), "utf8");
+  assert.ok(!gallery.includes("<style>"));
+  assert.match(gallery, /href="animation-gallery\.css"/);
+  assert.ok(fs.existsSync(new URL("../assets/pet/animation-gallery.css", import.meta.url)));
+  assert.ok(fs.existsSync(new URL("../assets/pet/animation-spritesheet.png", import.meta.url)));
 });
 
 test("mascot pixels come from the official blue Codex atlas, not a substitute drawing", async () => {
@@ -138,10 +233,14 @@ test("mascot pixels come from the official blue Codex atlas, not a substitute dr
     ),
   );
   for (const [state, row, frames] of [
-    ["working", 7, 8],
+    ["working", 7, 2],
+    ["writing", 7, 2],
+    ["patching", 4, 4],
+    ["error", 5, 1],
+    ["done", 8, 3],
     ["thinking", 6, 4],
-    ["waiting", 3, 7],
-    ["idle", 0, 7],
+    ["waiting", 3, 4],
+    ["idle", 0, 1],
   ]) {
     assert.equal(states[state].row, row);
     assert.equal(states[state].frames, frames);
@@ -172,13 +271,19 @@ test("mascot pixels come from the official blue Codex atlas, not a substitute dr
   }
 });
 
-test("work animation keeps a steady face with one blink over a long loop", () => {
-  assert.deepEqual(states.working.sourceFrames, [0, 4, 0, 4, 0, 2, 0, 4]);
-  assert.equal(states.working.sourceFrames.filter((n) => n === 2).length, 1);
-  assert.ok(states.working.delays.reduce((n, d) => n + d, 0) >= 500);
+test("high-movement loops maintain one expression family per state and legacy compatibility", () => {
+  assert.deepEqual(states.writing.sourceFrames, [0, 4]);
+  assert.deepEqual(states.thinking.sourceFrames, [0, 3, 4, 3]);
+  assert.deepEqual(states.error.sourceFrames, [1]);
+  assert.deepEqual(states.done.sourceFrames, [1, 2, 1]);
+  assert.deepEqual(states.idle.sourceFrames, [1]);
+  assert.deepEqual(gif("working"), gif("writing"));
+  assert.notDeepEqual(gif("waiting"), gif("done"));
   for (const spec of Object.values(states)) {
-    assert.equal(spec.frames, spec.delays.length);
-    assert.ok(spec.delays.every((d) => d >= 12));
+    assert.equal(spec.animation.length, spec.delays.length);
+    assert.equal(spec.fps, 10);
+    assert.ok(spec.animation.length >= 30);
+    assert.ok(spec.delays.every((d) => d === 10));
   }
 });
 

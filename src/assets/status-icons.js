@@ -121,3 +121,41 @@ export function badgeGallery() {
     .join("");
   return `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="290" viewBox="0 0 800 290"><rect width="800" height="290" rx="12" fill="#101820"/>${cells}</svg>`;
 }
+
+// Optional animated versions. Static PNGs remain unchanged and available for
+// Discord clients that do not animate external GIF activity assets.
+export const badgeDelays = [55, 25, 25, 25, 25, 25, 25, 65];
+export function statusAnimationPixels(kind, frame = 0) {
+  const rgba = statusIconPixels(kind), base = badgeSpecs[kind].color;
+  const f = frame % badgeDelays.length;
+  const rect = (x, y, w, h, color) => {
+    for (let py = y; py < y + h; py++)
+      for (let px = x; px < x + w; px++) {
+        const i = (py * 24 + px) * 4;
+        if (px >= 0 && py >= 0 && px < 24 && py < 24 && rgba[i + 3]) rgba.set([...color, 255], i);
+      }
+  };
+  const ink = [248, 252, 249];
+  if (kind === "thinking") {
+    rect(5, 8, 13, 6, base);
+    for (let i = 0; i < 3; i++) rect(5 + i * 5, 10 - (f % 4 === i + 1 ? 2 : 0), 3, 3, ink);
+  } else if (kind === "working") {
+    if (f === 3 || f === 4) rect(12, 15, 6, 2, base);
+    if (f === 2 || f === 5) rect(12, 11, 3, 1, ink);
+  } else {
+    // A single traveling rim glint gives a calm acknowledgment, not a flash.
+    const positions = [[8, 2], [12, 2], [17, 5], [20, 10], [18, 17], [12, 20], [5, 17], [2, 10]];
+    const [x, y] = positions[f];
+    rect(x, y, 2, 2, base.map((n) => Math.min(255, n + 48)));
+  }
+  return rgba;
+}
+export function statusAnimationFrame(kind, frame = 0) {
+  const small = statusAnimationPixels(kind, frame), rgba = Buffer.alloc(96 * 96 * 4);
+  for (let y = 0; y < 96; y++)
+    for (let x = 0; x < 96; x++) {
+      const i = (Math.floor(y / 4) * 24 + Math.floor(x / 4)) * 4;
+      small.copy(rgba, (y * 96 + x) * 4, i, i + 4);
+    }
+  return rgba;
+}
