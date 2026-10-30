@@ -12,8 +12,11 @@ test("Watching card follows task / today / lifetime / status / churn layout", ()
         status: "waiting",
         waitingReason: "done",
         task: "Turn an APK into a Unity project",
+        taskSource: "explicit",
         model: "gpt-5",
         tokens: 142800,
+        usage: { input: 120000, output: 22800 },
+        sessionId: "fixture-cost",
         startedAt: 1700000000000,
       },
       {
@@ -33,7 +36,7 @@ test("Watching card follows task / today / lifetime / status / churn layout", ()
     "$1.04k today · $24.3k all-time · Done · your move · +1055 −21",
   );
   assert.match(a.assets.small_image, /codex-status-waiting\.png/);
-  assert.match(a.assets.large_text, /gpt-5.*142.8K tokens/);
+  assert.match(a.assets.large_text, /gpt-5.*22.8k output tokens/);
   assert.equal(a.timestamps.start, 1700000000);
 });
 test("conversation names stay private by default and survive public tool/completion events", (t) => {
@@ -85,12 +88,14 @@ test("approval, model/token mode, task cleanup and source context filtering", ()
       waitingReason: "approval",
       model: "o4-mini",
       tokens: 1000,
+      usage: { input: 800, output: 200 },
+      sessionId: "fixture-token",
     },
     {},
     { presence: { stats: "tokens", type: 0 } },
   );
   assert.equal(a.type, 0);
-  assert.equal(a.state, "o4-mini · 1K tokens · Needs approval");
+  assert.equal(a.state, "o4-mini · 200 output tokens · Needs approval");
 });
 
 test("short acknowledgements do not replace the task title; settings can disable title storage", (t) => {
@@ -126,6 +131,31 @@ test("pixel status badge follows tool activity, approvals and errors", async (t)
   );
   applyEvent({ type: "task_failed" });
   const card = buildActivity(readJSON("state.json"), {}, config());
-  assert.match(card.state, /Blocked/);
+  assert.match(card.assets.small_text, /Blocked/);
   assert.match(card.assets.small_image, /codex-status-error\.png/);
+});
+
+test("Claude-style status frames count only selected-chat output tokens", (t) => {
+  sandbox(t);
+  const now = 1700000010000;
+  const state = { sessionId: "frames", source: "codex", project: "codex-rpc", model: "o4-mini", tool: "exec_command", file: "/workspace/src/index.js", tokens: 9999999 };
+  const chat = { tokens: 9999999, input: 9977199, output: 22800, prompts: 6, toolCalls: 18, activeTools: [{ name: "exec_command", startedAt: now - 65000 }] };
+  const c = { ...config(), privacy: "public" };
+  const a = { totals: { tokens: 1e12 }, days: { [new Date().toISOString().slice(0, 10)]: { activeSeconds: 5400 } } };
+  const expected = {
+    working: ["Working in codex-rpc", "Bash · index.js · 1.1min · 22.8k output tokens"],
+    thinking: ["Thinking in codex-rpc", "o4-mini · 6 prompts · 22.8k output tokens"],
+    waiting: ["Waiting on you · codex-rpc", "o4-mini · 6 prompts"],
+    idle: ["Idle in codex-rpc", "o4-mini · 1.5h today"],
+  };
+  for (const [status, [details, text]] of Object.entries(expected)) {
+    const activity = buildActivity({ ...state, status }, a, c, chat, now);
+    assert.equal(activity.details, details);
+    assert.equal(activity.state, text);
+    assert.ok(!JSON.stringify(activity).includes("9.9M"));
+  }
+  const missing = buildActivity({ ...state, status: "working", file: undefined }, a, c, { ...chat, output: null, activeTools: [] }, now);
+  assert.equal(missing.state, "Bash");
+  const privateCard = buildActivity({ ...state, status: "working" }, a, { ...c, privacy: "private" }, chat, now);
+  assert.ok(!JSON.stringify(privateCard).includes("index.js"));
 });

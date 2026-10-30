@@ -1,3 +1,4 @@
+import { getChatStats } from "./chat.js";
 import http from "node:http";
 import fs from "node:fs";
 import { randomBytes, timingSafeEqual } from "node:crypto";
@@ -132,6 +133,10 @@ export function createServer() {
         json(200, buildActivity(state, readJSON("aggregate.json"), config()));
         return;
       }
+      if (url.pathname === "/api/chat") {
+        json(200, getChatStats());
+        return;
+      }
       if (url.pathname === "/api/aggregate") {
         json(200, aggregate());
         return;
@@ -220,7 +225,7 @@ export function createServer() {
     fs.mkdirSync(home(), { recursive: true, mode: 0o700 });
     watcher = fs.watch(home(), (_, name) => {
       if (
-        ["state.json", "aggregate.json", "config.json", "daemon.json"].includes(
+        ["state.json", "aggregate.json", "sessions.json", "config.json", "daemon.json"].includes(
           name,
         )
       )

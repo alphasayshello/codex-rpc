@@ -24,6 +24,8 @@ test("Discord handshake, fragmented frames, activity ack, ping/pong, and disconn
       project: "secret",
       model: "o4-mini",
       tokens: 142800,
+      usage: { input: 120000, output: 22800 },
+      sessionId: "ipc-chat",
       tool: "bash",
       startedAt: 1700000000000,
     },
@@ -43,7 +45,7 @@ test("Discord handshake, fragmented frames, activity ack, ping/pong, and disconn
   );
   assert.ok(!sent.args.activity.details.includes("secret"));
   assert.equal(sent.args.activity.timestamps.start, 1700000000);
-  assert.match(sent.args.activity.state, /142.8K tokens/);
+  assert.match(sent.args.activity.state, /22.8k output tokens/);
   for (const peer of mock.peers) peer.write(frame(3, { ping: 1 }));
   await until(() => mock.received.some((x) => x.pong));
   client.close();

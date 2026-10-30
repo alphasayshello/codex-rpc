@@ -118,16 +118,72 @@ function heatmap(a) {
     months.append(label);
   }
 }
+function renderChat(chat = {}) {
+  const known = (n) => typeof n === "number" && Number.isFinite(n);
+  const metric = (n) => known(n) ? format(n) : "—";
+  $("#chat-heading").textContent = chat.title || (chat.id ? "Current conversation" : "Waiting for a conversation");
+  $("#chat-meta").textContent = chat.id
+    ? [chat.source === "chatgpt" ? "ChatGPT Desktop" : "Codex", chat.model || "Model not reported", "This conversation only"].join(" · ")
+    : "Your current conversation, independent of the time range above.";
+  $("#chat-tokens").textContent = metric(chat.output);
+  for (const name of ["input", "output", "reasoning", "cached", "prompts"])
+    $(`#chat-${name}`).textContent = metric(chat[name]);
+  $("#chat-tools-count").textContent = metric(chat.toolCalls);
+  $("#chat-time").textContent = known(chat.activeHours)
+    ? chat.activeHours < 1 ? `${Math.round(chat.activeHours * 60)} min` : `${chat.activeHours.toFixed(1)} h`
+    : "—";
+  $("#chat-churn").textContent = known(chat.linesAdded) && known(chat.linesRemoved)
+    ? `+${format(chat.linesAdded)} / −${format(chat.linesRemoved)}` : "—";
+  $("#chat-cost").textContent = known(chat.cost)
+    ? `$${chat.cost.toFixed(chat.cost < 1 ? 4 : 2)}${chat.unknownCostTokens ? " + unpriced" : ""}` : "—";
+  function meter(prefix, percent, label) {
+    $(`#chat-${prefix}-label`).textContent = label;
+    $(`#chat-${prefix}-fill`).style.width = `${known(percent) ? Math.max(0, Math.min(100, percent)) : 0}%`;
+  }
+  meter("cache", chat.cachePercent, known(chat.cachePercent) ? `${chat.cachePercent.toFixed(1)}%` : "Not reported");
+  meter("context", chat.contextPercent, known(chat.lastRequestTokens) && known(chat.contextWindow)
+    ? `${format(chat.lastRequestTokens)} / ${format(chat.contextWindow)}${known(chat.contextPercent) ? ` · ${chat.contextPercent.toFixed(1)}%` : ""}`
+    : "Not reported");
+  function tools(id, list, active) {
+    const target = $(id);
+    target.replaceChildren();
+    if (!list?.length) {
+      target.textContent = active ? "No tools running" : "No tool activity recorded";
+      return;
+    }
+    for (const tool of list.slice(-8)) {
+      const chip = document.createElement("span");
+      chip.className = `tool-chip${active ? " running" : ""}`;
+      const name = typeof tool === "string" ? tool : tool.name || "tool";
+      chip.textContent = name;
+      if (!active && known(tool.durationMs)) {
+        const duration = document.createElement("small");
+        duration.textContent = tool.durationMs < 1000 ? `${Math.round(tool.durationMs)}ms` : `${(tool.durationMs / 1000).toFixed(1)}s`;
+        chip.append(duration);
+      }
+      target.append(chip);
+    }
+  }
+  tools("#chat-active-tools", chat.activeTools, true);
+  tools("#chat-recent-tools", chat.recentTools, false);
+  $("#chat-note").textContent = [
+    "Recorded locally · reasoning is included in output · API equivalent is an estimate.",
+    chat.output == null ? "Output token usage has not been reported for this chat." : "",
+    chat.unknownCostTokens ? `${format(chat.unknownCostTokens)} tokens have no known model price.` : "",
+  ].filter(Boolean).join(" ");
+}
 async function refresh() {
   if (refreshing) return;
   refreshing = true;
   try {
-    const [s, a, year, activity] = await Promise.all([
+    const [s, a, year, activity, chat] = await Promise.all([
       api("/api/state"),
       api("/api/aggregate?range=" + $("#range").value),
       api("/api/aggregate?range=1y"),
       api("/api/presence"),
+      api("/api/chat"),
     ]);
+    renderChat(chat);
     const t = a.totals || {},
       state = ["working", "thinking", "waiting", "idle"].includes(s.status)
         ? s.status
@@ -230,8 +286,9 @@ function field(label, key, type = "text", hint = "") {
             [0, "Playing"],
           ]
         : [
+            ["chat", "Claude-style · chat output tokens (default)"],
             ["cost", "Today / all-time cost"],
-            ["tokens", "Model / tokens"],
+            ["tokens", "Model / output tokens"],
           ];
     for (const [value, label] of choices) {
       const option = document.createElement("option");

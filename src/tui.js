@@ -1,5 +1,6 @@
 import { config, readJSON, alive } from "./store.js";
 import { emptyStats, streaks, mergeStats } from "./scanner.js";
+import { getChatStats } from "./chat.js";
 export const pet = [
   "   .-~~~~-.",
   "  ( | >_ | )  Codex",
@@ -67,7 +68,26 @@ export function rangeAggregate(a, range = "all", now = new Date()) {
   totals.activeHours = totals.activeSeconds / 3600;
   return { ...a, totals, days, streak: streaks(days, now) };
 }
-export function renderStatus({ usage = false } = {}) {
+const known = (value, format = compact) =>
+  value === null || value === undefined ? "unavailable" : format(value);
+export function renderChat(chat = getChatStats(), settings = config()) {
+  if (!chat?.id) return "Current chat\nNo identified chat yet. Open a Codex session to collect chat-specific activity.";
+  const toolNames = (tools) =>
+    [...new Set((tools || []).map((tool) => typeof tool === "string" ? tool : tool.name).filter(Boolean))].join(", ");
+  const active = toolNames(chat.activeTools),
+    recent = toolNames(chat.recentTools);
+  return [
+    color(36, "Current chat"),
+    `${settings.privacy === "public" ? chat.title || "Untitled chat" : "Private chat"} · ${chat.source || "codex"} · ${chat.model || "unknown model"}`,
+    `${known(chat.output)} output tokens · ${known(chat.prompts)} prompts · ${known(chat.toolCalls)} tool calls · ${known(chat.activeHours, (n) => n.toFixed(2) + "h")} active`,
+    `Tokens: ${known(chat.input)} input · ${known(chat.output)} output · ${known(chat.reasoning)} reasoning · ${known(chat.cached)} cached${chat.cachePercent == null ? "" : ` (${chat.cachePercent.toFixed(1)}%)`}`,
+    `API equivalent: ${known(chat.cost, (n) => "$" + n.toFixed(4))} · ${known(chat.unknownCostTokens)} unpriced tokens · changes ${known(chat.linesAdded, (n) => "+" + n)} / ${known(chat.linesRemoved, (n) => "-" + n)}`,
+    `Context: ${known(chat.contextPercent, (n) => n.toFixed(1) + "%")} · ${known(chat.lastRequestTokens)} last request / ${known(chat.contextWindow)} window`,
+    `Active tools: ${active || "none"}`,
+    `Recent tools: ${recent || "none recorded"}`,
+  ].join("\n");
+}
+export function renderStatus({ usage = false, currentChat = true } = {}) {
   const s = readJSON("state.json", { status: "idle" }),
     a = readJSON("aggregate.json", {
       totals: emptyStats(),
@@ -81,6 +101,8 @@ export function renderStatus({ usage = false } = {}) {
     color(34, pet),
     `\n${config().enabled ? "enabled" : "paused"} · daemon ${alive(d.pid) ? "running" : "stopped"} · Discord ${d.connected ? "connected" : "offline"}`,
     `Live: ${s.status || "idle"} · ${s.model || "unknown model"} · ${config().privacy === "public" ? s.project || "Codex" : "private project"}`,
+    ...(currentChat ? ["\n" + renderChat(getChatStats(s))] : []),
+    "\nLifetime totals",
     `${compact(t.tokens)} tokens · ${t.sessions} sessions · ${(t.activeHours || 0).toFixed(1)}h · ${a.streak?.current || 0} day streak`,
     `API equivalent: $${(t.cost || 0).toFixed(4)} (estimate; ${compact(t.unknownCostTokens)} unpriced tokens)`,
   ];

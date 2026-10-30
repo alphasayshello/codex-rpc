@@ -33,6 +33,13 @@ export function rotateLog(message) {
 }
 export const backoff = (attempt, random = Math.random) =>
   Math.min(60000, 1000 * 2 ** Math.min(attempt, 6)) * (0.75 + random() * 0.5);
+// A chat-specific refresh supplements periodic history scans. Comparing only
+// identity/status avoids repeated scans for unknown chats or changing tokens.
+export function chatScanTrigger(previous = {}, state = {}) {
+  if (!state.sessionId) return false;
+  return previous.sessionId !== state.sessionId || previous.source !== state.source ||
+    (["working", "thinking"].includes(previous.status) && state.status === "waiting");
+}
 export async function runDaemon() {
   fs.mkdirSync(home(), { recursive: true, mode: 0o700 });
   const prior = readJSON("daemon.json");
@@ -58,6 +65,8 @@ export async function runDaemon() {
     lastSend = 0,
     lastScan = 0,
     lastDetect = 0,
+    observedChat = {},
+    pendingChatScan = false,
     scanner = null,
     stopped = false,
     lastPayload = "",
@@ -111,7 +120,12 @@ export async function runDaemon() {
         lastDetect = now;
         pollChatGPT().catch((e) => rotateLog(e.message));
       }
-      if (c.stats.enabled && now - lastScan >= c.timing.scanMs && !scanner) {
+      const observed = readJSON("state.json");
+      pendingChatScan ||= chatScanTrigger(observedChat, observed);
+      observedChat = { sessionId: observed.sessionId, source: observed.source, status: observed.status };
+      if (c.stats.enabled && !scanner &&
+        (now - lastScan >= c.timing.scanMs || (pendingChatScan && now - lastScan >= 10000))) {
+        pendingChatScan = false;
         lastScan = now;
         scanner = fork(
           fileURLToPath(new URL("./scanner.js", import.meta.url)),
@@ -183,7 +197,7 @@ export async function runDaemon() {
       stop().catch((e) => rotateLog(e.message));
       return;
     }
-    if (["state.json", "config.json", "aggregate.json"].includes(name)) tick();
+    if (["state.json", "config.json", "aggregate.json", "sessions.json"].includes(name)) tick();
   });
   async function stop() {
     if (stopped) return;

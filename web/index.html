@@ -40,7 +40,7 @@
       </header>
       <section id="overview">
         <div class="section-head">
-          <h2>At a glance <span class="pill">UTC</span></h2>
+          <h2>Across your sessions <span class="pill">UTC</span></h2>
           <label class="range"
             >Time range
             <select id="range" aria-label="Time range">
@@ -112,6 +112,36 @@
             </article>
           </div>
         </div>
+        <article class="panel chat-panel" aria-labelledby="chat-heading">
+          <div class="chat-heading">
+            <div>
+              <div class="panel-label"><span class="chat-live-dot"></span> THIS CHAT</div>
+              <h3 id="chat-heading">Waiting for a conversation</h3>
+              <p id="chat-meta" class="muted">Your current conversation, independent of the time range above.</p>
+            </div>
+            <div class="chat-total"><strong id="chat-tokens">—</strong><span>output tokens in this chat</span></div>
+          </div>
+          <div class="chat-token-grid">
+            <div><span>INPUT</span><strong id="chat-input">—</strong></div>
+            <div><span>OUTPUT</span><strong id="chat-output">—</strong></div>
+            <div><span>REASONING</span><strong id="chat-reasoning">—</strong></div>
+            <div><span>CACHED INPUT</span><strong id="chat-cached">—</strong></div>
+          </div>
+          <div class="chat-meters">
+            <div class="chat-meter"><div><span>Input cache reuse</span><span id="chat-cache-label">—</span></div><div class="track"><b id="chat-cache-fill"></b></div></div>
+            <div class="chat-meter"><div><span>Latest request / context window</span><span id="chat-context-label">—</span></div><div class="track"><b id="chat-context-fill"></b></div></div>
+          </div>
+          <dl class="chat-facts">
+            <div><dt>Prompts</dt><dd id="chat-prompts">—</dd></div>
+            <div><dt>Tool calls</dt><dd id="chat-tools-count">—</dd></div>
+            <div><dt>Active time</dt><dd id="chat-time">—</dd></div>
+            <div><dt>Lines changed</dt><dd id="chat-churn">—</dd></div>
+            <div><dt>API equivalent</dt><dd id="chat-cost">—</dd></div>
+          </dl>
+          <div class="chat-tool-row"><span>RUNNING NOW</span><div id="chat-active-tools" class="tool-chips">No tools running</div></div>
+          <div class="chat-tool-row"><span>RECENT TOOLS</span><div id="chat-recent-tools" class="tool-chips">No tool activity recorded</div></div>
+          <p id="chat-note" class="chat-note">Usage appears when local session logs report it. Reasoning is included in output.</p>
+        </article>
       </section>
       <section id="activity">
         <div class="section-head">

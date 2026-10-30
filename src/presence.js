@@ -1,3 +1,4 @@
+import { getChatStats } from "./chat.js";
 import { conversationName } from "./threads.js";
 // Compact, Claude-RPC-style card text. No network access or raw prompt storage.
 export const ASSET_BASE =
@@ -36,11 +37,19 @@ export function taskTitle(value) {
       .slice(0, 128) || undefined
   );
 }
-const compact = (n) =>
-  Intl.NumberFormat("en", {
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(Number(n) || 0);
+const compact = (value) => {
+  const n = Math.max(0, Number(value) || 0);
+  if (n < 1000) return String(Math.round(n));
+  for (const [unit, scale, digits] of [["k", 1e3, 1], ["M", 1e6, 2], ["B", 1e9, 2], ["T", 1e12, 2]]) {
+    const rounded = (n / scale).toFixed(digits);
+    if (Number(rounded) < 1000 || unit === "T") return rounded + unit;
+  }
+};
+const hoursLabel = (seconds) => {
+  if (!seconds) return "0h";
+  const minutes = Math.round(seconds / 60);
+  return minutes < 60 ? `${minutes}m` : minutes < 600 ? `${(minutes / 60).toFixed(1)}h` : `${Math.round(minutes / 60)}h`;
+};
 const money = (n) => {
   n = Math.max(0, Number(n) || 0);
   return (
@@ -73,7 +82,7 @@ export function statusBadgeKind(state = {}) {
   }
   return state.status === "thinking" ? "thinking" : "idle";
 }
-export function buildActivity(state = {}, aggregate = {}, c = {}) {
+export function buildActivity(state = {}, aggregate = {}, c = {}, chat = getChatStats(state, c), now = Date.now()) {
   if (c.enabled === false) return null;
   const status = ["working", "thinking", "waiting", "idle"].includes(
     state.status,
@@ -83,7 +92,7 @@ export function buildActivity(state = {}, aggregate = {}, c = {}) {
   const options = {
     type: 3,
     showTask: true,
-    stats: "cost",
+    stats: "chat",
     showChurn: true,
     ...c.presence,
   };
@@ -107,7 +116,7 @@ export function buildActivity(state = {}, aggregate = {}, c = {}) {
     : state.source === "chatgpt"
       ? "ChatGPT App · Pair Programming"
       : `${actions[status]} ${project}`;
-  const tokens = Number(state.tokens ?? aggregate.totals?.tokens) || 0,
+  const tokens = chat.output,
     totals = aggregate.totals || {},
     today = aggregate.days?.[new Date().toISOString().slice(0, 10)] || {};
   const prettyTools = {
@@ -129,43 +138,69 @@ export function buildActivity(state = {}, aggregate = {}, c = {}) {
             ? "Done · your move"
             : "Ready · your move"
       : status === "working"
-        ? prettyTools[state.tool] || "Working"
+        ? prettyTools[state.tool] || (state.tool ? `Using ${state.tool.replace(/^mcp__/, "").split("__").pop().slice(0, 32)}` : "Working")
         : status === "thinking"
           ? "Thinking"
           : "Idle";
   const parts =
-    options.stats === "tokens"
-      ? [`${state.model || "Codex"} · ${compact(tokens)} tokens`, action]
+    options.stats !== "cost"
+      ? [`${state.model || chat.model || "Codex"} · ${tokens == null ? "usage unavailable" : compact(tokens) + " output tokens"}`, action]
       : [
           `${money(today.cost)} today`,
           `${money(totals.cost)} all-time`,
           action,
         ];
+  const model = state.model || chat.model || "Codex";
+  const promptsLabel = chat.prompts == null ? "" : `${compact(chat.prompts)} ${chat.prompts === 1 ? "prompt" : "prompts"}`;
+  const tokensLabel = tokens == null ? "" : `${compact(tokens)} output tokens`;
+  const tool = String(state.tool || chat.activeTools?.at(-1)?.name || "");
+  const toolName = ({shell: "Bash", bash: "Bash", exec_command: "Bash", apply_patch: "Edit", write_file: "Write", read_file: "Read", update_plan: "Plan"})[tool] || tool.replace(/^mcp__/, "").replaceAll("__", ":");
+  const activeTool = chat.activeTools?.find((t) => t.name === tool) || (chat.lastTool?.endedAt == null ? chat.lastTool : null);
+  const toolMs = activeTool?.startedAt ? Math.max(0, now - activeTool.startedAt) : 0;
+  const seconds = Math.floor(toolMs / 1000), minutes = seconds / 60;
+  const elapsed = toolMs < 5000 ? "" : seconds < 60 ? `${seconds}s` : minutes < 10 ? `${minutes.toFixed(1)}min` : seconds < 3600 ? `${Math.round(minutes)}min` : `${Math.floor(minutes / 60)}h ${Math.floor(minutes % 60)}m`;
+  // Match claude-rpc's status-specific base frames. Missing values collapse
+  // rather than leaving empty separators or substituting lifetime counters.
+  const target = namedTitle || (state.source === "chatgpt" ? "ChatGPT App" : project);
+  const statusDetails = {
+    working: `Working in ${target}`,
+    thinking: `Thinking in ${target}`,
+    waiting: `Waiting on you · ${target}`,
+    idle: `Idle in ${target}`,
+  };
+  if (options.stats === "chat") {
+    const currentFile = !privateMode && typeof state.file === "string"
+      ? state.file.split(/[\\/]/).pop() : "";
+    const frames = {
+      working: [toolName, currentFile, elapsed, tokensLabel],
+      thinking: [model, promptsLabel, tokensLabel],
+      waiting: [model, promptsLabel],
+      idle: [model, `${hoursLabel(today.activeSeconds)} today`],
+    };
+    parts.splice(0, parts.length, ...frames[status].filter(Boolean));
+  }
   if (
     options.showChurn &&
-    options.stats !== "tokens" &&
+    options.stats === "cost" &&
     (today.linesAdded || 0) + (today.linesRemoved || 0)
   )
     parts.push(`+${today.linesAdded || 0} −${today.linesRemoved || 0}`);
   const activity = {
     type: options.type,
-    details: (details || `${actions[status]} ${project}`).slice(0, 128),
+    details: (options.stats === "chat" ? statusDetails[status] : details || `${actions[status]} ${project}`).slice(0, 128),
     state: parts.join(" · ").slice(0, 128),
     assets: {
-      large_image: c.assets?.[status] || `codex-pet-${status}`,
-      large_text:
-        `${state.model || "Codex"} · ${compact(tokens)} tokens · ${status} · API cost estimate`.slice(
-          0,
-          128,
-        ),
+      large_image: c.assets?.[status] || `${ASSET_BASE}/codex-pet-${status}.gif?v=calm-1`,
+      large_text: (options.stats === "chat"
+        ? status === "working" ? `Working with ${toolName || "Codex"}`
+          : status === "thinking" ? `Reasoning with ${model}`
+          : status === "waiting" ? action
+          : `Idle · ${model}`
+        : `${model} · ${tokens == null ? "Output usage unavailable" : `${compact(tokens)} output tokens`} · ${(totals.activeHours || 0).toFixed(1)}h on Codex · ${aggregate.streak?.current || 0} day streak`).slice(0, 128),
       small_image:
         c.assets?.badge ||
         `${ASSET_BASE}/codex-status-${statusBadgeKind({ ...state, status })}.png?v=pixel-1`,
-      small_text:
-        `${action} · ${aggregate.streak?.current || 0} day streak · ${(totals.activeHours || 0).toFixed(1)} all-time hours`.slice(
-          0,
-          128,
-        ),
+      small_text: (options.stats === "chat" ? status === "working" && toolName ? `Using ${toolName}` : action : `${action} · ${aggregate.streak?.current || 0} day streak · ${(totals.activeHours || 0).toFixed(1)} all-time hours`).slice(0, 128),
     },
   };
   if (state.startedAt)

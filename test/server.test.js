@@ -33,6 +33,18 @@ test("dashboard serves APIs/assets, live SVG, settings CSRF protection and range
     (await (await fetch(url + "/api/aggregate")).json()).totals.tokens,
     123,
   );
+  const unknownChat = await (await fetch(url + "/api/chat")).json();
+  assert.equal(unknownChat.tokens, null);
+  writeJSON("state.json", { status: "working", source: "codex", sessionId: "api-chat", model: "o3", tokens: 1000, tool: "apply_patch" });
+  writeJSON("sessions.json", { sessions: { "api-chat": { id: "api-chat", source: "codex", usageKnown: true, totals: { ...emptyStats(), tokens: 1000, input: 800, output: 200, prompts: 3, toolCalls: 5, files: { "secret.js": 1 } } } } });
+  const chat = await (await fetch(url + "/api/chat")).json();
+  assert.equal(chat.tokens, 1000);
+  assert.equal(chat.input, 800);
+  assert.equal(chat.toolCalls, 5);
+  assert.deepEqual(chat.files, {});
+  assert.equal(chat.title, "Private conversation");
+  const chatCard = await (await fetch(url + "/api/presence")).json();
+  assert.match(chatCard.state, /^Edit · 200 output tokens$/);
   assert.equal((await fetch(url + "/api/aggregate?range=oops")).status, 400);
   assert.equal(
     await new Promise((resolve, reject) => {

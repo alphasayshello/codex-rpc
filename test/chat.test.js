@@ -1,0 +1,98 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { sandbox } from "./helpers.js";
+import { getChatStats } from "../src/chat.js";
+import { writeJSON, config } from "../src/store.js";
+import { liveSessionFile } from "../src/live.js";
+import { estimateCost } from "../src/pricing.js";
+import { chatScanTrigger } from "../src/daemon.js";
+
+const publicSettings = () => ({ ...config(), privacy: "public" });
+const chat = (id, totals = {}, extra = {}) => ({ id, source: "codex", model: "gpt-5", usageKnown: true, totals, ...extra });
+test("chat statistics never borrow lifetime totals or another conversation", (t) => {
+  sandbox(t);
+  writeJSON("aggregate.json", { totals: { tokens: 999999, cost: 999 } });
+  writeJSON("sessions.json", { sessions: { other: chat("other", { tokens: 88888, cost: 100 }) } });
+  const unknown = getChatStats({ sessionId: "new", source: "codex" }, publicSettings());
+  assert.equal(unknown.tokens, null);
+  assert.equal(unknown.cost, null);
+  assert.equal(unknown.prompts, null);
+  assert.equal(unknown.toolCalls, null);
+  assert.equal(getChatStats({ tokens: 500 }, publicSettings()).tokens, null);
+  writeJSON("sessions.json", { sessions: { new: chat("new", { tokens: 123 }, { source: "chatgpt" }) } });
+  assert.equal(getChatStats({ sessionId: "new", source: "codex" }).tokens, null);
+});
+test("same-chat live and scanned cumulative counts merge by maximum", (t) => {
+  sandbox(t);
+  writeJSON("sessions.json", { updatedAt: 50, sessions: { a: chat("a", { input: 1000, output: 100, reasoning: 70, cached: 200, tokens: 1100, toolCalls: 9, prompts: 3, cost: 0.01 }) } });
+  const state = { sessionId: "a", source: "codex", updatedAt: 100, tokens: 1200, usage: { input: 1050, output: 150, cached: 250, reasoning: 90 }, observedToolCalls: 7 };
+  const result = getChatStats(state, publicSettings());
+  assert.equal(result.tokens, 1200);
+  assert.equal(result.input, 1050);
+  assert.equal(result.output, 150);
+  assert.equal(result.reasoning, 90);
+  assert.equal(result.cached, 250);
+  assert.equal(result.toolCalls, 9);
+  assert.equal(result.prompts, 3);
+  assert.equal(result.historyUpdatedAt, 50);
+  assert.equal(result.tokens, result.input + result.output);
+  assert.equal(result.cachePercent, 250 / 1050 * 100);
+  assert.equal(getChatStats({ ...state, tokens: 900, usage: {} }, publicSettings()).tokens, 1100);
+});
+test("cost keeps scanner model-aware history and adds only fresh live usage", (t) => {
+  sandbox(t);
+  writeJSON("sessions.json", { sessions: { a: chat("a", { input: 1000, output: 100, cached: 50, tokens: 1100, cost: 0.75, unknownCostTokens: 0 }) } });
+  const state = { sessionId: "a", source: "codex", model: "gpt-5", tokens: 1340, usage: { input: 1200, output: 140, cached: 150, reasoning: 30 } };
+  const result = getChatStats(state, publicSettings());
+  assert.equal(result.cost, 0.75 + estimateCost("gpt-5", { input: 200, output: 40, cached: 100 }));
+  assert.equal(result.unknownCostTokens, 0);
+  const unknown = getChatStats({ ...state, model: "unpriced-model" }, publicSettings());
+  assert.equal(unknown.cost, 0.75);
+  assert.equal(unknown.unknownCostTokens, 240);
+});
+test("newer per-chat snapshots supply parallel tools and last-request context", (t) => {
+  sandbox(t);
+  const active = [{ name: "bash", callId: "one", startedAt: 10 }, { name: "apply_patch", callId: "two", startedAt: 20 }];
+  writeJSON(liveSessionFile("a"), { sessionId: "a", source: "codex", updatedAt: 200, tokens: 1500, usage: { input: 1400, output: 100 }, activeTools: active, recentTools: active, observedToolCalls: 2, contextWindow: 10000, lastUsage: { total: 1000 } });
+  writeJSON(liveSessionFile("other"), { sessionId: "other", updatedAt: 999, tokens: 99999 });
+  const result = getChatStats({ sessionId: "a", source: "codex", updatedAt: 100, tokens: 500 }, publicSettings());
+  assert.equal(result.tokens, 1500);
+  assert.deepEqual(result.activeTools, active);
+  assert.equal(result.toolCalls, 2);
+  assert.equal(result.contextPercent, 10);
+  assert.equal(result.lastRequestTokens, 1000);
+});
+test("private views redact real conversation titles and hotspot files", (t) => {
+  const { codex } = sandbox(t);
+  fs.writeFileSync(path.join(codex, "session_index.jsonl"), JSON.stringify({ id: "a", thread_name: "Secret merger" }) + "\n");
+  writeJSON("sessions.json", { sessions: { a: chat("a", { tokens: 50, files: { "private/company.js": 4 }, languages: { JavaScript: 4 } }) } });
+  const state = { sessionId: "a", source: "codex", project: "secret" };
+  const visible = getChatStats(state, publicSettings());
+  assert.equal(visible.title, "Secret merger");
+  assert.equal(visible.files["private/company.js"], 4);
+  const hidden = getChatStats(state, { ...config(), privacy: "private" });
+  assert.equal(hidden.title, "Private conversation");
+  assert.deepEqual(hidden.files, {});
+  assert.deepEqual(hidden.languages, { JavaScript: 4 });
+});
+test("chat scan triggers once on named session switches or turn completion", () => {
+  assert.equal(chatScanTrigger({}, { sessionId: "a", status: "thinking" }), true);
+  assert.equal(chatScanTrigger({ sessionId: "a", status: "thinking" }, { sessionId: "b", status: "thinking" }), true);
+  assert.equal(chatScanTrigger({ sessionId: "a", status: "working" }, { sessionId: "a", status: "waiting" }), true);
+  assert.equal(chatScanTrigger({ sessionId: "a", status: "waiting" }, { sessionId: "a", status: "waiting" }), false);
+  assert.equal(chatScanTrigger({}, { status: "waiting" }), false);
+});
+test("total-only and partially itemized live tokens remain explicitly unpriced", (t) => {
+  sandbox(t);
+  const totalOnly = getChatStats({ sessionId: "new", source: "codex", model: "gpt-5", tokens: 1000 }, publicSettings());
+  assert.equal(totalOnly.cost, null);
+  assert.equal(totalOnly.unknownCostTokens, 1000);
+  assert.equal(totalOnly.input, null);
+  assert.equal(totalOnly.output, null);
+  writeJSON("sessions.json", { sessions: { a: chat("a", { input: 1000, output: 100, cached: 0, tokens: 1100, cost: 0.75, unknownCostTokens: 0 }) } });
+  const partial = getChatStats({ sessionId: "a", source: "codex", model: "gpt-5", tokens: 1500, usage: { input: 1100, output: 150, cached: 0 } }, publicSettings());
+  assert.equal(partial.unknownCostTokens, 250);
+  assert.equal(partial.cost, 0.75 + estimateCost("gpt-5", { input: 100, output: 50, cached: 0 }));
+});

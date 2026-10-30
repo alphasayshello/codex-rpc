@@ -2,9 +2,10 @@
 // prompt/tool argument content is persisted; only normalized state survives.
 import fs from "node:fs";
 import path from "node:path";
-import { codexHome, config, readJSON } from "./store.js";
+import { codexHome, config } from "./store.js";
 import { walk } from "./scanner.js";
 import { applyEvent, normalizeEvent } from "./hook.js";
+import { readLiveSession } from "./live.js";
 export class LogWatcher {
   constructor() {
     this.files = new Map();
@@ -64,13 +65,15 @@ export class LogWatcher {
           (p.type === "token_count" && p.info?.total_token_usage) ||
           (row.type === "token_usage_record" && p.thread_token_usage)
         ) {
-          const current = readJSON("codex-state.json");
+          const current = readLiveSession(info.context.sessionId, info.context.source);
           applyEvent({
             ...info.context,
             type: current.status || "thinking",
             timestamp: row.timestamp,
-            tokens: (p.thread_token_usage || p.info.total_token_usage)
-              .total_tokens,
+            tokenOnly: true,
+            usage: p.thread_token_usage || p.info.total_token_usage,
+            lastUsage: p.info?.last_token_usage || p.usage,
+            contextWindow: p.info?.model_context_window,
           });
         }
       }

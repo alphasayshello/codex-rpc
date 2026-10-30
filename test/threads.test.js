@@ -39,7 +39,7 @@ test("named conversation wins over latest message and refreshes after rename", (
   );
   assert.equal(
     buildActivity(readJSON("state.json"), {}, config()).details,
-    "Discord presence suite",
+    "Thinking in Discord presence suite",
   );
 });
 test("metadata tolerates partial rows and stale records without replacing the newest name", (t) => {

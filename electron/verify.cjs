@@ -68,17 +68,41 @@ app
       days,
       streak: streaks(days),
     });
-    writeJSON("state.json", {
+    const now = Date.now(), sessionId = "render-demo-chat";
+    const chatTotals = {
+      ...emptyStats(), tokens: 142800, input: 120000, output: 22800,
+      reasoning: 8000, cached: 75000, prompts: 14, toolCalls: 32,
+      activeSeconds: 1260, cost: 0.1848, linesAdded: 218, linesRemoved: 47,
+      tools: { exec_command: 18, apply_patch: 14 },
+    };
+    writeJSON("sessions.json", {
+      schemaVersion: 1, updatedAt: now, sessions: {
+        [sessionId]: {
+          id: sessionId, source: "codex", model: "o4-mini", usageKnown: true,
+          startedAt: now - 1800000, totals: chatTotals,
+          recentTools: [{ name: "apply_patch", callId: "finished-patch", startedAt: now - 15000, endedAt: now - 12000, durationMs: 3000 }],
+        },
+      },
+    });
+    const state = {
       status: "working",
+      sessionId,
       source: "codex",
       project: "codex-rpc",
-      task: "Build codex-rpc with live presence and analytics",
+      task: "Build live chat analytics",
+      taskSource: "session-name",
       model: "o4-mini",
       tokens: 142800,
+      usage: { total: 142800, input: 120000, output: 22800, reasoning: 8000, cached: 75000 },
+      contextWindow: 200000,
+      lastUsage: { total: 24000 },
+      activeTools: [{ name: "exec_command", callId: "running-command", startedAt: now - 3000 }],
+      recentTools: [{ name: "read_file", callId: "finished-read", startedAt: now - 8000, endedAt: now - 7500, durationMs: 500 }],
       tool: "applying a patch",
-      startedAt: Date.now() - 420000,
-      updatedAt: Date.now(),
-    });
+      startedAt: now - 420000,
+      updatedAt: now,
+    };
+    writeJSON("state.json", state);
     const { serve } = await import("../src/server.js");
     dashboard = await serve(0);
     const errors = [];
@@ -90,13 +114,16 @@ app
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
+        backgroundThrottling: false,
       },
     });
     window.webContents.on("console-message", (event) => {
       if (event.level === "error") errors.push(event.message);
     });
     await window.loadURL(`http://127.0.0.1:${dashboard.address().port}`);
-    const js = (source) => window.webContents.executeJavaScript(source);
+    const js = (source) => window.webContents.executeJavaScript(source).catch((error) => {
+      throw new Error(`${error.message}\nRenderer check: ${source}`);
+    });
     await until(() =>
       js(
         "document.querySelector('#connection').textContent==='Live on this device'",
@@ -107,6 +134,15 @@ app
       7,
     );
     assert.ok(await js("document.querySelector('#tokens').textContent!=='0'"));
+    assert.equal(config().presence.stats, "chat");
+    assert.equal(await js("document.querySelector('#chat-heading').textContent"), state.task);
+    assert.equal(await js("document.querySelector('#chat-tokens').textContent"), "22.8K");
+    assert.equal(await js("document.querySelector('#chat-prompts').textContent"), "14");
+    assert.equal(await js("document.querySelector('#chat-tools-count').textContent"), "32");
+    assert.equal(await js("document.querySelector('#chat-cache-label').textContent"), "62.5%");
+    assert.match(await js("document.querySelector('#chat-context-label').textContent"), /12\.0%/);
+    assert.match(await js("document.querySelector('#chat-active-tools').textContent"), /exec_command/);
+    assert.match(await js("document.querySelector('#chat-recent-tools').textContent"), /apply_patch.*read_file/);
     assert.equal(
       await js("document.documentElement.scrollWidth <= innerWidth"),
       true,
@@ -117,6 +153,9 @@ app
       path.join(output, "dashboard.png"),
       (await window.webContents.capturePage()).toPNG(),
     );
+    await js("document.querySelector('.chat-panel').scrollIntoView({block:'center'})");
+    await wait(100);
+    fs.writeFileSync(path.join(output, "chat.png"), (await window.webContents.capturePage()).toPNG());
     for (const tab of [
       "Presence",
       "Discord",
@@ -135,10 +174,23 @@ app
         ),
       );
     }
+    await js("Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent==='Presence').click()");
+    for (const mode of ["cost", "chat"]) {
+      await js(`(()=>{const field=document.querySelector('[data-key="presence.stats"]'); field.value=${JSON.stringify(mode)};field.dispatchEvent(new Event('change'));document.querySelector('#settings-form').requestSubmit()})()`);
+      await until(() => config().presence.stats === mode);
+      await until(() => js("document.querySelector('#save-status').textContent==='Saved on this device.'"));
+    }
+    await window.loadURL(`http://127.0.0.1:${dashboard.address().port}`);
+    await until(() => js("document.querySelector('#connection').textContent==='Live on this device'"));
+    assert.equal(await js("document.querySelector('[data-key=\"presence.stats\"]').value"), "chat");
     await js(
-      "Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent==='Codex Pet Assets').click(); document.querySelector('#settings').scrollIntoView()",
+      "Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent==='Codex Pet Assets').click(); document.querySelector('#settings').scrollIntoView({behavior:'instant'})",
     );
     await wait(100);
+    assert.ok(await js("document.querySelector('#settings-content').getBoundingClientRect().top < innerHeight - 200"));
+    await until(() => js("document.querySelector('#connection').textContent==='Live on this device'"));
+    window.webContents.invalidate();
+    await js("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
     fs.writeFileSync(
       path.join(output, "settings.png"),
       (await window.webContents.capturePage()).toPNG(),
@@ -151,23 +203,28 @@ app
       async () =>
         (await js("document.querySelector('#tokens').textContent")) !== before,
     );
+    assert.equal(await js("document.querySelector('#chat-tokens').textContent"), "22.8K");
     await js("document.querySelector('#heatmap button[title]').click()");
     assert.match(
       await js("document.querySelector('#day-detail').textContent"),
       /tokens/,
     );
     writeJSON("state.json", {
+      ...state,
       status: "waiting",
+      activeTools: [],
       model: "o4-mini",
       updatedAt: Date.now(),
     });
     await until(() =>
       js("document.querySelector('#live-status').textContent==='waiting'"),
     );
+    await until(() => js("document.querySelector('#chat-active-tools').textContent==='No tools running'"));
     await js(
       "Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent==='Privacy').click(); const field=document.querySelector('[data-key=privacy]'); field.value='private';field.dispatchEvent(new Event('change'));document.querySelector('#settings-form').requestSubmit()",
     );
     await until(() => config().privacy === "private");
+    await until(() => js("document.querySelector('#chat-heading').textContent==='Private conversation'"));
     await js("document.querySelector('#toggle-presence').click()");
     await until(() => config().enabled === false);
     window.setSize(430, 950);
@@ -181,9 +238,14 @@ app
       path.join(output, "mobile.png"),
       (await window.webContents.capturePage()).toPNG(),
     );
+    window.setSize(430, 1300);
+    await js("document.querySelector('.chat-panel').scrollIntoView({behavior:'instant'})");
+    await wait(100);
+    assert.equal(await js("document.documentElement.scrollWidth <= innerWidth"), true);
+    fs.writeFileSync(path.join(output, "chat-mobile.png"), (await window.webContents.capturePage()).toPNG());
     assert.deepEqual(errors, []);
     console.log(
-      "Verified desktop/mobile layout, 7 tabs, settings save, range control, heatmap, SSE and pause. Screenshots in docs/.",
+      "Verified desktop/mobile layout, per-chat metrics/tools/context, chat-mode persistence, 7 tabs, settings save, range isolation, heatmap, SSE, privacy and pause. Screenshots in docs/.",
     );
   })
   .catch((e) => {
@@ -194,5 +256,5 @@ app
     window?.destroy();
     dashboard?.closeDashboard();
     fs.rmSync(temp, { recursive: true, force: true });
-    app.quit();
+    app.exit(process.exitCode || 0);
   });

@@ -6,7 +6,8 @@ import { scan } from "./scanner.js";
 import { main as hook, applyEvent } from "./hook.js";
 import { runDaemon } from "./daemon.js";
 import { setup, startDaemon, stopDaemon, uninstall } from "./service.js";
-import { renderStatus, insights } from "./tui.js";
+import { renderStatus, renderChat, insights } from "./tui.js";
+import { getChatStats } from "./chat.js";
 import { doctor } from "./doctor.js";
 import { serve } from "./server.js";
 import { generateCards } from "./statcards.js";
@@ -16,7 +17,8 @@ export const help = `codex-rpc / a little presence.
 Usage: codex-rpc <command>
 
   setup         Wire notify, enable detector, install service, start daemon
-  status        Live state and lifetime totals (--watch to refresh)
+  status        Live state, current chat and lifetime totals (--watch)
+  chat          Current-chat tokens, tools, cost, context (--json, --watch)
   usage         Heatmap, hourly histogram, tools, languages, API estimates
   insights      Five contextual lines about your week
   preview       Show the exact Discord text and assets for all four states
@@ -102,12 +104,19 @@ export async function main(args = process.argv.slice(2)) {
       break;
     }
     case "status":
-    case "usage": {
-      const render = () => console.log(renderStatus({ usage: true }));
+    case "usage":
+    case "chat": {
+      const render = () => console.log(
+        cmd === "chat"
+          ? rest.includes("--json")
+            ? JSON.stringify(getChatStats(), null, 2)
+            : renderChat()
+          : renderStatus({ usage: cmd === "usage", currentChat: cmd === "status" }),
+      );
       render();
       if (rest.includes("--watch")) {
         const timer = setInterval(() => {
-          process.stdout.write("\x1b[2J\x1b[H");
+          if (!rest.includes("--json")) process.stdout.write("\x1b[2J\x1b[H");
           render();
         }, 3000);
         for (const signal of ["SIGINT", "SIGTERM"])

@@ -3,7 +3,7 @@
 <img src="assets/pet/preview-banner.svg" width="800" alt="codex-rpc — a little presence. Working, thinking, waiting, idle." />
 
 **Discord Rich Presence for Codex CLI & ChatGPT Desktop.**<br/>
-Live model. Little pet. Lifetime stats. Everything local.
+Your chat. Your tools. Your little pet. Everything local.
 
 [MIT](LICENSE) · Node 18+ · zero runtime dependencies · [security](SECURITY.md)
 
@@ -36,14 +36,16 @@ Discord **Desktop** must be running. Browser-only Discord cannot expose its loca
 
 ```text
 Watching Codex RPC
-Build a complete Discord presence suite
-$1.04k today · $24.3k all-time · Done · your move · +1055 −21
+Working in Codex RPC
+Bash · 22.8k output tokens
 ▣ 0:58 elapsed
 ```
 
-The card follows the same compact layout as claude-rpc: conversation name on top, daily/lifetime API-equivalent cost plus live status below, a state badge, and the session timer. The numbers above are an illustration, not collected usage. Discord controls wrapping, font and application name; the bundled application is named **Codex RPC**. `Watching` is the default activity type.
+The default card follows [claude-rpc’s status templates](https://github.com/rar-file/claude-rpc/blob/main/src/default-config.js): **working** shows tool, file and tool elapsed time when available, then this chat’s **output tokens**; **thinking** shows model, prompts and output tokens; **waiting** shows model and prompts; **idle** shows model and today’s active hours. Missing fields disappear cleanly. The headline uses the conversation name when public. Input and cached tokens are never added to the Discord token counter. Full usage breakdowns remain available locally in the dashboard and `chat --json`.
 
-For that named-chat layout, open `codex-rpc serve`, choose **Privacy → public**, and leave **Presence → Show conversation name** enabled. Private mode keeps task and project names out of the card. Presence also offers the original **Model / tokens** stats line and **Playing / Watching** header. `codex-rpc preview` prints the exact text and asset URLs for all four states before you share anything.
+The pet tooltip describes the live action; the pixel badge tooltip names the tool or status. Discord controls wrapping, fonts and application name; the bundled application is named **Codex RPC**. `Watching` is the default activity type.
+
+For that named-chat layout, open `codex-rpc serve`, choose **Privacy → public**, and leave **Presence → Show conversation name** enabled. Private mode keeps task and project names out of the card. The default stats line is **This chat**. Presence also offers **Today / all-time cost**, **Model / tokens**, and a **Playing / Watching** header. `codex-rpc preview` prints the exact text and asset URLs for all four states before you share anything.
 
 The blue pet uses selected original poses with deliberate holds, not a rapid expression slideshow: work keeps its neutral terminal face, with one brief blink in a 5.22-second loop. Other states move slowly or give an occasional wave. Dashboard SSE updates preserve an animation already in progress. Ten pixel badges cover commands, thinking, completion, idle, approval, editing, reading, review, ready and errors. They are drawn on a crisp 24-pixel grid and enlarged without antialiasing; the card selects a badge from the live tool/state. A custom badge URL overrides them.
 
@@ -58,15 +60,16 @@ Codex session log tail ───┼──→ state.json ──→ 02. daemon ─
 ChatGPT process/window ──┘                       ↑
                                                   │
 ~/.codex/sessions/**/*.jsonl ──→ 03. scanner ──→ aggregate.json
-                                  │                    │
-                           scanner-cache.json     TUI · web · cards
+                                  │              sessions.json
+                           scanner-cache.json          │
+                                                  TUI · web · cards
 ```
 
 **01. hook** — a short-lived JSON reader. Accepts stdin or the notify JSON argument, normalizes lifecycle events, atomically replaces state, exits. No network work in the hook. “Zero blocking delay” means no artificial sleeps or network waits on the normal hook path; reading/writing local files still takes time. Windows transient file-handle conflicts receive a bounded retry (up to 71 ms total) to preserve atomic writes; normal writes do not wait.
 
 **02. daemon** — a small, long-lived Node process. Tails modified session logs, polls ChatGPT process/window state, watches JSON files, and sends raw Discord IPC frames. Fragmented frames, READY handshakes, ACKs, ping/pong, reconnect backoff with jitter, and 5 MiB log rotation are handled locally. Updates are coalesced with a minimum 15-second interval to avoid Discord throttling. Disabled presence clears immediately.
 
-**03. scanner** — a short-lived child. Recursively discovers JSONL session logs and only parses files whose size or modification time changed. A modified file is re-read in full so cumulative token counters, rewrites, and truncated tails remain correct. Deleted files leave the aggregate. `history.jsonl` is a prompt-only fallback when session logs are absent, so overlapping history never doubles totals.
+**03. scanner** — a short-lived child. Recursively discovers JSONL session logs and only parses files whose size or modification time changed. A modified file is re-read in full so cumulative token counters, rewrites, and truncated tails remain correct. Deleted files leave both the aggregate and per-chat index. `sessions.json` keeps each conversation’s own usage, tools and costs, keyed by its actual session ID. `history.jsonl` is a prompt-only fallback when session logs are absent, so overlapping history never doubles totals.
 
 ## the pet has a job
 
@@ -100,7 +103,8 @@ ChatGPT detection is process-only on Windows; macOS uses System Events for foreg
 | --- | --- |
 | `setup` | stable runtime, Codex notify, detector, login service, daemon |
 | `start` / `stop` / `restart` | manage the daemon |
-| `status [--watch]` | live state, ASCII pet, totals, heatmap and rankings |
+| `status [--watch]` | live state, ASCII pet, this chat, totals, heatmap and rankings |
+| `chat [--json] [--watch]` | current conversation’s tokens, tools, prompts, time and estimated cost |
 | `usage [--watch]` | heat-graded bars, 52-week heatmap, hour histogram, tools, languages, cost |
 | `insights` | trend, peak weekday, hotspot, cost/token pace, streak |
 | `preview` | exact current Discord text and asset URLs for all four states |
@@ -108,7 +112,7 @@ ChatGPT detection is process-only on Windows; macOS uses System Events for foreg
 | `statcards [--output ./statcards]` | SVG card with embedded pet, 12-month heatmap, four badges, Markdown |
 | `doctor` | Node, notify, detector, daemon, real Discord handshake, aggregate age, privacy |
 | `pause` / `resume` | persist `enabled: false` / `true`; kill switch for new collection and presence |
-| `scan` | update the aggregate immediately |
+| `scan` | update lifetime and per-chat history immediately |
 | `hook [JSON]` | ingest argument or newline-delimited stdin JSON |
 | `run -- [Codex args]` | wrap Codex with lifecycle boundaries |
 | `uninstall` | remove hook block, service, runtime; retain analytics/config |
@@ -120,11 +124,17 @@ No subscription quota requests or credential reads. `usage` means recorded local
 
 ## on your machine
 
+The **THIS CHAT** headline counts output tokens only. Its separate breakdown follows the selected live conversation: input/output/reasoning/cached tokens, cache reuse, latest request/context window when reported, prompts, tool calls, active time, line changes and API-equivalent cost. Running and recent tools show names and recorded durations, never raw arguments. Unknown values show **—**, not a lifetime total.
+
 Dashboard range: **7d · 30d · 90d · 1y · all**. The year heatmap stays year-wide; headline totals, languages, tools, costs, source breakdown and hour chart follow the range. UTC dates keep the CLI, cards, and scanner consistent.
 
 <img src="docs/dashboard.png" width="1000" alt="Local dark dashboard with Codex Pet, token/hour/session totals and activity heatmap (synthetic sample data)" />
 
+The chat panel is independent of this range; switching chats switches its identity and metrics. For the same view in your terminal, run `codex-rpc chat --watch`; use `codex-rpc chat --json` for scripts.
+
 Seven settings tabs: **Presence · Discord · Codex Pet Assets · Timing · Daemon Controls · Privacy · Stats**. Save locally, no cloud account. The daemon controls start, pause, resume, restart and stop the background process. The dashboard itself remains open after stop.
+
+Local read-only JSON endpoints include `/api/state`, `/api/aggregate?range=30d`, and **`/api/chat`**. The chat endpoint returns the current conversation summary, with `null` for unavailable metrics; it never substitutes all-time usage.
 
 Local SVG endpoints update from the latest aggregate on every request:
 
@@ -154,7 +164,8 @@ Electron runs the same loopback dashboard on a random port with Node integration
 {
   "enabled": true,
   "privacy": "private",
-  "clientId": "YOUR_DISCORD_APPLICATION_ID",
+  "clientId": "1565535814308470814",
+  "presence": { "stats": "chat", "showTask": true, "showChurn": true },
   "assets": {
     "working": "https://your-host/codex-pet-working.gif",
     "thinking": "https://your-host/codex-pet-thinking.gif",
@@ -168,13 +179,15 @@ Electron runs the same loopback dashboard on a random port with Node integration
 
 `enabled: false` stops new hooks, log tailing, scans and presence. It does not erase existing data. Config changes take effect without daemon restart. Use `CODEX_RPC_HOME` and `CODEX_HOME` to isolate state/input roots; `CODEX_RPC_IPC` selects a bridged socket; `CODEX_RPC_CODEX_BIN` overrides the wrapped Codex executable.
 
-State and cache files are inspectable JSON (0700 directory, 0600 files on POSIX). `codex-state.json` and `chatgpt-state.json` retain per-source snapshots. `state.json` is the selected live activity. `aggregate.json` holds totals and daily slices. `desktop-aggregate.json` stores observed ChatGPT focus/session summaries, and `chatgpt-observation.json` stores the last process observation. `scanner-cache.json` holds per-file summaries, file paths and metadata, never raw transcript content. Even in private mode, this local cache can contain hotspot paths; privacy redaction applies to presence and aggregate views. See [SECURITY.md](SECURITY.md) for the full model.
+State and cache files are inspectable JSON (0700 directory, 0600 files on POSIX). `codex-state.json` and `chatgpt-state.json` retain per-source snapshots. `state.json` is the selected live activity. `aggregate.json` holds lifetime totals and daily slices. `sessions.json` holds the scanned per-conversation summaries. `live/` keeps source-scoped, hashed-ID chat snapshots so switching chats cannot carry another chat’s counters into the next one. `desktop-aggregate.json` stores observed ChatGPT focus/session summaries, and `chatgpt-observation.json` stores the last process observation. `scanner-cache.json` holds per-file summaries, file paths and metadata, never raw transcript content. Even in private mode, this local cache can contain hotspot paths; privacy redaction applies to presence, per-chat API/CLI views, and aggregate views. Per-chat exports redact hotspot filenames in private mode; live snapshots omit task/project/file names. Hashed snapshot filenames do not encrypt their contents. See [SECURITY.md](SECURITY.md) for the full model.
 
 macOS installs `~/Library/LaunchAgents/dev.codex-rpc.plist`. Linux installs `~/.config/systemd/user/codex-rpc.service`. Windows installs a per-user Startup `.cmd` task; no elevation or machine-wide service. On Linux without a user systemd session, setup prints a registration hint and still starts a detached daemon. WSL requires Discord in the same environment or an explicit trusted Unix socket bridge via `CODEX_RPC_IPC`; Windows named pipes are not directly available to Linux Node.
 
 ## counting things honestly
 
-Input, output, cached-input and reasoning tokens are separate. Total tokens are input + output; reasoning is already part of output. New `token_usage_record` entries are preferred and deduplicated by response ID; legacy cumulative token-count records are differenced only when those records are absent. Reasoning and cost are never counted through both streams. Tool call IDs and paired user-message records are deduplicated within each log. Active time sums timestamp gaps capped at five minutes, an approximation of engaged time. Missing timestamps are marked unknown, not assigned fake dates. File languages and line churn are derived only from logged tool arguments/patches, not a whole-repository Git diff. Session-log copies outside the sessions tree are not scanned. Hotspot counts mean tool touches, not unique changed files.
+Input, output, cached-input and reasoning tokens are separate. Total tokens are input + output; reasoning is already part of output. Within each conversation, new `token_usage_record` entries are preferred and deduplicated by response ID; legacy cumulative token-count records are differenced only when those records are absent. Reasoning and cost are never counted through both streams. Tool call IDs and paired user-message records are deduplicated within each log. Active time sums timestamp gaps capped at five minutes, an approximation of engaged time. Missing timestamps are marked unknown, not assigned fake dates. File languages and line churn are derived only from logged tool arguments/patches, not a whole-repository Git diff. Session-log copies outside the sessions tree are not scanned. Hotspot counts mean tool touches, not unique changed files.
+
+Chat totals combine matching session-ID history and live observations without adding the same cumulative counters twice. Lifetime aggregates never fill missing chat metrics. Prompts, tools, line changes and active time need compatible local logs; live tool counts cover observed calls. ChatGPT process detection alone cannot reveal a conversation ID, title, model or token usage, so unavailable chat data stays unknown.
 
 Prices are **USD API-equivalent estimates**, not a ChatGPT/Codex subscription bill. Rates are snapshots, not fetched at runtime. Unknown models accumulate `unknownCostTokens` and contribute no invented cost. Historical models are retained for old sessions. Source rates checked 2026-10-29: [o3](https://developers.openai.com/api/docs/models/o3), [o4-mini](https://developers.openai.com/api/docs/models/o4-mini), [GPT-5](https://developers.openai.com/api/docs/models/gpt-5), [codex-mini-latest](https://developers.openai.com/api/docs/models/codex-mini-latest), [current pricing](https://developers.openai.com/api/docs/pricing). Update the inspectable table in `src/pricing.js` when prices change.
 
@@ -201,6 +214,8 @@ src/daemon.js         02. Discord supervisor
 src/scanner.js        03. incremental history scanner
 src/ipc.js            raw Discord IPC client
 src/presence.js       card templates and compact usage text
+src/chat.js           current-chat history/live summary
+src/live.js           scoped snapshots and token normalization
 src/log-watcher.js    live JSONL tailer
 src/chatgpt-detector.js
 src/pricing.js        token cost snapshots

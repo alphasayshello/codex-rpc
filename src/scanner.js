@@ -103,24 +103,32 @@ function usageOf(u = {}) {
       0,
   };
 }
+export { safeFilePath } from "./paths.js";
+import { safeFilePath } from "./paths.js";
 export async function parseFile(filename) {
   const result = {
     totals: emptyStats(),
     days: {},
     sessionIds: [],
+    sessions: {},
     latest: null,
   };
-  let model = "unknown",
-    source = "codex",
-    session = filename,
-    lastTime = 0,
-    previousUsage = {},
-    seen = new Set();
-  const modernUsage = {},
-    legacyUsage = {},
-    fallbackPrompts = {};
-  let hasModernUsage = false,
-    hasPromptEvents = false;
+  let model = "unknown", source = "codex", session = filename;
+  const seen = new Set();
+  const accounting = new Map();
+  function sessionData(id) {
+    if (!result.sessions[id]) {
+      result.sessions[id] = {
+        id, source, model: "unknown", startedAt: 0, lastActivityAt: 0,
+        totals: emptyStats(), usageKnown: false, recentTools: [],
+      };
+      accounting.set(id, {
+        previousUsage: {}, lastTime: 0, modernUsage: {}, legacyUsage: {},
+        fallbackPrompts: {}, hasModernUsage: false, hasPromptEvents: false,
+      });
+    }
+    return result.sessions[id];
+  }
   const titles = new Map();
   const stream = fs.createReadStream(filename, { encoding: "utf8" });
   const lines = readline.createInterface({
@@ -146,29 +154,40 @@ export async function parseFile(filename) {
         : "codex";
     }
     if (row.session_id) session = row.session_id;
-    if (row.model || p.model) model = row.model || p.model;
+    const chat = sessionData(session), ledger = accounting.get(session);
+    source = chat.source;
+    if (row.type === "session_meta") {
+      source = /chatgpt/i.test(p.originator || p.source || "") ? "chatgpt" : "codex";
+      chat.source = source;
+    }
+    model = row.model || p.model || chat.model;
+    chat.model = model;
     const parsed = Date.parse(
       row.timestamp ||
         p.timestamp ||
         (row.ts ? new Date(row.ts * 1000).toISOString() : ""),
     );
     const time = Number.isFinite(parsed) ? parsed : 0;
+    if (time) {
+      chat.startedAt = chat.startedAt ? Math.min(chat.startedAt, time) : time;
+      chat.lastActivityAt = Math.max(chat.lastActivityAt, time);
+    }
     const day = time ? new Date(time).toISOString().slice(0, 10) : "unknown";
     const delta = emptyStats();
     const id = p.call_id || p.response_id || p.id || row.id;
     const isTool = ["function_call", "custom_tool_call", "tool_call"].includes(
       type,
     );
-    const dedupKey = id ? `${isTool ? "tool" : type}:${id}` : null;
+    const dedupKey = id ? `${session}:${isTool ? "tool" : type}:${id}` : null;
     if (dedupKey && seen.has(dedupKey)) continue;
     if (dedupKey) seen.add(dedupKey);
     // Prefer semantic user_message events when present. Newer app logs have
-    // only response items, so keep those as a per-file fallback.
+    // only response items, so keep those as a per-session fallback.
     const semanticPrompt = type === "user_message";
     const fallbackPrompt = row.type === "response_item" && p.role === "user";
     const historyPrompt = !!(p.text && row.session_id);
     if (semanticPrompt || fallbackPrompt || historyPrompt) {
-      if (semanticPrompt) hasPromptEvents = true;
+      if (semanticPrompt) ledger.hasPromptEvents = true;
       const text =
         p.message ||
         p.text ||
@@ -186,11 +205,15 @@ export async function parseFile(filename) {
           candidate.prompts = 1;
           candidate.sources[source] = 1;
           if (time) candidate.hours[new Date(time).getUTCHours()]++;
-          mergeStats((fallbackPrompts[day] ||= emptyStats()), candidate);
+          mergeStats((ledger.fallbackPrompts[day] ||= emptyStats()), candidate);
         }
       }
     }
     if (isTool) {
+      const tool = { name: p.name || "unknown", startedAt: time };
+      if (p.call_id) tool.callId = p.call_id;
+      chat.recentTools.push(tool);
+      chat.recentTools = chat.recentTools.slice(-8);
       delta.toolCalls++;
       bump(delta.tools, p.name || "unknown");
       let args = p.arguments || p.input || {};
@@ -208,9 +231,10 @@ export async function parseFile(filename) {
       const paths = [
         args.file_path,
         args.path,
-        ...String(patch).matchAll(/\*\*\* (?:Add|Update|Delete) File: (.+)/g),
+        ...String(patch).matchAll(/^\*\*\* (?:Add|Update|Delete) File: ([^\r\n]+)\r?$/gm),
       ]
         .map((x) => (Array.isArray(x) ? x[1] : x))
+        .map(safeFilePath)
         .filter(Boolean);
       for (const f of new Set(paths)) {
         bump(delta.files, f);
@@ -221,22 +245,30 @@ export async function parseFile(filename) {
         if (l.startsWith("-") && !l.startsWith("---")) delta.linesRemoved++;
       }
     }
+    if (["function_call_output", "custom_tool_call_output", "tool_result"].includes(type)) {
+      const tool = [...chat.recentTools].reverse().find((x) => p.call_id && x.callId === p.call_id);
+      if (tool && tool.startedAt && time >= tool.startedAt) {
+        tool.endedAt = time;
+        tool.durationMs = time - tool.startedAt;
+      }
+    }
     let usage = null;
     if (type === "token_count") {
       const info = p.info || {};
       if (info.total_token_usage) {
         const total = usageOf(info.total_token_usage),
-          prev = previousUsage;
+          prev = ledger.previousUsage;
         usage = Object.fromEntries(
           Object.entries(total).map(([k, v]) => [
             k,
             Math.max(0, v - (prev[k] || 0)),
           ]),
         );
-        previousUsage = total;
+        ledger.previousUsage = total;
       } else if (info.last_token_usage) usage = usageOf(info.last_token_usage);
     } else if (p.usage) usage = usageOf(p.usage);
     if (usage) {
+      chat.usageKnown = true;
       const usageStats = emptyStats();
       Object.assign(usageStats, usage);
       usageStats.tokens = usage.input + usage.output;
@@ -246,21 +278,24 @@ export async function parseFile(filename) {
       if (time && usageStats.tokens)
         usageStats.hours[new Date(time).getUTCHours()]++;
       const modern = row.type === "token_usage_record";
-      if (modern) hasModernUsage = true;
-      const bucket = modern ? modernUsage : legacyUsage;
+      if (modern) ledger.hasModernUsage = true;
+      const bucket = modern ? ledger.modernUsage : ledger.legacyUsage;
       mergeStats((bucket[day] ||= emptyStats()), usageStats);
     }
-    if (time && lastTime && time >= lastTime)
-      delta.activeSeconds = Math.min(300, (time - lastTime) / 1000);
-    if (time) lastTime = Math.max(time, lastTime);
+    if (time && ledger.lastTime && time >= ledger.lastTime)
+      delta.activeSeconds = Math.min(300, (time - ledger.lastTime) / 1000);
+    if (time) ledger.lastTime = Math.max(time, ledger.lastTime);
     if (time && (delta.prompts || delta.toolCalls || delta.tokens))
       delta.hours[new Date(time).getUTCHours()]++;
     delta.sourceHours[source] = delta.activeSeconds / 3600;
     delta.sources[source] = delta.prompts + delta.toolCalls;
+    mergeStats(chat.totals, delta);
     mergeStats(result.totals, delta);
     mergeStats((result.days[day] ||= emptyStats()), delta);
     if (!result.sessionIds.includes(session)) {
       result.sessionIds.push(session);
+      chat.totals.sessions = 1;
+      chat.totals.sourceSessions[source] = 1;
       result.totals.sessions++;
       result.days[day].sessions++;
       result.totals.sourceSessions[source]++;
@@ -280,13 +315,17 @@ export async function parseFile(filename) {
       result.latest = { ...event, type: event.status };
     }
   }
-  for (const bucket of [
-    hasModernUsage ? modernUsage : legacyUsage,
-    hasPromptEvents ? {} : fallbackPrompts,
-  ]) {
-    for (const [day, stats] of Object.entries(bucket)) {
-      mergeStats(result.totals, stats);
-      mergeStats((result.days[day] ||= emptyStats()), stats);
+  for (const [id, ledger] of accounting) {
+    const chat = result.sessions[id];
+    for (const bucket of [
+      ledger.hasModernUsage ? ledger.modernUsage : ledger.legacyUsage,
+      ledger.hasPromptEvents ? {} : ledger.fallbackPrompts,
+    ]) {
+      for (const [day, stats] of Object.entries(bucket)) {
+        mergeStats(chat.totals, stats);
+        mergeStats(result.totals, stats);
+        mergeStats((result.days[day] ||= emptyStats()), stats);
+      }
     }
   }
   return result;
@@ -338,7 +377,7 @@ export async function scan({ live = false } = {}) {
   }
   try {
     const cache = readJSON("scanner-cache.json", { files: {} }),
-      next = { schemaVersion: 4, files: {} };
+      next = { schemaVersion: 6, files: {} };
     if (!config().enabled || !config().stats.enabled)
       return readJSON("aggregate.json", {
         schemaVersion: 1,
@@ -360,6 +399,7 @@ export async function scan({ live = false } = {}) {
       filesScanned: 0,
       filesReused: 0,
     };
+    const sessions = { schemaVersion: 1, updatedAt: aggregate.updatedAt, sessions: {} };
     let latest;
     if (!config().enabled || !config().stats.enabled)
       return readJSON("aggregate.json", aggregate);
@@ -367,7 +407,7 @@ export async function scan({ live = false } = {}) {
       const st = fs.statSync(filename),
         old = cache.files[filename];
       const cached =
-        cache.schemaVersion === 4 &&
+        cache.schemaVersion === 6 &&
         old &&
         old.size === st.size &&
         old.mtimeMs === st.mtimeMs;
@@ -383,6 +423,32 @@ export async function scan({ live = false } = {}) {
       mergeStats(aggregate.totals, entry.data.totals);
       for (const [d, s] of Object.entries(entry.data.days))
         mergeStats((aggregate.days[d] ||= emptyStats()), s);
+      for (const [id, chat] of Object.entries(entry.data.sessions)) {
+        const existing = sessions.sessions[id];
+        if (!existing) sessions.sessions[id] = structuredClone(chat);
+        else {
+          mergeStats(existing.totals, chat.totals);
+          existing.totals.sessions = 1;
+          existing.totals.sourceSessions[chat.source] = 1;
+          existing.startedAt = Math.min(existing.startedAt || Infinity, chat.startedAt || Infinity);
+          if (!Number.isFinite(existing.startedAt)) existing.startedAt = 0;
+          if (chat.lastActivityAt >= existing.lastActivityAt) {
+            existing.source = chat.source;
+            existing.model = chat.model;
+          }
+          existing.lastActivityAt = Math.max(existing.lastActivityAt, chat.lastActivityAt);
+          existing.usageKnown ||= chat.usageKnown;
+          const seenTools = new Set();
+          existing.recentTools = [...existing.recentTools, ...chat.recentTools]
+            .sort((a, b) => a.startedAt - b.startedAt)
+            .filter((tool) => {
+              const key = tool.callId || `${tool.name}:${tool.startedAt}`;
+              if (seenTools.has(key)) return false;
+              seenTools.add(key);
+              return true;
+            }).slice(-8);
+        }
+      }
       const event = entry.data.latest;
       if (
         event &&
@@ -400,8 +466,10 @@ export async function scan({ live = false } = {}) {
     if (config().privacy === "private") {
       aggregate.totals.files = {};
       for (const s of Object.values(aggregate.days)) s.files = {};
+      for (const chat of Object.values(sessions.sessions)) chat.totals.files = {};
     }
     writeJSON("scanner-cache.json", next);
+    writeJSON("sessions.json", sessions);
     writeJSON("aggregate.json", aggregate);
     if (
       live &&

@@ -14,7 +14,7 @@ export const defaults = {
   privacy: "private",
   clientId: "1565535814308470814",
   buttons: [],
-  presence: { type: 3, showTask: true, stats: "cost", showChurn: true },
+  presence: { type: 3, showTask: true, stats: "chat", showChurn: true },
   assets: {
     working:
       "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-working.gif?v=calm-1",
@@ -42,6 +42,7 @@ export function writeJSON(name, value) {
   fs.mkdirSync(home(), { recursive: true, mode: 0o700 });
   const target = file(name),
     temp = `${target}.${process.pid}.${randomUUID()}.tmp`;
+  fs.mkdirSync(path.dirname(target),{recursive:true,mode:0o700});
   try {
     fs.writeFileSync(temp, JSON.stringify(value, null, 2) + "\n", {
       mode: 0o600,
@@ -80,7 +81,7 @@ export function validateConfig(c) {
   n.presence = { ...config().presence, ...n.presence };
   if (
     ![0, 3].includes(n.presence.type) ||
-    !["cost", "tokens"].includes(n.presence.stats) ||
+    !["chat", "cost", "tokens"].includes(n.presence.stats) ||
     typeof n.presence.showTask !== "boolean" ||
     typeof n.presence.showChurn !== "boolean"
   )
