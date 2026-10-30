@@ -79,7 +79,7 @@ export async function main(args = process.argv.slice(2)) {
     case "status":
     case "usage": {
       const render = () =>
-        console.log(renderStatus({ usage: cmd === "usage" }));
+        console.log(renderStatus({ usage: true }));
       render();
       if (rest.includes("--watch")) {
         const timer = setInterval(() => {

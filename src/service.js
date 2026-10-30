@@ -13,17 +13,33 @@ import {
   alive,
   xml,
 } from "./store.js";
+import { uninstallCompletions } from "./completion.js";
 export const root = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
+const runtimeExecutable = () =>
+  process.env.CODEX_RPC_SEA &&
+  fs.existsSync(
+    path.join(
+      home(),
+      "bin",
+      process.platform === "win32" ? "codex-rpc.exe" : "codex-rpc",
+    ),
+  )
+    ? path.join(
+        home(),
+        "bin",
+        process.platform === "win32" ? "codex-rpc.exe" : "codex-rpc",
+      )
+    : process.execPath;
 const cli = () => path.join(home(), "runtime/bin/codex-rpc.js");
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 export function registerHook() {
   fs.mkdirSync(codexHome(), { recursive: true, mode: 0o700 });
   const target = path.join(codexHome(), "config.toml");
   let text = fs.existsSync(target) ? fs.readFileSync(target, "utf8") : "";
-  const line = `notify = ${JSON.stringify([process.execPath, cli(), "hook"])}`;
+  const line = `notify = ${JSON.stringify([runtimeExecutable(), cli(), "hook"])}`;
   const top = text.split(/^\s*\[/m)[0];
   if (/^\s*notify\s*=/m.test(top) && !top.includes("codex-rpc"))
     throw Error(
@@ -54,7 +70,7 @@ export function unregisterHook() {
   }
 }
 export function serviceDefinition(platform = process.platform) {
-  const node = process.execPath,
+  const node = runtimeExecutable(),
     command = [node, cli(), "daemon"];
   if (platform === "darwin")
     return {
@@ -129,7 +145,7 @@ export async function startDaemon() {
   const entry = fs.existsSync(cli())
     ? cli()
     : path.join(root, "bin/codex-rpc.js");
-  const child = spawn(process.execPath, [entry, "daemon"], {
+  const child = spawn(runtimeExecutable(), [entry, "daemon"], {
     stdio: "ignore",
     detached: true,
     env: process.env,
@@ -139,7 +155,7 @@ export async function startDaemon() {
     failure = e;
   });
   child.unref();
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 200; i++) {
     await delay(50);
     if (failure) throw failure;
     const state = readJSON("daemon.json");
@@ -166,6 +182,17 @@ export async function setup({ noService = false, noStart = false } = {}) {
       fs.cpSync(path.join(root, name), path.join(runtime, name), {
         recursive: true,
       });
+  if (process.env.CODEX_RPC_SEA) {
+    const dir = path.join(home(), "bin");
+    fs.mkdirSync(dir, { recursive: true });
+    const destination = path.join(
+      dir,
+      process.platform === "win32" ? "codex-rpc.exe" : "codex-rpc",
+    );
+    if (path.resolve(process.execPath) !== path.resolve(destination))
+      fs.copyFileSync(process.execPath, destination);
+    fs.chmodSync(destination, 0o755);
+  }
   let hook;
   try {
     hook = registerHook();
@@ -180,6 +207,7 @@ export async function uninstall() {
   removeService();
   await stopDaemon();
   unregisterHook();
+  uninstallCompletions();
   fs.rmSync(path.join(home(), "runtime"), { recursive: true, force: true });
   return (
     "Removed hooks, service, and installed runtime. Analytics/config retained; delete " +

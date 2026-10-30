@@ -60,13 +60,17 @@ export class LogWatcher {
           continue;
         const event = { ...info.context, ...row };
         if (normalizeEvent(event)) applyEvent(event);
-        else if (p.type === "token_count" && p.info?.total_token_usage) {
+        else if (
+          (p.type === "token_count" && p.info?.total_token_usage) ||
+          (row.type === "token_usage_record" && p.thread_token_usage)
+        ) {
           const current = readJSON("codex-state.json");
           applyEvent({
             ...info.context,
             type: current.status || "thinking",
             timestamp: row.timestamp,
-            tokens: p.info.total_token_usage.total_tokens,
+            tokens: (p.thread_token_usage || p.info.total_token_usage)
+              .total_tokens,
           });
         }
       }

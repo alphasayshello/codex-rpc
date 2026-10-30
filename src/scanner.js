@@ -33,6 +33,8 @@ export function emptyStats() {
     commands: {},
     hours: Array(24).fill(0),
     sources: { codex: 0, chatgpt: 0 },
+    sourceHours: { codex: 0, chatgpt: 0 },
+    sourceSessions: { codex: 0, chatgpt: 0 },
   };
 }
 export function mergeStats(to, from) {
@@ -112,6 +114,11 @@ export async function parseFile(filename) {
     lastTime = 0,
     previousUsage = {},
     seen = new Set();
+  const modernUsage = {},
+    legacyUsage = {},
+    fallbackPrompts = {};
+  let hasModernUsage = false,
+    hasPromptEvents = false;
   const stream = fs.createReadStream(filename, { encoding: "utf8" });
   const lines = readline.createInterface({
     input: stream,
@@ -135,6 +142,7 @@ export async function parseFile(filename) {
         ? "chatgpt"
         : "codex";
     }
+    if (row.session_id) session = row.session_id;
     if (row.model || p.model) model = row.model || p.model;
     const parsed = Date.parse(
       row.timestamp ||
@@ -144,20 +152,20 @@ export async function parseFile(filename) {
     const time = Number.isFinite(parsed) ? parsed : 0;
     const day = time ? new Date(time).toISOString().slice(0, 10) : "unknown";
     const delta = emptyStats();
-    const id = p.call_id || row.id;
+    const id = p.call_id || p.response_id || p.id || row.id;
     const isTool = ["function_call", "custom_tool_call", "tool_call"].includes(
       type,
     );
     const dedupKey = id ? `${isTool ? "tool" : type}:${id}` : null;
     if (dedupKey && seen.has(dedupKey)) continue;
     if (dedupKey) seen.add(dedupKey);
-    // history.jsonl duplicates prompts from session logs and is scanned only as fallback.
-    if (
-      type === "user_message" ||
-      (row.type === "response_item" && p.role === "user") ||
-      (p.text && row.session_id)
-    ) {
-      // Codex emits both event_msg/user_message and response_item/message for one prompt.
+    // Prefer semantic user_message events when present. Newer app logs have
+    // only response items, so keep those as a per-file fallback.
+    const semanticPrompt = type === "user_message";
+    const fallbackPrompt = row.type === "response_item" && p.role === "user";
+    const historyPrompt = !!(p.text && row.session_id);
+    if (semanticPrompt || fallbackPrompt || historyPrompt) {
+      if (semanticPrompt) hasPromptEvents = true;
       const text =
         p.message ||
         p.text ||
@@ -165,10 +173,18 @@ export async function parseFile(filename) {
           ? p.content.map((x) => x.text || "").join("")
           : p.content) ||
         "";
-      const key = `prompt:${session}:${text}:${Math.floor(time / 10000)}`;
+      const turn = p.internal_chat_message_metadata_passthrough?.turn_id;
+      const key = `prompt:${session}:${semanticPrompt ? "event" : "fallback"}:${turn || text}:${Math.floor(time / 10000)}`;
       if (!seen.has(key)) {
-        delta.prompts++;
         seen.add(key);
+        if (semanticPrompt || historyPrompt) delta.prompts++;
+        else {
+          const candidate = emptyStats();
+          candidate.prompts = 1;
+          candidate.sources[source] = 1;
+          if (time) candidate.hours[new Date(time).getUTCHours()]++;
+          mergeStats((fallbackPrompts[day] ||= emptyStats()), candidate);
+        }
       }
     }
     if (isTool) {
@@ -218,17 +234,25 @@ export async function parseFile(filename) {
       } else if (info.last_token_usage) usage = usageOf(info.last_token_usage);
     } else if (p.usage) usage = usageOf(p.usage);
     if (usage) {
-      Object.assign(delta, usage);
-      delta.tokens = usage.input + usage.output;
+      const usageStats = emptyStats();
+      Object.assign(usageStats, usage);
+      usageStats.tokens = usage.input + usage.output;
       const cost = estimateCost(model, usage);
-      if (cost === null) delta.unknownCostTokens = delta.tokens;
-      else delta.cost = cost;
+      if (cost === null) usageStats.unknownCostTokens = usageStats.tokens;
+      else usageStats.cost = cost;
+      if (time && usageStats.tokens)
+        usageStats.hours[new Date(time).getUTCHours()]++;
+      const modern = row.type === "token_usage_record";
+      if (modern) hasModernUsage = true;
+      const bucket = modern ? modernUsage : legacyUsage;
+      mergeStats((bucket[day] ||= emptyStats()), usageStats);
     }
     if (time && lastTime && time >= lastTime)
       delta.activeSeconds = Math.min(300, (time - lastTime) / 1000);
     if (time) lastTime = Math.max(time, lastTime);
     if (time && (delta.prompts || delta.toolCalls || delta.tokens))
       delta.hours[new Date(time).getUTCHours()]++;
+    delta.sourceHours[source] = delta.activeSeconds / 3600;
     delta.sources[source] = delta.prompts + delta.toolCalls;
     mergeStats(result.totals, delta);
     mergeStats((result.days[day] ||= emptyStats()), delta);
@@ -236,9 +260,20 @@ export async function parseFile(filename) {
       result.sessionIds.push(session);
       result.totals.sessions++;
       result.days[day].sessions++;
+      result.totals.sourceSessions[source]++;
+      result.days[day].sourceSessions[source]++;
     }
     const event = normalizeEvent({ ...row, source, model, sessionId: session });
     if (event) result.latest = { ...event, type: event.status };
+  }
+  for (const bucket of [
+    hasModernUsage ? modernUsage : legacyUsage,
+    hasPromptEvents ? {} : fallbackPrompts,
+  ]) {
+    for (const [day, stats] of Object.entries(bucket)) {
+      mergeStats(result.totals, stats);
+      mergeStats((result.days[day] ||= emptyStats()), stats);
+    }
   }
   return result;
 }
@@ -247,7 +282,10 @@ export function streaks(days, now = new Date()) {
     .filter(
       (d) =>
         d !== "unknown" &&
-        (days[d].prompts || days[d].toolCalls || days[d].tokens),
+        (days[d].prompts ||
+          days[d].toolCalls ||
+          days[d].tokens ||
+          days[d].activeSeconds),
     )
     .sort();
   let longest = 0,
@@ -284,7 +322,15 @@ export async function scan({ live = false } = {}) {
   }
   try {
     const cache = readJSON("scanner-cache.json", { files: {} }),
-      next = { files: {} };
+      next = { schemaVersion: 2, files: {} };
+    if (!config().enabled || !config().stats.enabled)
+      return readJSON("aggregate.json", {
+        schemaVersion: 1,
+        updatedAt: 0,
+        totals: emptyStats(),
+        days: {},
+        streak: { current: 0, longest: 0 },
+      });
     const files = walk(path.join(codexHome(), "sessions"));
     // Prefer session logs; history has no token/tool data and overlaps prompts.
     if (!files.length && fs.existsSync(path.join(codexHome(), "history.jsonl")))
@@ -304,7 +350,11 @@ export async function scan({ live = false } = {}) {
     for (const filename of files) {
       const st = fs.statSync(filename),
         old = cache.files[filename];
-      const cached = old && old.size === st.size && old.mtimeMs === st.mtimeMs;
+      const cached =
+        cache.schemaVersion === 2 &&
+        old &&
+        old.size === st.size &&
+        old.mtimeMs === st.mtimeMs;
       const entry = cached
         ? old
         : {
@@ -323,6 +373,11 @@ export async function scan({ live = false } = {}) {
         (!latest || Date.parse(event.timestamp) > Date.parse(latest.timestamp))
       )
         latest = event;
+    }
+    const desktop = readJSON("desktop-aggregate.json", { days: {} });
+    for (const [day, stats] of Object.entries(desktop.days || {})) {
+      mergeStats(aggregate.totals, stats);
+      mergeStats((aggregate.days[day] ||= emptyStats()), stats);
     }
     aggregate.totals.activeHours = aggregate.totals.activeSeconds / 3600;
     aggregate.streak = streaks(aggregate.days);

@@ -14,6 +14,9 @@ const states = {
   function_call: "working",
   custom_tool_call: "working",
   "tool-end": "thinking",
+  function_call_output: "thinking",
+  custom_tool_call_output: "thinking",
+  turn_aborted: "waiting",
   "approval-request": "waiting",
   "agent-turn-complete": "waiting",
   task_complete: "waiting",
@@ -58,7 +61,10 @@ export function applyEvent(input) {
     eventTime = Date.parse(e.timestamp) || time;
   if (
     prior.eventTime > eventTime ||
-    (e.timestamp && prior.eventTime === eventTime && prior.status === e.status)
+    (e.timestamp &&
+      prior.eventTime === eventTime &&
+      prior.status === e.status &&
+      (e.tokens === undefined || prior.tokens === e.tokens))
   )
     return prior;
   const next = {

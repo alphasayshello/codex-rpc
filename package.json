@@ -15,19 +15,24 @@
     "src",
     "web",
     "assets",
-    "electron",
+    "electron/*.cjs",
+    "electron/package.json",
+    "electron/package-lock.json",
     "scripts",
     "README.md",
     "SECURITY.md",
     "VERSIONING.md",
-    "LICENSE"
+    "LICENSE",
+    "docs",
+    "config.example.json"
   ],
   "scripts": {
     "test": "node --test",
     "assets": "node src/assets/generate-pet-gifs.js",
     "start": "node bin/codex-rpc.js serve",
     "build:sea": "node scripts/build-sea.js",
-    "check": "node scripts/check.js"
+    "check": "node scripts/check.js",
+    "verify:desktop": "npm --prefix electron run verify"
   },
   "keywords": [
     "codex",

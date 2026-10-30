@@ -11,7 +11,7 @@ export const file = (name) => path.join(home(), name);
 export const defaults = {
   enabled: true,
   privacy: "private",
-  clientId: "",
+  clientId: "1565535814308470814",
   buttons: [],
   assets: { working: "", thinking: "", waiting: "", idle: "", badge: "" },
   timing: { idleMs: 300000, pollMs: 2000, scanMs: 60000, presenceMs: 15000 },
