@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sandbox } from "./helpers.js";
+import { sandbox, jsonl } from "./helpers.js";
+import path from "node:path";
 import { buildActivity, taskTitle } from "../src/presence.js";
 import { applyEvent } from "../src/hook.js";
 import { config, writeJSON, readJSON } from "../src/store.js";
@@ -35,8 +36,15 @@ test("Watching card follows task / today / lifetime / status / churn layout", ()
   assert.match(a.assets.large_text, /gpt-5.*142.8K tokens/);
   assert.equal(a.timestamps.start, 1700000000);
 });
-test("task titles stay private by default and survive public tool/completion events", (t) => {
-  sandbox(t);
+test("conversation names stay private by default and survive public tool/completion events", (t) => {
+  const { codex } = sandbox(t);
+  jsonl(path.join(codex, "session_index.jsonl"), [
+    {
+      id: "chat",
+      thread_name: "Make the CLI simpler",
+      updated_at: "2026-10-29T12:00:00Z",
+    },
+  ]);
   applyEvent({
     type: "user_message",
     message: "Fix the private checkout\nExtra secret details",
@@ -45,7 +53,9 @@ test("task titles stay private by default and survive public tool/completion eve
   writeJSON("config.json", { ...config(), privacy: "public" });
   applyEvent({
     type: "user_message",
-    message: "Make the CLI simpler\nFull prompt stays out of state",
+    "thread-id": "chat",
+    message:
+      "This latest message must not replace the chat name\nFull prompt stays out of state",
   });
   applyEvent({ type: "tool-start", tool: "apply_patch" });
   applyEvent({ type: "agent-turn-complete" });

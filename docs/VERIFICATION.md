@@ -17,7 +17,7 @@ Verified locally on macOS ARM64, 2026-10-29. Test homes and Codex inputs were di
 | HTTP/dashboard | State/aggregate/config/exact-presence-preview APIs, range boundaries, Host/Origin/request-token checks, static assets, SVG card endpoints and live SSE updates. |
 | Settings and visual layout | `npm --prefix electron run verify`: all seven tabs, save settings, range changes, interactive heatmap, SSE and pause; confirmed zero pet `src` mutations on an unrelated live update; no horizontal overflow at 1440 and 430 pixels. Captured and visually inspected `dashboard.png`, `settings.png`, `mobile.png`, using synthetic data. |
 | Stat cards | Embedded source-derived pet SVG, 12-month heatmap, tokens/sessions/hours/streak badges and Markdown exports. |
-| Node support | Full `node --test` suite: 39 passing tests on Node 18.20.8 and Node 26.10.0. `npm run check` passes. |
+| Node support | Full `node --test` suite: 42 passing tests on Node 18.20.8 and Node 26.10.0. `npm run check` passes. |
 | Packaging | `npm pack --dry-run --json` verifies the CLI, source, generated assets, optional Electron source, config example and documentation, without nested `node_modules`. |
 | Standalone executable | Built with official Node 26.10.0 SEA, ad-hoc signed on macOS. Verified help, setup without service installation, stable executable copy, daemon start, scanner and stop in an isolated home. Homebrew's Node build has SEA disabled, so official Node is required for this build step. |
 | Git/documentation | Logical commits; README, SECURITY, VERSIONING, MIT license for original code and third-party mascot provenance. |
@@ -29,3 +29,5 @@ The earlier platform-dependent PNG regeneration failure was fixed with determini
 OS installers are tested as service descriptors and isolated installation logic. Linux systemd and Windows Startup activation have not been exercised on this macOS host. Live ChatGPT state transitions are tested with deterministic process-result fixtures; macOS Automation permissions and Linux/Windows foreground capabilities remain environment-dependent. The utility cannot recover ChatGPT conversation/token history from process observation.
 
 No npm package/release was published automatically. The user handles GitHub pushes. After pushing, verify that each configured raw GitHub asset URL serves the new GIF bytes, inspect the real Discord card, and review the cross-platform CI results.
+
+Conversation-name regression: display names come from the latest valid `session_index.jsonl` entry, survive new user messages, refresh after renames, and fall back to the project label for unnamed chats. No message text is automatically used as the conversation title.

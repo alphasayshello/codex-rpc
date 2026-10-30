@@ -41,9 +41,9 @@ $1.04k today · $24.3k all-time · Done · your move · +1055 −21
 ▣ 0:58 elapsed
 ```
 
-The card follows the same compact layout as claude-rpc: current task on top, daily/lifetime API-equivalent cost plus live status below, a state badge, and the session timer. The numbers above are an illustration, not collected usage. Discord controls wrapping, font and application name; the bundled application is named **Codex RPC**. `Watching` is the default activity type.
+The card follows the same compact layout as claude-rpc: conversation name on top, daily/lifetime API-equivalent cost plus live status below, a state badge, and the session timer. The numbers above are an illustration, not collected usage. Discord controls wrapping, font and application name; the bundled application is named **Codex RPC**. `Watching` is the default activity type.
 
-For that task-title layout, open `codex-rpc serve`, choose **Privacy → public**, and leave **Presence → Show current task** enabled. Private mode keeps task and project names out of the card. Presence also offers the original **Model / tokens** stats line and **Playing / Watching** header. `codex-rpc preview` prints the exact text and asset URLs for all four states before you share anything.
+For that named-chat layout, open `codex-rpc serve`, choose **Privacy → public**, and leave **Presence → Show conversation name** enabled. Private mode keeps task and project names out of the card. Presence also offers the original **Model / tokens** stats line and **Playing / Watching** header. `codex-rpc preview` prints the exact text and asset URLs for all four states before you share anything.
 
 The blue pet uses selected original poses with deliberate holds, not a rapid expression slideshow: work keeps its neutral terminal face, with one brief blink in a 5.22-second loop. Other states move slowly or give an occasional wave. Dashboard SSE updates preserve an animation already in progress. Ten pixel badges cover commands, thinking, completion, idle, approval, editing, reading, review, ready and errors. They are drawn on a crisp 24-pixel grid and enlarged without antialiasing; the card selects a badge from the live tool/state. A custom badge URL overrides them.
 
@@ -148,7 +148,7 @@ Electron runs the same loopback dashboard on a random port with Node integration
 
 ## settings & privacy
 
-`~/.codex-rpc/config.json` contains overrides. See [config.example.json](config.example.json). Default privacy is `private`: Discord receives “a private project”, not task titles or project/file names. Public mode can retain a short current-task title from the first line of the user prompt; full prompts are not stored. Tokens, model, tool name, hours and streak can still be shared. Public buttons and URLs are explicit user configuration.
+`~/.codex-rpc/config.json` contains overrides. See [config.example.json](config.example.json). Default privacy is `private`: Discord receives “a private project”, not task titles or project/file names. Public mode uses the actual conversation name from `~/.codex/session_index.jsonl`; later messages never replace it. Renames are picked up automatically. Unnamed chats fall back to the project label; full prompts are not used as display titles. Tokens, model, tool name, hours and streak can still be shared. Public buttons and URLs are explicit user configuration.
 
 ```json
 {

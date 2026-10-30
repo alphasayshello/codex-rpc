@@ -4,7 +4,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { codexHome, config, readJSON } from "./store.js";
 import { walk } from "./scanner.js";
-import { taskTitle } from "./presence.js";
 import { applyEvent, normalizeEvent } from "./hook.js";
 export class LogWatcher {
   constructor() {
@@ -57,14 +56,6 @@ export class LogWatcher {
           info.context.cwd = p.cwd;
         }
         if (p.model) info.context.model = p.model;
-        const title = taskTitle(
-          p.type === "user_message"
-            ? p.message
-            : p.role === "user"
-              ? p.content
-              : undefined,
-        );
-        if (title) info.context.task = title;
         if (Date.now() - Date.parse(row.timestamp || "") > c.timing.idleMs)
           continue;
         const event = { ...info.context, ...row };

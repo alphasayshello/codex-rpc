@@ -1,3 +1,4 @@
+import { conversationName } from "./threads.js";
 // Compact, Claude-RPC-style card text. No network access or raw prompt storage.
 export const ASSET_BASE =
   "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet";
@@ -94,12 +95,18 @@ export function buildActivity(state = {}, aggregate = {}, c = {}) {
     waiting: "Waiting on you in",
     idle: "Idle in",
   };
-  const details =
-    options.showTask && !privateMode && state.task
-      ? taskTitle(state.task)
-      : state.source === "chatgpt"
-        ? "ChatGPT App · Pair Programming"
-        : `${actions[status]} ${project}`;
+  const namedTitle =
+    options.showTask && !privateMode
+      ? conversationName(state.sessionId) ||
+        (!state.sessionId || state.taskSource
+          ? taskTitle(state.task)
+          : undefined)
+      : undefined;
+  const details = namedTitle
+    ? namedTitle
+    : state.source === "chatgpt"
+      ? "ChatGPT App · Pair Programming"
+      : `${actions[status]} ${project}`;
   const tokens = Number(state.tokens ?? aggregate.totals?.tokens) || 0,
     totals = aggregate.totals || {},
     today = aggregate.days?.[new Date().toISOString().slice(0, 10)] || {};

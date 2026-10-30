@@ -11,7 +11,7 @@ import {
   isMain,
   alive,
 } from "./store.js";
-import { taskTitle } from "./presence.js";
+import { conversationName } from "./threads.js";
 import { estimateCost } from "./pricing.js";
 import { applyEvent, normalizeEvent } from "./hook.js";
 export function emptyStats() {
@@ -119,9 +119,9 @@ export async function parseFile(filename) {
   const modernUsage = {},
     legacyUsage = {},
     fallbackPrompts = {};
-  let currentTask;
   let hasModernUsage = false,
     hasPromptEvents = false;
+  const titles = new Map();
   const stream = fs.createReadStream(filename, { encoding: "utf8" });
   const lines = readline.createInterface({
     input: stream,
@@ -147,14 +147,6 @@ export async function parseFile(filename) {
     }
     if (row.session_id) session = row.session_id;
     if (row.model || p.model) model = row.model || p.model;
-    const title = taskTitle(
-      p.type === "user_message"
-        ? p.message
-        : p.role === "user"
-          ? p.content
-          : undefined,
-    );
-    if (title) currentTask = title;
     const parsed = Date.parse(
       row.timestamp ||
         p.timestamp ||
@@ -274,11 +266,12 @@ export async function parseFile(filename) {
       result.totals.sourceSessions[source]++;
       result.days[day].sourceSessions[source]++;
     }
+    if (!titles.has(session)) titles.set(session, conversationName(session));
     const event = normalizeEvent({
       ...row,
       source,
       model,
-      task: currentTask,
+      task: titles.get(session),
       sessionId: session,
     });
     if (event) {
@@ -345,7 +338,7 @@ export async function scan({ live = false } = {}) {
   }
   try {
     const cache = readJSON("scanner-cache.json", { files: {} }),
-      next = { schemaVersion: 3, files: {} };
+      next = { schemaVersion: 4, files: {} };
     if (!config().enabled || !config().stats.enabled)
       return readJSON("aggregate.json", {
         schemaVersion: 1,
@@ -374,7 +367,7 @@ export async function scan({ live = false } = {}) {
       const st = fs.statSync(filename),
         old = cache.files[filename];
       const cached =
-        cache.schemaVersion === 3 &&
+        cache.schemaVersion === 4 &&
         old &&
         old.size === st.size &&
         old.mtimeMs === st.mtimeMs;

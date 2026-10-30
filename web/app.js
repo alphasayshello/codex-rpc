@@ -322,10 +322,10 @@ function settings() {
       ["Activity type", "presence.type", "activityType"],
       ["Stats line", "presence.stats", "statsStyle"],
       [
-        "Show current task",
+        "Show conversation name",
         "presence.showTask",
         "checkbox",
-        "Task titles are shared only in public privacy mode.",
+        "Conversation names are shared only in public privacy mode.",
       ],
       ["Show lines added / removed", "presence.showChurn", "checkbox"],
       [

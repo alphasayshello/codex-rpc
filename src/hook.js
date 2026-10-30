@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { taskTitle } from "./presence.js";
+import { conversationName } from "./threads.js";
 import { isMain, readJSON, writeJSON, config, file } from "./store.js";
 const states = {
   working: "working",
@@ -46,14 +47,7 @@ export function normalizeEvent(input) {
     project:
       input.project ||
       (input.cwd || p.cwd ? path.basename(input.cwd || p.cwd) : undefined),
-    task: taskTitle(
-      input.task ||
-        (type === "user_message"
-          ? p.message
-          : p.role === "user"
-            ? p.content
-            : input["input-messages"]?.at(-1)),
-    ),
+    task: taskTitle(input.threadName || input.task || p.thread_name),
     waitingReason: ["error", "task_failed"].includes(type)
       ? "error"
       : type === "approval-request"
@@ -77,6 +71,13 @@ export function applyEvent(input) {
   // Independent source files avoid lost read-modify-write updates from concurrent hooks.
   const source = e.source === "chatgpt" ? "chatgpt" : "codex";
   const prior = readJSON(`${source}-state.json`);
+  if (c.privacy === "public" && c.presence.showTask) {
+    const title = conversationName(e.sessionId || prior.sessionId);
+    if (title) {
+      e.task = title;
+      e.taskSource = "thread";
+    } else if (e.task) e.taskSource = "explicit";
+  }
   const time = Date.now(),
     eventTime = Date.parse(e.timestamp) || time;
   if (
@@ -110,12 +111,18 @@ export function applyEvent(input) {
     "sessionId",
     "project",
     "task",
+    "taskSource",
     "waitingReason",
     "model",
     "tool",
     "tokens",
   ])
     if (e[k] !== undefined) next[k] = e[k];
+  if (e.sessionId && e.sessionId !== prior.sessionId && !e.task) {
+    delete next.task;
+    delete next.taskSource;
+  }
+  if (!e.task && !prior.taskSource) delete next.task;
   if (e.status !== "working") delete next.tool;
   if (e.status !== "waiting") delete next.waitingReason;
   if (c.privacy === "private" || !c.presence.showTask) delete next.task;
