@@ -1,6 +1,6 @@
 {
   "name": "codex-rpc",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Local Discord presence and lifetime analytics for Codex and ChatGPT Desktop",
   "type": "module",
   "license": "MIT",

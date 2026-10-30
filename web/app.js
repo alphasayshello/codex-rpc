@@ -24,6 +24,10 @@ function setMotion(reduced, persist = true) {
   $("#motion-toggle").setAttribute("aria-pressed", String(reduced));
   $("#motion-label").textContent = reduced ? "Animate effects" : "Reduce motion";
   if (persist) storage.set("codex-rpc-motion", reduced ? "reduced" : "full");
+  for (const picture of document.querySelectorAll(".animation-option img")) {
+    const scene = picture.closest("[data-animation]").dataset.animation;
+    picture.src = `/assets/pet/codex-pet-${scene}.${reduced ? "svg" : "gif"}`;
+  }
 }
 setMotion(storage.get("codex-rpc-motion") ? storage.get("codex-rpc-motion") === "reduced" : motionPreference.matches, false);
 $("#motion-toggle").addEventListener("click", () => { setMotion(document.documentElement.dataset.motion !== "reduced"); refresh(); });
@@ -93,6 +97,7 @@ document.addEventListener("keydown", (event) => {
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
   }
 });
+let animationData = { animations: [], baseURL: "" };
 let cfg,
   token,
   tab = "Presence",
@@ -418,14 +423,14 @@ async function refresh() {
       state = ["working", "thinking", "waiting", "idle"].includes(s.status)
         ? s.status
         : "idle";
-    const visual = ["idle", "thinking", "writing", "patching", "error", "done", "waiting", "working"].includes(s.visualState) ? s.visualState : state;
+    const visual = animationData.animations.some(({ id }) => id === s.visualState) ? s.visualState : state;
     $(".live").dataset.state = visual;
     const bundled =
       "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/";
     const configuredPet = activity?.assets?.large_image;
     const reduced = document.documentElement.dataset.motion === "reduced";
     const petName = configuredPet?.startsWith(bundled) ? configuredPet.slice(bundled.length).split(/[?#]/)[0] : "";
-    const localPet = /^codex-pet-(working|thinking|waiting|idle|writing|patching|error|done)\.gif$/.test(petName);
+    const localPet = animationData.animations.some(({ id }) => petName === `codex-pet-${id}.gif`);
     const petURL = localPet ? `/assets/pet/${petName.replace(/\.gif$/, reduced ? ".svg" : ".gif")}`
       : configuredPet?.startsWith("https://") ? configuredPet
       : `/assets/pet/codex-pet-${visual}.${reduced ? "svg" : "gif"}`;
@@ -577,6 +582,43 @@ function field(label, key, type = "text", hint = "") {
   wrap.append(caption, input);
   return wrap;
 }
+function animationPicker() {
+  const panel = document.createElement("section"); panel.className = "animation-picker";
+  const heading = document.createElement("h3"); heading.textContent = "Find your pet’s next move";
+  const description = document.createElement("p"); description.className = "muted";
+  description.textContent = "Tools choose their matching scene automatically. Pick an animation below to customize a state, then save your changes.";
+  const label = document.createElement("label"); label.className = "animation-target-label"; label.textContent = "Customize state";
+  const select = document.createElement("select"); select.id = "animation-target";
+  for (const scene of animationData.animations) {
+    if (scene.id === "working" || !Object.hasOwn(cfg.assets, scene.id)) continue;
+    const option = document.createElement("option"); option.value = scene.id; option.textContent = scene.label; select.append(option);
+  }
+  select.value = "writing"; label.append(select);
+  const grid = document.createElement("div"); grid.className = "animation-options";
+  const reduced = document.documentElement.dataset.motion === "reduced";
+  for (const scene of animationData.animations.filter(({ id }) => id !== "working")) {
+    const button = document.createElement("button"); button.type = "button"; button.className = "animation-option";
+    button.dataset.animation = scene.id; button.title = scene.description; button.setAttribute("aria-label", `Use ${scene.label} for selected state`);
+    const picture = document.createElement("img"); picture.src = reduced ? scene.previewPath : scene.path; picture.alt = ""; picture.loading = "lazy"; picture.width = 96; picture.height = 104;
+    const caption = document.createElement("span"); caption.textContent = scene.label;
+    button.append(picture, caption);
+    button.addEventListener("click", () => {
+      const input = document.querySelector(`[data-key="assets.${select.value}"]`);
+      input.value = animationData.baseURL + `codex-pet-${scene.id}.gif?v=smooth-1`;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      markSelected();
+      $("#save-status").textContent = `${scene.label} selected for ${select.selectedOptions[0].textContent}. Save changes to apply.`;
+    });
+    grid.append(button);
+  }
+  function markSelected() {
+    const current = cfg.assets[select.value];
+    for (const button of grid.children) button.setAttribute("aria-pressed", String(current?.split(/[?#]/)[0] === animationData.baseURL + `codex-pet-${button.dataset.animation}.gif`));
+  }
+  select.addEventListener("change", markSelected); markSelected();
+  panel.append(heading, description, label, grid); return panel;
+}
+
 function settings() {
   const tabs = $(".tabs");
   tabs.replaceChildren();
@@ -647,20 +689,10 @@ function settings() {
     ],
     Discord: [["Application ID", "clientId", "text"]],
     "Codex Pet Assets": [
-      ["Writing GIF URL / key", "assets.writing"],
-      ["Patching GIF URL / key", "assets.patching"],
-      ["Error GIF URL / key", "assets.error"],
-      ["Success GIF URL / key", "assets.done"],
-      ["Legacy working GIF URL / key", "assets.working"],
-      ["Thinking GIF URL / key", "assets.thinking"],
-      ["Waiting GIF URL / key", "assets.waiting"],
-      ["Idle GIF URL / key", "assets.idle"],
-      [
-        "Status badge override",
-        "assets.badge",
-        "text",
-        "Leave blank for automatic working / thinking / done / idle icons.",
-      ],
+      ...Object.keys(cfg.assets).filter((id) => id !== "badge").map((id) => [
+        `${animationData.animations.find((scene) => scene.id === id)?.label || id} GIF URL / key`, `assets.${id}`,
+      ]),
+      ["Status badge override", "assets.badge", "text", "Leave blank for automatic pixel tool badges."],
     ],
     Timing: Object.keys(cfg.timing).map((k) => [k, "timing." + k, "number"]),
     Privacy: [
@@ -669,7 +701,15 @@ function settings() {
     ],
     Stats: [["Scan local session logs", "stats.enabled", "checkbox"]],
   };
-  for (const def of defs[tab] || []) content.append(field(...def));
+  if (tab === "Codex Pet Assets") {
+    const advanced = document.createElement("details"); advanced.className = "asset-advanced";
+    const summary = document.createElement("summary"); summary.textContent = "Custom image URLs and Discord asset keys";
+    advanced.append(summary);
+    for (const def of defs[tab]) (def[1] === "assets.badge" ? content : advanced).append(field(...def));
+    content.append(advanced);
+  } else {
+    for (const def of defs[tab] || []) content.append(field(...def));
+  }
   if (tab === "Daemon Controls") {
     for (const action of ["start", "pause", "resume", "restart", "stop"]) {
       const b = document.createElement("button");
@@ -690,6 +730,7 @@ function settings() {
     }
   }
   if (tab === "Codex Pet Assets") {
+    content.prepend(animationPicker());
     const gallery = document.createElement("img");
     gallery.src = "/assets/pet/status-badges.svg";
     gallery.alt =
@@ -736,7 +777,7 @@ $("#toggle-presence").addEventListener("click", async () => {
 });
 try {
   ({ token } = await api("/api/session"));
-  cfg = await api("/api/config");
+  [cfg, animationData] = await Promise.all([api("/api/config"), api("/api/animations")]);
   settings();
   await refresh();
   const stream = new EventSource("/events");

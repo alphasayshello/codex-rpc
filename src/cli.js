@@ -3,7 +3,7 @@ import { selectedState } from "./selection.js";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { buildActivity } from "./presence.js";
-import { readJSON, writeJSON, config } from "./store.js";
+import { animationStates, readJSON, writeJSON, config } from "./store.js";
 import { scan } from "./scanner.js";
 import { main as hook, applyEvent } from "./hook.js";
 import { runDaemon } from "./daemon.js";
@@ -23,7 +23,7 @@ Usage: codex-rpc <command>
   chat          Current-chat tokens, tools, cost, context (--json, --watch)
   usage         Heatmap, hourly histogram, tools, languages, API estimates
   insights      Five contextual lines about your week
-  preview       Show the exact Discord text and assets for six visual states and approval waiting
+  preview       Show Discord text/assets for core scenes (--all: all 19 animations)
   serve         Local dashboard + seven settings tabs (port 47474)
   statcards     Generate stats.svg, heatmap.svg, badges and Markdown
   doctor        Diagnose hooks, daemon, detector, IPC, stats, privacy
@@ -130,9 +130,11 @@ export async function main(args = process.argv.slice(2)) {
       const state = readJSON("state.json"),
         aggregate = readJSON("aggregate.json"),
         settings = { ...config(), enabled: true };
-      for (const [scene, status] of [["writing", "working"], ["patching", "working"], ["thinking", "thinking"], ["error", "waiting"], ["done", "waiting"], ["idle", "idle"], ["waiting", "waiting"]]) {
+      const previewScenes = rest.includes("--all") ? animationStates : ["writing", "patching", "thinking", "error", "done", "idle", "waiting"];
+      for (const scene of previewScenes) {
+        const status = scene.startsWith("idle") ? "idle" : scene === "thinking" ? "thinking" : ["error", "done", "waiting", "celebrating"].includes(scene) ? "waiting" : "working";
         const activity = buildActivity(
-          { ...state, status, visualState: scene, waitingReason: scene === "error" ? "error" : scene === "done" ? "done" : "approval", eventTime: Date.now() },
+          { ...state, status, visualState: scene, waitingReason: scene === "error" ? "error" : ["done", "celebrating"].includes(scene) ? "done" : undefined, eventTime: Date.now() },
           aggregate,
           settings,
         );

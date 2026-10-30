@@ -535,9 +535,107 @@ app
     writeJSON("state.json", { ...readJSON("state.json"), eventTime: Date.now() - 20000, updatedAt: Date.now() });
     await until(() => js("document.querySelector('#pet').getAttribute('src')==='/assets/pet/codex-pet-idle.svg'"));
     assert.equal(await js("fetch('/api/state').then(r=>r.json()).then(s=>s.visualState)"), "idle");
+    // All new scenes travel through the actual local API and asset routes.
+    const catalog = await js("fetch('/api/animations').then(r=>r.json())");
+    assert.equal(catalog.animations.length, 20); // 19 scenes plus legacy working.
+    assert.equal(new Set(catalog.animations.map(scene => scene.id)).size, 20);
+    assert.ok(catalog.animations.some(scene => scene.id === "idle-cozy"));
+    const routes = catalog.animations.flatMap(scene => ["gif", "svg"].map(format => `/assets/pet/codex-pet-${scene.id}.${format}`));
+    const served = await js(`Promise.all(${JSON.stringify(routes)}.map(async route=>{const response=await fetch(route);const bytes=new Uint8Array(await response.arrayBuffer());return {route,status:response.status,type:response.headers.get('content-type'),prefix:new TextDecoder().decode(bytes.slice(0,100))}}))`);
+    for (const response of served) {
+      assert.equal(response.status, 200, response.route);
+      if (response.route.endsWith(".gif")) { assert.equal(response.type, "image/gif"); assert.match(response.prefix, /^GIF8[79]a/); }
+      else { assert.equal(response.type, "image/svg+xml"); assert.ok(response.prefix.includes("<svg")); }
+    }
+    // Choosing artwork changes the settings draft, never the persisted config
+    // until the existing Save changes action is used.
+    await js("document.querySelector('#settings-tab-2').click()");
+    assert.equal(await js("document.querySelectorAll('.animation-option').length"), 19);
+    assert.equal(await js("document.querySelector('#animation-target').value"), "writing");
+    const oldWriting = config().assets.writing;
+    const chosenURL = catalog.baseURL + "codex-pet-reading.gif?v=smooth-1";
+    await js("document.querySelector('.animation-option[data-animation=reading]').click()");
+    assert.equal(await js("document.querySelector('[data-key=\"assets.writing\"]').value"), chosenURL);
+    assert.equal(config().assets.writing, oldWriting);
+    assert.match(await js("document.querySelector('#save-status').textContent"), /Save changes to apply/);
+    await js("document.querySelector('#settings-form').requestSubmit()");
+    await until(() => config().assets.writing === chosenURL);
+    emit("writing");
+    await until(() => js("document.querySelector('#pet').getAttribute('src')==='/assets/pet/codex-pet-reading.svg'"));
+    await reload();
+    await js("document.querySelector('#settings-tab-2').click()");
+    assert.equal(await js("document.querySelector('[data-key=\"assets.writing\"]').value"), chosenURL);
+    assert.equal(await js("document.querySelector('.animation-option[data-animation=reading]').getAttribute('aria-pressed')"), "true");
+    assert.equal(await js("[...document.querySelectorAll('.animation-option img')].every(image=>image.getAttribute('src').endsWith('.svg'))"), true);
+    await js("document.querySelector('#motion-toggle').click()");
+    await until(() => js("[...document.querySelectorAll('.animation-option img')].every(image=>image.getAttribute('src').endsWith('.gif'))"));
+    await until(() => js("document.querySelector('#pet').getAttribute('src')==='/assets/pet/codex-pet-reading.gif'"));
+    // The full animation studio remains local: controls, filters, keyboard
+    // navigation, copy feedback and motion/background preferences are real DOM.
+    await window.loadURL(`http://127.0.0.1:${dashboard.address().port}/assets/pet/animation-gallery.html`);
+    await until(() => js("document.querySelectorAll('.scene-card').length===19 && document.querySelector('#preview-image').complete && document.querySelector('#preview-image').naturalWidth>0"));
+    assert.equal(await js("document.querySelector('#scene-count').textContent"), "19 scenes");
+    await js("document.querySelector('[data-filter=bonus]').click()");
+    assert.equal(await js("document.querySelectorAll('.scene-card:not([hidden])').length"), 12);
+    await js("document.querySelector('[data-filter=core]').click()");
+    assert.equal(await js("document.querySelectorAll('.scene-card:not([hidden])').length"), 7);
+    await js("document.querySelector('[data-filter=all]').click();document.querySelector('#family-filter').value='research';document.querySelector('#family-filter').dispatchEvent(new Event('change'))");
+    assert.equal(await js("[...document.querySelectorAll('.scene-card:not([hidden])')].every(card=>card.dataset.family==='research')"), true);
+    assert.ok(await js("document.querySelectorAll('.scene-card:not([hidden])').length>0"));
+    await js("document.querySelector('#family-filter').value='all';document.querySelector('#family-filter').dispatchEvent(new Event('change'));document.querySelector('#scene-search').value='no-such-scene-xyz';document.querySelector('#scene-search').dispatchEvent(new Event('input'))");
+    assert.equal(await js("document.querySelectorAll('.scene-card:not([hidden])').length"), 0);
+    assert.equal(await js("document.querySelector('#empty-scenes').hidden"), false);
+    await js("document.querySelector('#scene-search').value='';document.querySelector('#scene-search').dispatchEvent(new Event('input'));document.querySelector('.scene-card[data-scene=testing]').click()");
+    assert.equal(await js("document.querySelector('#preview-title').textContent"), "Testing");
+    assert.equal(await js("document.querySelector('#download-gif').getAttribute('href')"), "codex-pet-testing.gif");
+    assert.equal(await js("document.querySelector('#download-svg').getAttribute('href')"), "codex-pet-testing.svg");
+    assert.match(await js("document.querySelector('#asset-url').value"), /codex-pet-testing\.gif\?v=smooth-1$/);
+    await js("Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.testCopiedAsset=value}}});document.querySelector('#copy-url').click()");
+    await until(() => js("document.querySelector('#copy-status').textContent.includes('GIF URL copied')"));
+    assert.equal(await js("window.testCopiedAsset"), await js("document.querySelector('#asset-url').value"));
+    await js("document.querySelector('.scene-card[data-scene=testing]').focus()");
+    await key("End");
+    assert.equal(await js("document.activeElement.dataset.scene"), "idle-cozy");
+    await key("Home");
+    assert.equal(await js("document.activeElement.dataset.scene"), "idle");
+    await js("document.querySelector('#reduce-motion').checked=false;document.querySelector('#reduce-motion').dispatchEvent(new Event('change'))");
+    if (await js("document.querySelector('#play-toggle').textContent==='Play animations'")) await js("document.querySelector('#play-toggle').click()");
+    assert.match(await js("document.querySelector('#preview-image').getAttribute('src')"), /\.gif$/);
+    await js("document.querySelector('#play-toggle').click()");
+    assert.match(await js("document.querySelector('#preview-image').getAttribute('src')"), /\.svg$/);
+    await js("document.querySelector('#play-toggle').click();document.querySelector('#reduce-motion').checked=true;document.querySelector('#reduce-motion').dispatchEvent(new Event('change'))");
+    assert.equal(await js("document.querySelector('#play-toggle').disabled"), true);
+    assert.equal(await js("[...document.querySelectorAll('.scene-image')].every(image=>image.getAttribute('src').endsWith('.svg'))"), true);
+    for (const background of ["light", "checkerboard", "dark"]) {
+      await js(`document.querySelector('#background-select').value=${JSON.stringify(background)};document.querySelector('#background-select').dispatchEvent(new Event('change'))`);
+      assert.equal(await js("document.body.dataset.background"), background);
+    }
+    await window.loadURL(`http://127.0.0.1:${dashboard.address().port}/assets/pet/animation-gallery.html`);
+    await until(() => js("document.querySelector('#reduce-motion').checked"));
+    assert.equal(await js("document.querySelector('#play-toggle').disabled"), true);
+    assert.equal(await js("document.body.dataset.background"), "dark");
+    // Capture the full-motion hero from the actual top of the document, then
+    // show the complete bonus collection so distinct scenes remain visible.
+    await js("document.querySelector('[data-filter=all]').click();document.querySelector('#family-filter').value='all';document.querySelector('#family-filter').dispatchEvent(new Event('change'));document.querySelector('#scene-search').value='';document.querySelector('#scene-search').dispatchEvent(new Event('input'));document.querySelector('#background-select').value='dark';document.querySelector('#background-select').dispatchEvent(new Event('change'));document.querySelector('#reduce-motion').checked=false;document.querySelector('#reduce-motion').dispatchEvent(new Event('change'));document.querySelector('.scene-card[data-scene=writing]').click()");
+    if (await js("document.querySelector('#play-toggle').textContent==='Play animations'")) await js("document.querySelector('#play-toggle').click()");
+    assert.equal(await js("[...document.querySelectorAll('.scene-image')].every(image=>image.getAttribute('src').endsWith('.gif'))"), true);
+    window.setSize(1440, 1100);
+    await js("scrollTo({top:0,behavior:'instant'});new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))");
+    assert.equal(await js("scrollY"), 0);
+    await capture("pet-studio.png");
+    window.setSize(430, 1050);
+    await js("scrollTo({top:0,behavior:'instant'});new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))");
+    assert.equal(await js("document.documentElement.scrollWidth<=innerWidth"), true);
+    assert.equal(await js("scrollY"), 0);
+    await capture("pet-studio-mobile.png");
+    window.setSize(1440, 1100);
+    await js("scrollTo({top:document.querySelector('.scene-section[data-section=bonus]').getBoundingClientRect().top+scrollY-20,behavior:'instant'})");
+    await until(() => js("[...document.querySelectorAll('.scene-card[data-kind=bonus] img')].every(image=>image.complete&&image.naturalWidth>0)"));
+    assert.equal(await js("[...document.querySelectorAll('.scene-card[data-kind=bonus]')].every(card=>{const box=card.getBoundingClientRect();return box.top>=0&&box.bottom<=innerHeight})"), true);
+    await capture("pet-collection.png");
     assert.deepEqual(errors, []);
     console.log(
-      "Verified actual-hook file/diff/command telemetry, stable thinking and operation/session timers, six GIF/SVG visual states, asset keys, privacy and button suppression; output-only recaps, motion persistence, stable mascot across SSE, pin isolation, safe timeline, themes, keyboard/mobile navigation, responsive layout, settings, heatmap and pause. Screenshots in docs/.",
+      "Verified actual-hook file/diff/command telemetry, stable thinking and operation/session timers, 20 GIF and 20 SVG asset routes, 19-scene gallery controls and settings picker, six canonical lifecycle states, asset keys, privacy and button suppression; output-only recaps, motion persistence, stable mascot across SSE, pin isolation, safe timeline, themes, keyboard/mobile navigation, responsive layout, settings, heatmap and pause. Screenshots in docs/.",
     );
   })
   .catch((e) => {

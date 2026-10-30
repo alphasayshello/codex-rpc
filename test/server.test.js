@@ -123,7 +123,25 @@ test("dashboard serves APIs/assets, live SVG, settings CSRF protection and range
   assert.equal((await fetch(url + "/api/recaps")).status, 200);
   assert.deepEqual((await (await fetch(url + "/api/recaps")).json()).rows, []);
   assert.equal((await fetch(url + "/assets/pet/codex-status-thinking.gif")).headers.get("content-type"), "image/gif");
-  assert.equal((await fetch(url + "/assets/pet/animation-gallery.html")).status, 200);
+  const catalog = await (await fetch(url + "/api/animations")).json();
+  assert.equal(catalog.animations.length, 20);
+  assert.equal(new Set(catalog.animations.map(({ id }) => id)).size, 20);
+  assert.match(catalog.baseURL, /^https:\/\/raw\.githubusercontent\.com\//);
+  for (const scene of catalog.animations) {
+    for (const route of [scene.path, scene.previewPath]) {
+      const response = await fetch(url + route);
+      assert.equal(response.status, 200, route);
+      assert.equal(response.headers.get("content-type"), route.endsWith("gif") ? "image/gif" : "image/svg+xml");
+    }
+  }
+  const gallery = await fetch(url + "/assets/pet/animation-gallery.html");
+  assert.equal(gallery.status, 200);
+  assert.match(gallery.headers.get("content-security-policy"), /script-src 'self'/);
+  assert.equal((await fetch(url + "/assets/pet/animation-gallery.js")).headers.get("content-type"), "text/javascript");
+  assert.equal((await fetch(url + "/assets/pet/animation-catalog.json")).status, 200);
+  assert.equal((await fetch(url + "/assets/pet/manifest.json")).status, 200);
+  assert.equal((await fetch(url + "/assets/pet/codex-pet-not-a-scene.gif")).status, 404);
+  assert.equal((await fetch(url + "/assets/pet/codex-pet-constructor.gif")).status, 404);
   assert.equal((await fetch(url + "/not-a-route")).status, 404);
   controller = new AbortController();
   const response = await fetch(url + "/events", { signal: controller.signal });

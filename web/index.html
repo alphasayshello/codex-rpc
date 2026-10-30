@@ -26,10 +26,11 @@
       </nav>
       <div class="sidebar-note"><span class="dot"></span> Live on your device<small>Codex &amp; ChatGPT Desktop</small></div>
       <div class="aside-bottom">
+        <a class="sidebar-gallery-link" href="/assets/pet/animation-gallery.html" target="_blank" rel="noopener"><img src="/assets/pet/codex-pet-writing.svg" width="24" height="26" alt="" />Pet studio <span aria-hidden="true">↗</span></a>
         <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><span id="theme-label">Light mode</span></button>
         <button id="motion-toggle" class="theme-toggle" type="button" aria-pressed="false"><span aria-hidden="true">▦</span><span id="motion-label">Reduce motion</span></button>
         <a class="sidebar-card-link" href="/cards/stats.svg" target="_blank" rel="noopener">Your stats card <span aria-hidden="true">↗</span></a>
-        <small>Local data. No telemetry.<br />codex-rpc <span class="version">0.2.0</span></small>
+        <small>Local data. No telemetry.<br />codex-rpc <span class="version">0.3.0</span></small>
       </div>
     </aside>
     <main id="main-content">
@@ -40,8 +41,9 @@
         </div>
         <div class="connection" role="status"><span id="stream-dot" class="dot"></span><span id="connection">Connecting</span></div>
       </div>
-      <header>
-        <div><span class="eyebrow">Overview</span><h1>Your activity</h1><p>A live view of your work, from this chat to all time.</p></div>
+      <header class="workspace-header">
+        <div><span class="eyebrow">YOUR WORKSPACE</span><h1>Your activity</h1><p>The work in front of you. The progress behind it.</p></div>
+        <a class="studio-link" href="/assets/pet/animation-gallery.html" target="_blank" rel="noopener"><img src="/assets/pet/codex-pet-writing.svg" width="28" height="30" alt="" /><span>Meet your next mood<small>Explore the pet studio</small></span><span aria-hidden="true">↗</span></a>
       </header>
       <section id="overview">
         <div class="section-head">
@@ -81,7 +83,7 @@
                   height="42"
                 />
               </div>
-              <div>
+              <div class="operation-copy">
                 <h3 id="live-action">Ready when you are.</h3>
                 <p id="live-model">No active model</p>
                 <p id="live-source" class="muted">Codex CLI</p>

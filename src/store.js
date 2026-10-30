@@ -9,6 +9,13 @@ export const home = () =>
 export const codexHome = () =>
   process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
 export const file = (name) => path.join(home(), name);
+export const bonusAnimationStates = Object.freeze([
+  "reading", "searching", "terminal", "testing", "building", "installing",
+  "reviewing", "debugging", "connecting", "focus", "celebrating", "idle-cozy",
+]);
+export const animationStates = Object.freeze([
+  "idle", "thinking", "waiting", "writing", "patching", "error", "done", ...bonusAnimationStates,
+]);
 export const defaults = {
   enabled: true,
   privacy: "private",
@@ -17,16 +24,19 @@ export const defaults = {
   presence: { type: 3, showTask: true, stats: "telemetry", showChurn: true, timer: "operation" },
   assets: {
     working:
-      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-working.gif?v=typing-1",
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-working.gif?v=smooth-1",
     thinking:
-      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-thinking.gif?v=motion-2",
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-thinking.gif?v=smooth-1",
     waiting:
-      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-waiting.gif?v=motion-2",
-    idle: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-idle.gif?v=motion-2",
-    writing: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-writing.gif?v=typing-1",
-    patching: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-patching.gif?v=motion-2",
-    error: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-error.gif?v=motion-2",
-    done: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-done.gif?v=motion-2",
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-waiting.gif?v=smooth-1",
+    idle: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-idle.gif?v=smooth-1",
+    writing: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-writing.gif?v=smooth-1",
+    patching: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-patching.gif?v=smooth-1",
+    error: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-error.gif?v=smooth-1",
+    done: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-done.gif?v=smooth-1",
+    ...Object.fromEntries(bonusAnimationStates.map((scene) => [scene,
+      `https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-${scene}.gif?v=smooth-1`,
+    ])),
     badge: "",
   },
   timing: { idleMs: 300000, pollMs: 2000, scanMs: 60000, presenceMs: 15000, successMs: 15000 },
@@ -121,7 +131,7 @@ export function validateConfig(c) {
   n.timing = { ...config().timing, ...n.timing };
   for (const [k, v] of Object.entries(n.assets))
     if (
-      !(k in defaults.assets) ||
+      !Object.hasOwn(defaults.assets, k) ||
       typeof v !== "string" ||
       (v && !/^https:\/\//.test(v) && !/^[\w-]+$/.test(v))
     )

@@ -12,6 +12,8 @@ import { emptyStats } from "./scanner.js";
 import { statsSVG, heatmapSVG, badgeSVG } from "./statcards.js";
 import { startDaemon, stopDaemon } from "./service.js";
 import { watchDirectory } from "./directory-watch.js";
+import { animationCatalog } from "./assets/generate-pet-gifs.js";
+const animationIds = new Set(animationCatalog.map(({ id }) => id));
 export function createServer() {
   const token = randomBytes(24).toString("hex"),
     clients = new Set();
@@ -112,6 +114,10 @@ export function createServer() {
         res.writeHead(405).end();
         return;
       }
+      if (url.pathname === "/api/animations") {
+        json(200, { animations: animationCatalog, baseURL: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/" });
+        return;
+      }
       if (url.pathname === "/api/state") {
         const state = selectedState();
         if (config().privacy !== "public" || !config().presence.showTask)
@@ -208,6 +214,9 @@ export function createServer() {
         "/": ["../web/index.html", "text/html"],
         "/app.js": ["../web/app.js", "text/javascript"],
         "/style.css": ["../web/style.css", "text/css"],
+        "/assets/pet/animation-gallery.js": ["../assets/pet/animation-gallery.js", "text/javascript"],
+        "/assets/pet/manifest.json": ["../assets/pet/manifest.json", "application/json"],
+        "/assets/pet/animation-catalog.json": ["../assets/pet/animation-catalog.json", "application/json"],
         "/assets/pet/animation-gallery.css": ["../assets/pet/animation-gallery.css", "text/css"],
         "/assets/pet/animation-gallery.html": ["../assets/pet/animation-gallery.html", "text/html"],
         "/assets/pet/animation-spritesheet.png": ["../assets/pet/animation-spritesheet.png", "image/png"],
@@ -216,11 +225,8 @@ export function createServer() {
           "image/svg+xml",
         ],
       };
-      if (
-        /^\/assets\/pet\/codex-pet-(working|thinking|waiting|idle|writing|patching|error|done)\.(gif|svg)$/.test(
-          url.pathname,
-        )
-      ) {
+      const petAsset = /^\/assets\/pet\/codex-pet-([a-z-]+)\.(gif|svg)$/.exec(url.pathname);
+      if (petAsset && animationIds.has(petAsset[1])) {
         routes[url.pathname] = [
           ".." + url.pathname,
           url.pathname.endsWith(".gif") ? "image/gif" : "image/svg+xml",

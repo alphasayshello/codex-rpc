@@ -1,7 +1,7 @@
 import { summarizeCommand } from "./watcher.js";
 import fs from "node:fs";
 import { safeFilePath } from "./paths.js";
-import { config, file, readJSON, writeJSON } from "./store.js";
+import { config, file, readJSON, writeJSON, animationStates } from "./store.js";
 import { readLiveSession } from "./live.js";
 import { conversationName } from "./threads.js";
 
@@ -34,6 +34,7 @@ function safeTool(tool, settings) {
 }
 function redact(state, settings) {
   const next = { ...state };
+  if (!animationStates.includes(next.visualState)) delete next.visualState;
   for (const field of ["activeTools", "recentTools"])
     if (state[field] !== undefined) next[field] = Array.isArray(state[field]) ? state[field].map((tool) => safeTool(tool, settings)).filter(Boolean) : [];
   if (state.lastTool !== undefined) next.lastTool = safeTool(state.lastTool, settings);

@@ -12,6 +12,7 @@ import {
   unregisterHook,
 } from "../src/service.js";
 import { config, writeJSON, readJSON, alive } from "../src/store.js";
+import { animationStates } from "../src/store.js";
 import { completion, commands } from "../src/completion.js";
 const exec = promisify(execFile),
   cli = fileURLToPath(new URL("../bin/codex-rpc.js", import.meta.url));
@@ -38,6 +39,9 @@ test("all read-only commands exit cleanly and produce useful output", async (t) 
     assert.ok(stdout.trim(), cmd);
     assert.equal(stderr, "", cmd);
   }
+  const allPreviews = await exec(process.execPath, [cli, "preview", "--all"], { env, timeout: 10000 });
+  assert.equal(allPreviews.stderr, "");
+  for (const scene of animationStates) assert.ok(allPreviews.stdout.includes(`\n${scene.toUpperCase()} ·`), scene);
   await assert.rejects(
     exec(process.execPath, [cli, "no-such-command"], { env }),
   );
@@ -165,6 +169,8 @@ test("setup refreshes bundled GIF URLs and restarts an existing daemon without c
       working: oldBase + "/codex-pet-working.gif",
       writing: oldBase + "/codex-pet-writing.gif?v=motion-2",
       patching: "https://my-assets.example/patching.gif",
+      testing: oldBase + "/codex-pet-testing.gif?v=older",
+      building: oldBase + "/codex-pet-focus.gif?v=custom",
       thinking: "https://my-assets.example/thinking.gif",
       badge: oldBase + "/codex-badge.png",
     },
@@ -178,9 +184,11 @@ test("setup refreshes bundled GIF URLs and restarts an existing daemon without c
     timeout: 20000,
   });
   assert.notEqual(readJSON("daemon.json").pid, original);
-  assert.match(config().assets.working, /\?v=typing-1$/);
-  assert.match(config().assets.writing, /\?v=typing-1$/);
+  assert.match(config().assets.working, /\?v=smooth-1$/);
+  assert.match(config().assets.writing, /\?v=smooth-1$/);
   assert.equal(config().assets.patching, "https://my-assets.example/patching.gif");
+  assert.match(config().assets.testing, /codex-pet-testing\.gif\?v=smooth-1$/);
+  assert.equal(config().assets.building, oldBase + "/codex-pet-focus.gif?v=custom");
   assert.equal(
     config().assets.thinking,
     "https://my-assets.example/thinking.gif",

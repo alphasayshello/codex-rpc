@@ -1,3 +1,5 @@
+import { animationStates } from "./store.js";
+import { summarizeCommand } from "./watcher.js";
 import { safeFilePath } from "./paths.js";
 import { getChatStats } from "./chat.js";
 import { conversationName } from "./threads.js";
@@ -84,17 +86,32 @@ export function statusBadgeKind(state = {}) {
   }
   return state.status === "thinking" ? "thinking" : "idle";
 }
+const allowedVisualStates = new Set(animationStates);
 export function getVisualState(state = {}, settings = {}, now = Date.now()) {
-  if (state.status === "idle") return "idle";
-  if (state.waitingReason === "error" || state.visualState === "error") return "error";
-  if (state.visualState === "done" || (state.status === "waiting" && state.waitingReason === "done")) {
+  const explicit = typeof state.visualState === "string" && allowedVisualStates.has(state.visualState) ? state.visualState : null;
+  // Idle projections must settle old errors/successes even if a live snapshot
+  // still carries the previous operation's visual hint. Other scenes are chosen
+  // explicitly or by the current tool, never by rotating on elapsed time.
+  if (state.status === "idle") return ["idle-cozy", "connecting", "focus"].includes(explicit) ? explicit : "idle";
+  if (state.waitingReason === "error" || explicit === "error") return "error";
+  if (explicit === "done" || (state.status === "waiting" && state.waitingReason === "done")) {
     const ended = state.eventTime || state.updatedAt;
-    return !ended || now - ended < (settings.timing?.successMs || 15000) ? "done" : "idle";
+    return !ended || now - ended < (settings.timing?.successMs || 15000) ? explicit === "celebrating" ? "celebrating" : "done" : "idle";
   }
-  if (["thinking", "writing", "patching"].includes(state.visualState)) return state.visualState;
+  if (explicit) return explicit;
   if (state.status === "thinking") return "thinking";
-  if (state.status === "working") return state.operationKind === "editing" || /patch|edit|write_file/i.test(state.effectiveTool || state.tool || "") ? "patching" : "writing";
-  return "waiting";
+  if (state.status !== "working") return "waiting";
+  const tool = String(state.effectiveTool || state.tool || "").toLowerCase();
+  if (state.operationKind === "editing" || /patch|edit|write_file/.test(tool)) return "patching";
+  const command = summarizeCommand(state.commandSummary) || "";
+  if (/^(?:(?:npm|pnpm|yarn) (?:test|run test)|pytest|cargo test|go test)$/.test(command)) return "testing";
+  if (/^(?:(?:npm|pnpm|yarn) (?:build|run build)|cargo build|go build)$/.test(command)) return "building";
+  if (/^(?:(?:npm|pnpm|yarn) (?:install|ci))$/.test(command)) return "installing";
+  if (/^git (?:diff|show)$/.test(command) || /review/.test(tool)) return "reviewing";
+  if (/^(?:rg|grep|find)$/.test(command) || /(?:^|[_:.])(?:rg|grep|glob|find)(?:$|[_:.])|search/.test(tool)) return "searching";
+  if (/^(?:cat|sed)$/.test(command) || /read|list_directory|list_files/.test(tool)) return "reading";
+  if (state.operationKind === "shell" || /(?:^|[_:.])(?:bash|shell|exec_command|terminal|run_command)(?:$|[_:.])/.test(tool)) return "terminal";
+  return "writing";
 }
 const clockLabel = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
 export function buildActivity(state = {}, aggregate = {}, c = {}, chat = getChatStats(state, c), now = Date.now()) {
@@ -229,20 +246,23 @@ export function buildActivity(state = {}, aggregate = {}, c = {}, chat = getChat
     const workspaceBudget = Math.max(8, actionBudget - 8 - idleBranch.length);
     const idleProject = project.length > workspaceBudget ? project.slice(0, workspaceBudget - 1) + "…" : project;
     const liveAction = status === "idle" || visual === "idle" ? `Idle in ${idleProject}${idleBranch}` : status === "working" && coding ? `Editing ${shownFile || "files"}${churn}`
-      : status === "working" && /bash|shell|exec_command/.test(tool) ? `Running: ${command || "shell command"}`
+      : status === "working" && (state.operationKind === "shell" || /bash|shell|exec_command/.test(tool)) ? `Running: ${command || "shell command"}`
       : status === "working" ? (toolName ? `Using ${toolName}` : "Working")
       : visual === "error" ? "Needs attention" : "";
     telemetryState = [liveAction, telemetryModel, tokensLabel, !privateMode && options.showTask && status === "thinking" ? namedTitle : null].filter(Boolean).join(" · ");
   }
   const visualAsset = c.assets?.[visual];
   const legacyWorking = c.assets?.working;
-  const chosenAsset = ["writing", "patching"].includes(visual) && legacyWorking && !legacyWorking.startsWith(ASSET_BASE) && (!visualAsset || visualAsset.split("?")[0] === `${ASSET_BASE}/codex-pet-${visual}.gif`) ? legacyWorking : visualAsset;
+  const automaticWorking = status === "working" && !allowedVisualStates.has(state.visualState);
+  const legacyCompatible = ["writing", "patching"].includes(visual) || automaticWorking;
+  const sceneAtDefault = !visualAsset || visualAsset.split("?")[0] === `${ASSET_BASE}/codex-pet-${visual}.gif`;
+  const chosenAsset = legacyCompatible && legacyWorking && !legacyWorking.startsWith(ASSET_BASE) && sceneAtDefault ? legacyWorking : visualAsset;
   const activity = {
     type: options.type,
     details: (telemetryDetails || (options.stats === "chat" ? statusDetails[status] : details || `${actions[status]} ${project}`)).slice(0, 128),
     state: (telemetryState || parts.join(" · ")).slice(0, 128),
     assets: {
-      large_image: chosenAsset || c.assets?.[status] || `${ASSET_BASE}/codex-pet-${visual}.gif?v=motion-2`,
+      large_image: chosenAsset || c.assets?.[status] || `${ASSET_BASE}/codex-pet-${visual}.gif?v=smooth-1`,
       large_text: (options.stats === "chat"
         ? status === "working" ? `Working with ${toolName || "Codex"}`
           : status === "thinking" ? `Reasoning with ${model}`

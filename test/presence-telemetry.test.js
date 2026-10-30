@@ -36,9 +36,9 @@ test('thinking timer, bash summary, idle branch and safe missing-metadata fallba
   const session=buildActivity({status:'thinking',thinkingStartedAt:now-10000,startedAt:now-100000}, {}, {...c,presence:{...c.presence,timer:'session'}},chat,now);
   assert.equal(session.timestamps.start,(now-100000)/1000);
 });
-test('six scenes, approval waiting and bounded success settle independently of token updates',t=>{
+test('tool scenes, approval waiting and bounded success settle independently of token updates',t=>{
   sandbox(t); const c=config();
-  for(const [s,expected] of [[{status:'idle'},'idle'],[{status:'thinking'},'thinking'],[{status:'working',tool:'shell'},'writing'],[{status:'working',tool:'apply_patch'},'patching'],[{status:'waiting',waitingReason:'error'},'error'],[{status:'waiting',waitingReason:'approval'},'waiting']])assert.equal(getVisualState(s,c,now),expected);
+  for(const [s,expected] of [[{status:'idle'},'idle'],[{status:'thinking'},'thinking'],[{status:'working',tool:'shell'},'terminal'],[{status:'working',tool:'apply_patch'},'patching'],[{status:'waiting',waitingReason:'error'},'error'],[{status:'waiting',waitingReason:'approval'},'waiting']])assert.equal(getVisualState(s,c,now),expected);
   assert.equal(getVisualState({status:'waiting',waitingReason:'done',eventTime:now-1000},c,now),'done');
   assert.equal(getVisualState({status:'waiting',waitingReason:'done',eventTime:now-16000},c,now),'idle');
 });
