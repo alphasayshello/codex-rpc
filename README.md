@@ -43,7 +43,9 @@ Standalone binaries, when attached to a release, bundle Node. Download the file 
 
 **GitHub downloads only:** the npm name `codex-rpc` belongs to another project. Do not use `npx codex-rpc@latest` for this repository.
 
-`setup` installs a stable local runtime, registers Codex notify, enables app detection, installs per-user login startup, and starts the daemon. Existing notifiers and custom asset URLs are preserved. Use `setup --no-service` to skip login startup, or `setup --no-service --no-start` to prepare the integration without starting it.
+`setup` installs a stable local runtime, registers native Codex lifecycle hooks plus the legacy completion notifier, enables app detection, installs per-user login startup, and starts the daemon. Existing notifiers and custom asset URLs are preserved. Use `setup --no-service` to skip login startup, or `setup --no-service --no-start` to prepare the integration without starting it.
+
+After setup, open **`/hooks` in Codex** to review and trust the new handlers. Existing trust and disabled feature flags are preserved. `codex-rpc hooks` shows registration and review guidance; the log watcher remains a fallback. [Hook setup and event reference](docs/HOOKS.md).
 
 ## on Discord
 
@@ -127,7 +129,8 @@ Electron is optional and is not part of the normal CLI runtime.
 | `pause` / `resume` | Stop or resume presence and new collection. |
 | `scan` | Refresh lifetime and per-chat history. |
 | `run -- [Codex args]` | Wrap Codex with session lifecycle events. |
-| `hook [JSON]` | Ingest an event argument or newline-delimited stdin JSON. |
+| `hooks [--json]` | Inspect lifecycle registration, sources, review guidance and queued events. |
+| `hook [JSON]` | Ingest native hook JSON, legacy event arguments or newline-delimited stdin JSON. |
 | `completion install [shell]` | Install bash, zsh, fish or PowerShell completion. |
 | `completion <shell>` | Print a completion script. |
 | `uninstall` | Remove integration and runtime; retain config and analytics. |
@@ -147,7 +150,7 @@ Live SVG endpoints: `/cards/stats.svg`, `/cards/heatmap.svg`, and `/cards/{token
 
 Inspect the JSON under `~/.codex-rpc/`. No runtime SDK, database service or cloud account.
 
-The hook retains metadata, not transcripts. The scanner reparses changed files and reuses unchanged summaries. The daemon reconnects with backoff, rotates logs, and coalesces counters at a steady interval of at least 15 seconds. A bounded reserve allows major transitions when budget is available. Directory-watch failures fall back to polling and recover after directory recreation.
+The hook retains metadata, not transcripts. Native callbacks cover tools, approvals, interrupts, compaction and session/turn boundaries. A small local metadata inbox serializes concurrent callbacks and log observations so tool counts are retained. The scanner reparses changed files and reuses unchanged summaries. The daemon reconnects with backoff, rotates logs, and coalesces counters at a steady interval of at least 15 seconds. A bounded reserve allows major transitions when budget is available. Directory-watch failures fall back to polling and recover after directory recreation.
 
 ## settings and privacy
 

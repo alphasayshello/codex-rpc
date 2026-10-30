@@ -21,6 +21,7 @@ export const commands = [
   "uninstall",
   "completion",
   "scan",
+  "hooks",
   "hook",
   "run",
   "help",

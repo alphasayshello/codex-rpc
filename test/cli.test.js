@@ -25,6 +25,7 @@ test("all read-only commands exit cleanly and produce useful output", async (t) 
     "insights",
     "preview",
     "doctor",
+    "hooks",
     "statcards",
     "help",
     "version",

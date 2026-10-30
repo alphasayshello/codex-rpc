@@ -1,3 +1,4 @@
+import { installLifecycleHooks, removeLifecycleHooks } from "./hooks-config.js";
 import fs from "node:fs";
 import { replaceFile } from "./atomic.js";
 import os from "node:os";
@@ -50,6 +51,7 @@ export function registerHook() {
     throw Error(
       "Existing Codex notify is preserved. Chain codex-rpc hook yourself or use codex-rpc run -- <args>.",
     );
+  fs.mkdirSync(home(), { recursive: true, mode: 0o700 });
   if (!fs.existsSync(file("codex-config.backup.toml")))
     fs.writeFileSync(file("codex-config.backup.toml"), text, { mode: 0o600 });
   text = clean;
@@ -64,6 +66,7 @@ export function registerHook() {
   return line;
 }
 export function unregisterHook() {
+  removeLifecycleHooks();
   const target = path.join(codexHome(), "config.toml");
   if (fs.existsSync(target)) {
     const text = fs
@@ -289,9 +292,12 @@ export async function setup({ noService = false, noStart = false } = {}) {
   } catch (e) {
     hook = e.message;
   }
+  let lifecycle;
+  try { lifecycle = installLifecycleHooks({ executable: runtimeExecutable(), entry: cli() }); }
+  catch (e) { lifecycle = { configured: false, error: e.message, trust: "unknown", reviewRequired: true, guidance: "Run /hooks in Codex to inspect lifecycle hook definitions; existing configuration was preserved." }; }
   const service = noService ? null : installService();
   if (!noStart) await startDaemon();
-  return { home: home(), hook, service, started: !noStart };
+  return { home: home(), hook, lifecycle, service, started: !noStart };
 }
 export async function uninstall() {
   removeService();

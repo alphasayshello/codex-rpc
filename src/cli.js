@@ -13,12 +13,14 @@ import { getChatStats } from "./chat.js";
 import { doctor } from "./doctor.js";
 import { serve } from "./server.js";
 import { generateCards } from "./statcards.js";
+import { inspectLifecycleHooks } from "./hooks-config.js";
+import { queuedEventCount } from "./event-queue.js";
 import { completion, installCompletion } from "./completion.js";
 export const help = `codex-rpc / a little presence.
 
 Usage: codex-rpc <command>
 
-  setup         Wire notify, enable detector, install service, start daemon
+  setup         Wire lifecycle hooks + notify, install service, start daemon
   status        Live state, current chat and lifetime totals (--watch)
   chat          Current-chat tokens, tools, cost, context (--json, --watch)
   usage         Heatmap, hourly histogram, tools, languages, API estimates
@@ -32,6 +34,7 @@ Usage: codex-rpc <command>
   uninstall     Remove integration; retain local analytics/config
   completion install [bash|zsh|fish|powershell]
   scan          Refresh lifetime analytics
+  hooks         Inspect lifecycle integration and trust guidance (--json)
   hook          Accept JSON argument or stdin lifecycle events
   run -- ...    Wrap the Codex CLI for session start/end detection
   help/version
@@ -58,8 +61,23 @@ export async function main(args = process.argv.slice(2)) {
     case "--version":
       console.log(JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version);
       break;
+    case "hooks": {
+      const report = { ...inspectLifecycleHooks(), queuedEvents: queuedEventCount() };
+      if (rest.includes("--json")) console.log(JSON.stringify(report, null, 2));
+      else {
+        console.log(`Codex lifecycle hooks: ${report.eventCount}/${report.expectedEvents.length} configured`);
+        console.log(report.path);
+        if (report.events.length) console.log(report.events.join(" · "));
+        console.log(report.guidance);
+        if (!report.configured) console.log("Run codex-rpc setup to install the integration.");
+        if (report.featuresEnabled === false) console.log("The Codex hooks feature is explicitly disabled in your config.");
+        if (report.queuedEvents) console.log(`${report.queuedEvents} metadata events queued; keep the daemon running to drain them.`);
+        for (const error of report.errors) console.log(`Attention: ${error}`);
+      }
+      break;
+    }
     case "hook":
-      await hook();
+      await hook(rest[0] ?? null);
       break;
     case "daemon":
       await runDaemon();

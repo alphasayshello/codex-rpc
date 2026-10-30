@@ -1,16 +1,12 @@
-import fs from "node:fs";
-import path from "node:path";
-import { config, validateConfig, readJSON, alive, codexHome } from "./store.js";
+import { inspectLifecycleHooks } from "./hooks-config.js";
+import { config, validateConfig, readJSON, alive } from "./store.js";
 import { DiscordIPC, existingSockets } from "./ipc.js";
 import { detectChatGPT } from "./chatgpt-detector.js";
 export async function doctor() {
   const c = config(),
     d = readJSON("daemon.json"),
     a = readJSON("aggregate.json");
-  let hook = "";
-  try {
-    hook = fs.readFileSync(path.join(codexHome(), "config.toml"), "utf8");
-  } catch {}
+  const lifecycle = inspectLifecycleHooks();
   const detector = c.chatgpt.enabled
     ? await detectChatGPT()
     : { error: "Detector disabled" };
@@ -46,8 +42,17 @@ export async function doctor() {
     ],
     [
       "Codex notify",
-      hook.includes("# codex-rpc notify begin"),
-      "Run codex-rpc setup; existing notifiers require manual chaining",
+      lifecycle.legacyNotify.configured,
+      lifecycle.legacyNotify.owned ? "Legacy codex-rpc notify registered (completion compatibility)" : lifecycle.legacyNotify.configured
+        ? "Custom notify preserved; lifecycle hooks are configured separately" : "Run codex-rpc setup; existing notifiers remain untouched",
+      true,
+    ],
+    [
+      "Codex lifecycle hooks",
+      lifecycle.configured && lifecycle.featuresEnabled !== false,
+      lifecycle.errors[0] || (lifecycle.featuresEnabled === false ? "features.hooks=false was preserved. Enable hooks manually if desired, then review /hooks."
+        : lifecycle.configured ? `${lifecycle.eventCount} configured; trust unknown. ${lifecycle.guidance}` : "Run codex-rpc setup to add lifecycle hooks, then review and trust them in /hooks."),
+      true,
     ],
     [
       "ChatGPT detector",
@@ -66,5 +71,5 @@ export async function doctor() {
       valid,
       configHint,
     ],
-  ].map(([name, ok, hint]) => ({ name, ok, hint: ok ? "OK" : hint }));
+  ].map(([name, ok, hint, keepHint]) => ({ name, ok, hint: ok && !keepHint ? "OK" : hint }));
 }

@@ -1,3 +1,4 @@
+import { drainHookEvents } from "./hook.js";
 import { selectedState } from "./selection.js";
 import { watchDirectory } from "./directory-watch.js";
 import fs from "node:fs";
@@ -95,6 +96,7 @@ export async function runDaemon() {
     }
     tickBusy = true;
     try {
+      drainHookEvents();
       const c = config(),
         now = Date.now();
       if (c.clientId !== lastClientId) {

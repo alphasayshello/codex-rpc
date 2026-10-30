@@ -6,6 +6,88 @@ import { conversationName } from "./threads.js";
 import { isMain, readJSON, writeJSON, config } from "./store.js";
 import { liveSessionFile, readLiveSession, normalizeUsage } from "./live.js";
 import { recapCounters, recordTurnEvent } from "./recaps.js";
+import { nativeEvent, isNativeEvent } from "./native-events.js";
+import { dispatchEvent, drainEvents } from "./event-queue.js";
+const safeText = (value, max = 256) => typeof value === "string" ? value.replace(/[\x00-\x1f\x7f]/g, " ").slice(0, max) : undefined;
+const counter = (value) => ["number", "string"].includes(typeof value) && Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : undefined;
+const toolStarts = new Set(["tool-start", "function_call", "custom_tool_call"]);
+const toolEnds = new Set(["tool-end", "function_call_output", "custom_tool_call_output"]);
+function toolMetadata(event, settings) {
+  const metadata = {};
+  for (const field of ["file", "safeFiles", "fileCount", "linesAdded", "linesRemoved", "commandSummary", "operationKind", "effectiveTool"])
+    if (event[field] !== undefined && (settings.privacy === "public" || ["fileCount", "linesAdded", "linesRemoved", "operationKind", "effectiveTool"].includes(field))) metadata[field] = event[field];
+  if (event.safeFiles?.length) metadata.fileCount = event.safeFiles.length;
+  return metadata;
+}
+function persistSameChat(next, prior, source, sessionId) {
+  if (sessionId) writeJSON(liveSessionFile(sessionId, source), next);
+  for (const name of [`${source}-state.json`, "state.json"]) {
+    const selected = readJSON(name);
+    if (selected.sessionId === sessionId && (selected.source || "codex") === source && selected.eventTime === prior.eventTime)
+      writeJSON(name, next);
+  }
+}
+function redactSnapshot(next, settings) {
+  if (settings.privacy !== "public" || !settings.presence.showTask) delete next.task;
+  if (settings.privacy !== "public") {
+    for (const key of ["project", "branch", "file", "currentFiles", "commandSummary"]) delete next[key];
+    const redactTool = ({ file, safeFiles, commandSummary, ...tool }) => tool;
+    next.activeTools = (next.activeTools || []).map(redactTool);
+    next.recentTools = (next.recentTools || []).map(redactTool);
+    if (next.lastTool) next.lastTool = redactTool(next.lastTool);
+  }
+  return next;
+}
+function mergeStaleTool(event, prior, source, sessionId, at, settings) {
+  const id = String(event.callId), metadata = toolMetadata(event, settings);
+  let active = [...(prior.activeTools || [])], recent = [...(prior.recentTools || [])];
+  const seen = [...(prior.toolCallIds || [])];
+  const known = recent.find((tool) => tool.callId === id);
+  if (toolStarts.has(event.type)) {
+    if (!seen.includes(id)) {
+      seen.push(id);
+      const open = !prior.turnClosedAt && !(prior.closedTurnIds || []).includes(event.turnId) && ["working", "thinking"].includes(prior.status)
+        && (!event.turnId || !prior.turnId || event.turnId === prior.turnId)
+        && (!prior.turnStartedAt || at >= prior.turnStartedAt);
+      const tool = { name: event.tool || "tool", callId: id, startedAt: at, status: open ? "running" : "unknown", ...metadata,
+        ...(!open ? { endedAt: Math.max(at, prior.turnClosedAt || prior.eventTime), durationMs: Math.max(0, (prior.turnClosedAt || prior.eventTime) - at) } : {}) };
+      if (open) active.push(tool);
+      recent = [...recent, tool].slice(-50);
+    } else {
+      // Fill missing metadata without replacing a newer observation of this ID.
+      active = active.map((tool) => tool.callId === id ? { ...metadata, ...tool } : tool);
+      recent = recent.map((tool) => tool.callId === id ? { ...metadata, ...tool } : tool);
+    }
+  } else {
+    const running = active.find((tool) => tool.callId === id);
+    if (running || !seen.includes(id) || known?.status === "unknown" || (event.outcome?.status === "failed" && known?.status !== "failed")) {
+      if (!seen.includes(id)) seen.push(id);
+      const ended = { ...(running || known || { name: event.tool || "tool", callId: id }), ...metadata, ...event.outcome,
+        endedAt: at, ...(Number.isFinite((running || known)?.startedAt) ? { durationMs: Math.max(0, at - (running || known).startedAt) } : {}) };
+      recent = [...recent.filter((tool) => tool.callId !== id), ended].slice(-50);
+      active = active.filter((tool) => tool.callId !== id);
+    }
+  }
+  active.sort((a, b) => a.startedAt - b.startedAt);
+  const next = { ...prior, activeTools: active, recentTools: recent, toolCallIds: seen, observedToolCalls: seen.length };
+  if (prior.lastTool?.callId === id) next.lastTool = recent.find((tool) => tool.callId === id) || prior.lastTool;
+  if (prior.status === "working" && active.length) {
+    const files = [...new Set([...active].reverse().flatMap((tool) => tool.safeFiles || (tool.file ? [tool.file] : [])))];
+    if (files.length) { next.currentFiles = files; next.currentFileCount = files.length; next.file = files[0]; }
+    else {
+      const counts = active.map((tool) => tool.fileCount).filter((count) => count > 0);
+      if (counts.length) next.currentFileCount = counts.length === 1 ? counts[0] : null;
+    }
+    for (const key of ["linesAdded", "linesRemoved"]) {
+      const values = active.map((tool) => tool[key]).filter((value) => typeof value === "number");
+      if (values.length) next[key] = values.reduce((sum, value) => sum + value, 0);
+    }
+  }
+  recordTurnEvent(event, prior, next, at, settings);
+  redactSnapshot(next, settings);
+  persistSameChat(next, prior, source, sessionId);
+  return next;
+}
 const states = {
   working: "working",
   writing: "working",
@@ -60,10 +142,15 @@ export function toolOutcome(input) {
   const objects = [input, p, output, output?.metadata].filter((v) => v && typeof v === "object");
   const codes = objects.flatMap((v) => [v.exitCode, v.exit_code]).filter((v) => typeof v === "number" && Number.isSafeInteger(v));
   const exitCode = codes.find((code) => code !== 0) ?? codes[0];
-  const failed = objects.some((v) => v.is_error === true || v.isError === true || ["failed", "error", "cancelled", "canceled"].includes(v.status)) || (exitCode != null && exitCode !== 0);
-  return { status: failed ? "failed" : "completed", ...(exitCode != null ? { exitCode } : {}) };
+  const failed = objects.some((v) => v.is_error === true || v.isError === true || ["failed", "error", "cancelled", "canceled"].includes(v.status)
+    || (input.nativeHook && (v.success === false || (typeof v.error === "string" && v.error.length > 0)))) || (exitCode != null && exitCode !== 0);
+  const confirmed = exitCode === 0 || objects.some((v) => v.success === true || v.is_error === false || v.isError === false || ["completed", "success", "succeeded"].includes(v.status));
+  return { status: failed ? "failed" : input.nativeHook && !confirmed ? "unknown" : "completed", ...(exitCode != null ? { exitCode } : {}) };
 }
 export function normalizeEvent(input) {
+  if (!input || typeof input !== "object") return null;
+  if (isNativeEvent(input)) input = nativeEvent(input);
+  if (!input) return null;
   const p = input.payload || input;
   const rawType = p.type || input.type;
   const type = typeof rawType === "string" ? rawType.toLowerCase() : "";
@@ -78,9 +165,12 @@ export function normalizeEvent(input) {
   const telemetry = toolTelemetry(input);
   const visuals = { writing: "writing", coding: "writing", patching: "patching", diff_applying: "patching", planning: "thinking", sleeping: "idle", stuck: "error", error: "error", done: "done", success: "done" };
   const cwd = input.cwd || p.cwd;
+  const rawTimestamp = input.timestamp;
+  const parsedTimestamp = typeof rawTimestamp === "number" ? rawTimestamp : Date.parse(rawTimestamp);
   return {
     status,
     type,
+    nativeHook: input.nativeHook === true,
     ...telemetry,
     visualState: Object.hasOwn(visuals, type) ? visuals[type] : undefined,
     branch: cwd ? workspaceBranch(cwd) || undefined : undefined,
@@ -92,15 +182,14 @@ export function normalizeEvent(input) {
       linesAdded: Number.isSafeInteger(input.linesAdded ?? p.lines_added) && (input.linesAdded ?? p.lines_added) >= 0 ? input.linesAdded ?? p.lines_added : null,
       linesRemoved: Number.isSafeInteger(input.linesRemoved ?? p.lines_removed) && (input.linesRemoved ?? p.lines_removed) >= 0 ? input.linesRemoved ?? p.lines_removed : null,
     },
-    callId: p.call_id || input.callId || input.call_id || p.id,
+    callId: safeText(p.call_id || input.callId || input.call_id || p.id),
     usage: normalizeUsage(input.usage || p.thread_token_usage || p.info?.total_token_usage),
     lastUsage: normalizeUsage(input.lastUsage || p.info?.last_token_usage),
-    contextWindow: input.contextWindow ?? p.info?.model_context_window ?? p.model_context_window,
-    source: input.source || p.source || "codex",
-    sessionId: input["thread-id"] || input.thread_id || p.session_id || input.sessionId || p.thread_id,
+    contextWindow: counter(input.contextWindow ?? p.info?.model_context_window ?? p.model_context_window),
+    source: input.source === "chatgpt" || p.source === "chatgpt" ? "chatgpt" : "codex",
+    sessionId: safeText(input["thread-id"] || input.thread_id || p.session_id || input.sessionId || p.thread_id),
     project:
-      input.project ||
-      (input.cwd || p.cwd ? path.basename(input.cwd || p.cwd) : undefined),
+      safeText(input.project || (typeof cwd === "string" ? path.basename(cwd) : undefined), 128),
     task: taskTitle(input.threadName || input.task || p.thread_name),
     waitingReason: ["error", "task_failed", "stuck"].includes(type)
       ? "error"
@@ -111,16 +200,26 @@ export function normalizeEvent(input) {
           : ["agent-turn-complete", "task_complete", "waiting", "done", "success"].includes(type)
             ? "done"
             : undefined,
-    model: input.model || p.model,
-    tool: input.tool || p.name,
-    tokens: input.tokens ?? p.info?.total_token_usage?.total_tokens,
-    timestamp: input.timestamp,
+    model: safeText(input.model || p.model, 128),
+    tool: safeText(input.tool || p.name, 128),
+    tokens: counter(input.tokens ?? p.info?.total_token_usage?.total_tokens),
+    timestamp: new Date(Number.isFinite(parsedTimestamp) && parsedTimestamp >= 0 && parsedTimestamp <= 8640000000000000 ? parsedTimestamp : Date.now()).toISOString(),
     outcome: ["tool-end", "function_call_output", "custom_tool_call_output"].includes(type) ? toolOutcome(input) : undefined,
   };
 }
 export function applyEvent(input) {
   const e = normalizeEvent(input);
   if (!e) return null;
+  const c = config();
+  if (!c.enabled) return null;
+  if (e.safeFiles?.length) e.fileCount = e.safeFiles.length;
+  if (c.privacy !== "public") {
+    for (const key of ["project", "branch", "task", "file", "safeFiles", "commandSummary"]) delete e[key];
+  } else if (!c.presence.showTask) delete e.task;
+  return dispatchEvent(e, applyNormalizedEvent);
+}
+export function drainHookEvents() { return drainEvents(applyNormalizedEvent); }
+export function applyNormalizedEvent(e) {
   const c = config();
   if (!c.enabled) return null;
   const source = e.source === "chatgpt" ? "chatgpt" : "codex";
@@ -141,7 +240,44 @@ export function applyEvent(input) {
   const time = Date.now();
   const parsedTime = typeof e.timestamp === "number" ? e.timestamp : Date.parse(e.timestamp);
   const eventTime = Number.isFinite(parsedTime) && parsedTime >= 0 ? parsedTime : time;
-  if (prior.eventTime > eventTime) return prior;
+  const closedIdentity = e.turnId && (prior.closedTurnIds || []).includes(e.turnId);
+  if ((closedIdentity || (prior.turnClosedAt && (!e.turnId || !prior.turnId || e.turnId === prior.turnId)))
+    && !e.tokenOnly && e.sessionId && e.callId && (toolStarts.has(e.type) || toolEnds.has(e.type)))
+    return mergeStaleTool(e, prior, source, sessionId, eventTime, c);
+  if (closedIdentity && e.turnId !== prior.turnId && ["task_complete", "agent-turn-complete", "turn_aborted", "session-end", "task_failed", "error"].includes(e.type)) {
+    recordTurnEvent(e, prior, prior, eventTime, c);
+    return prior;
+  }
+  if (prior.eventTime > eventTime) {
+    if (!e.tokenOnly && e.sessionId && e.callId && (toolStarts.has(e.type) || toolEnds.has(e.type)))
+      return mergeStaleTool(e, prior, source, sessionId, eventTime, c);
+    // Native hooks arrive without producer timestamps. A later-tailed log may
+    // still carry newer cumulative usage, but must not replay old lifecycle or
+    // steal selection. Accept only monotonic counters for this exact chat.
+    const before = prior.usage || {}, usage = e.usage;
+    const recapOnly = e.tokenOnly && e.sessionId && usage && e.turnId;
+    // A late final record for turn A may be lower than turn B's live total.
+    // Reconcile only its explicit identity using observed producer counters,
+    // never merged newer counters from the selected live snapshot.
+    if (recapOnly) recordTurnEvent(e, prior, prior, eventTime, c);
+    const fresh = e.tokenOnly && e.sessionId && usage &&
+      usage.total >= (prior.tokens || before.total || 0) &&
+      usage.input >= (before.input || 0) && usage.output >= (before.output || 0) &&
+      (usage.total > (prior.tokens || before.total || 0) || usage.input > (before.input || 0) || usage.output > (before.output || 0));
+    if (!fresh) return prior;
+    const next = { ...prior, usage: { ...usage, cached: Math.max(usage.cached, before.cached || 0), reasoning: Math.max(usage.reasoning, before.reasoning || 0) }, tokens: usage.total };
+    if (!recapOnly) recordTurnEvent(e, prior, next, eventTime, c);
+    redactSnapshot(next, c);
+    if (sessionId) writeJSON(liveSessionFile(sessionId, source), next);
+    const updateSameChat = (name) => {
+      const selected = readJSON(name);
+      if (selected.sessionId === sessionId && (selected.source || "codex") === source && selected.eventTime === prior.eventTime)
+        writeJSON(name, redactSnapshot({ ...selected, usage: next.usage, tokens: next.tokens }, c));
+    };
+    updateSameChat(`${source}-state.json`);
+    updateSameChat("state.json");
+    return next;
+  }
   const next = {
     ...prior,
     status: e.tokenOnly && e.type !== "token_count" ? prior.status || e.status : e.status,
@@ -168,6 +304,22 @@ export function applyEvent(input) {
     "contextWindow",
   ])
     if (e[k] !== undefined) next[k] = e[k];
+  if (["turn-start", "task_started", "user_message"].includes(e.type) && !e.tokenOnly) {
+    next.turnStartedAt = eventTime;
+    if (e.turnId) next.turnId = e.turnId;
+    else delete next.turnId;
+    delete next.turnClosedAt;
+  } else if ((toolStarts.has(e.type) || toolEnds.has(e.type)) && e.turnId && e.turnId !== prior.turnId) {
+    next.turnId = e.turnId;
+    delete next.turnStartedAt;
+    delete next.turnClosedAt;
+  }
+  if (e.type === "session-start") delete next.turnClosedAt;
+  if (["task_complete", "agent-turn-complete", "turn_aborted", "session-end", "task_failed", "error"].includes(e.type) && !e.tokenOnly) {
+    next.turnClosedAt = eventTime;
+    const closed = e.turnId || prior.turnId;
+    if (closed) next.closedTurnIds = [...new Set([...(prior.closedTurnIds || []), closed])].slice(-20);
+  }
   if (e.sessionId && e.sessionId !== prior.sessionId && !e.task) {
     delete next.task;
     delete next.taskSource;
@@ -181,12 +333,9 @@ export function applyEvent(input) {
     next.tokens = Math.max(0, Number(e.tokens) || 0);
     if (next.usage) next.usage = { ...next.usage, total: next.tokens };
   }
-  const metadata = {};
-  for (const field of ["file", "safeFiles", "linesAdded", "linesRemoved", "commandSummary", "operationKind", "effectiveTool"])
-    if (e[field] !== undefined && (c.privacy === "public" || ["linesAdded", "linesRemoved", "operationKind", "effectiveTool"].includes(field))) metadata[field] = e[field];
-  if (e.safeFiles?.length) metadata.fileCount = e.safeFiles.length;
-  const starts = ["tool-start", "function_call", "custom_tool_call"].includes(e.type);
-  const ends = ["tool-end", "function_call_output", "custom_tool_call_output"].includes(e.type);
+  const metadata = toolMetadata(e, c);
+  const starts = toolStarts.has(e.type);
+  const ends = toolEnds.has(e.type);
   let active = [...(prior.activeTools || [])];
   let recent = [...(prior.recentTools || [])];
   const seen = [...(prior.toolCallIds || [])];
@@ -217,6 +366,23 @@ export function applyEvent(input) {
       recent = [...recent.filter((t) => t.callId !== target), completed].slice(-50);
       next.lastTool = completed;
       active = active.filter((t) => t.callId !== target);
+    } else if (e.nativeHook && target && !seen.includes(target)) {
+      // Async callback scheduling can deliver PostToolUse first. Remember its
+      // stable ID so a delayed native/log PreToolUse cannot revive the call.
+      seen.push(target);
+      const completed = { name: String(e.tool || "tool").slice(0, 128), callId: target, ...metadata, ...e.outcome, endedAt: eventTime };
+      recent = [...recent.filter((t) => t.callId !== target), completed].slice(-50);
+      next.lastTool = completed;
+    } else if (e.nativeHook && target) {
+      const existing = recent.find((entry) => entry.callId === target);
+      if (existing && ((existing.status === "unknown" && e.outcome?.status !== "unknown") || (existing.status !== "failed" && e.outcome?.status === "failed"))) {
+        // Permission waits can temporarily close active calls as unknown. A
+        // later explicit native result refines the outcome without a new call.
+        const completed = { ...existing, ...metadata, ...e.outcome, endedAt: eventTime,
+          ...(Number.isFinite(existing.startedAt) ? { durationMs: Math.max(0, eventTime - existing.startedAt) } : {}) };
+        recent = recent.map((entry) => entry.callId === target ? completed : entry);
+        next.lastTool = completed;
+      }
     }
   } else if (["waiting", "idle"].includes(e.status) && !e.tokenOnly) {
     recent = recent.map((t) => active.some((a) => a.callId === t.callId)
@@ -301,22 +467,60 @@ export function applyEvent(input) {
   if (!(current.eventTime > selected.eventTime)) writeJSON("state.json", selected);
   return next;
 }
-export async function main() {
-  let data = process.argv[2];
+export async function main(data = process.argv[2]) {
+  const nativeFailure = (input) => {
+    if (!/"hook_event_name"\s*:\s*"/.test(input || "")) return false;
+    if (/"hook_event_name"\s*:\s*"Stop"/.test(input)) process.stdout.write("{}");
+    return true;
+  };
   if (!data) {
     const chunks = [];
-    let size = 0;
-    for await (const chunk of process.stdin) {
-      size += chunk.length;
-      if (size > 1024 * 1024) throw Error("Hook input exceeds 1 MiB");
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    let size = 0, oversized = false, hints = "", tail = "";
+    try {
+      for await (const chunk of process.stdin) {
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        const scan = tail + buffer.toString();
+        const found = scan.match(/"hook_event_name"\s*:\s*"[^"\r\n]{0,128}"/g);
+        if (found) {
+          if (found.some((value) => /:\s*"Stop"$/.test(value))) hints = '"hook_event_name":"Stop"';
+          else hints ||= found[0];
+        }
+        tail = scan.slice(-256);
+        size += buffer.length;
+        if (size > 1024 * 1024) oversized = true;
+        else chunks.push(buffer);
+      }
+    } catch (error) {
+      if (nativeFailure(hints || Buffer.concat(chunks).toString())) return;
+      throw error;
+    }
+    if (oversized) {
+      if (nativeFailure(hints)) return;
+      throw Error("Hook input exceeds 1 MiB");
     }
     data = Buffer.concat(chunks).toString();
   }
-  if (Buffer.byteLength(data || "") > 1024 * 1024)
+  if (Buffer.byteLength(data || "") > 1024 * 1024) {
+    if (nativeFailure(data)) return;
     throw Error("Hook input exceeds 1 MiB");
-  for (const line of (data || "").split("\n").filter(Boolean))
-    applyEvent(JSON.parse(line));
+  }
+  let inputs;
+  try {
+    // Native stdin is often pretty JSON; legacy notify still supports JSONL.
+    try { inputs = [JSON.parse(data)]; }
+    catch { inputs = (data || "").split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line)); }
+  } catch (error) {
+    if (nativeFailure(data)) return;
+    throw error;
+  }
+  let stop = false;
+  for (const input of inputs) {
+    const native = isNativeEvent(input);
+    try { applyEvent(input); }
+    catch (error) { if (!native) throw error; }
+    if (native && input.hook_event_name === "Stop") stop = true;
+  }
+  if (stop) process.stdout.write("{}");
 }
 if (isMain(import.meta.url))
   main().catch((e) => {
