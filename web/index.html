@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>codex-rpc · your work, in presence</title>
+    <link rel="icon" href="/assets/pet/codex-pet-working.svg" />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <aside>
+      <a class="brand" href="#overview"
+        ><span class="mark">&gt;_</span> codex-rpc<span class="version"
+          >0.1</span
+        ></a
+      >
+      <div class="navlabel">WORKSPACE</div>
+      <nav>
+        <a href="#overview" class="selected">◈ Overview</a
+        ><a href="#activity">▦ Activity</a><a href="#settings">⚙ Settings</a>
+      </nav>
+      <div class="aside-bottom">
+        <span class="dot"></span> LOCAL FIRST<br /><small
+          >No accounts. No telemetry.<br />Just you and your little pet.</small
+        >
+      </div>
+    </aside>
+    <main>
+      <header>
+        <div>
+          <span class="eyebrow">YOUR WORK, IN PRESENCE</span>
+          <h1>A little presence.<br />A lifetime of progress.</h1>
+          <p>Your Codex &amp; ChatGPT activity, all in one quiet corner.</p>
+        </div>
+        <div class="connection">
+          <span id="stream-dot" class="dot"></span
+          ><span id="connection">Connecting</span>
+        </div>
+      </header>
+      <section id="overview">
+        <div class="section-head">
+          <h2>At a glance <span class="pill">UTC</span></h2>
+          <label class="range"
+            >Time range
+            <select id="range" aria-label="Time range">
+              <option value="7d">Last 7 days</option>
+              <option value="30d" selected>Last 30 days</option>
+              <option value="90d">Last 90 days</option>
+              <option value="1y">Last year</option>
+              <option value="all">All time</option>
+            </select></label
+          >
+        </div>
+        <div class="overview-grid">
+          <article class="live panel">
+            <div class="panel-label">
+              <span class="dot"></span> LIVE PRESENCE
+              <span id="live-status" class="pill">idle</span>
+            </div>
+            <div class="pet-live">
+              <img
+                id="pet"
+                src="/assets/pet/codex-pet-idle.gif"
+                alt="Codex Pet idle"
+                width="160"
+                height="160"
+              />
+              <div>
+                <h3 id="live-action">Ready when you are.</h3>
+                <p id="live-model">No active model</p>
+                <p id="live-source" class="muted">Codex CLI</p>
+              </div>
+            </div>
+            <div class="live-foot">
+              <span id="daemon">Daemon offline</span
+              ><button id="toggle-presence" class="text-button">
+                Pause presence ⏸
+              </button>
+            </div>
+          </article>
+          <div class="metrics">
+            <article class="panel metric">
+              <span class="panel-label">TOTAL TOKENS</span
+              ><strong id="tokens">0</strong
+              ><small>input + output · reasoning included</small>
+            </article>
+            <article class="panel metric">
+              <span class="panel-label">ACTIVE HOURS</span
+              ><strong id="hours">0.0<span>h</span></strong
+              ><small>gaps capped at 5 minutes</small>
+            </article>
+            <article class="panel metric">
+              <span class="panel-label">SESSIONS</span
+              ><strong id="sessions">0</strong
+              ><small>recorded local sessions</small>
+            </article>
+            <article class="panel metric">
+              <span class="panel-label">CURRENT STREAK</span
+              ><strong id="streak">0<span>days</span></strong
+              ><small id="best-streak">Your next prompt starts it.</small>
+            </article>
+          </div>
+        </div>
+      </section>
+      <section id="activity">
+        <div class="section-head">
+          <h2>The small things add up.</h2>
+          <span class="muted">A year of showing up</span>
+        </div>
+        <article class="panel heat-panel">
+          <div class="panel-label">
+            ACTIVITY <span id="active-days" class="muted">0 active days</span>
+          </div>
+          <div class="heat-scroll">
+            <div id="months"></div>
+            <div class="heat-layout">
+              <div class="day-labels">
+                <span>Mon</span><span>Wed</span><span>Fri</span>
+              </div>
+              <div id="heatmap" aria-label="Daily activity heatmap"></div>
+            </div>
+          </div>
+          <div class="heat-footer">
+            <span id="day-detail">Select a square to explore a day.</span
+            ><span>Less <i></i><i></i><i></i><i></i><i></i> More</span>
+          </div>
+        </article>
+        <div class="three-cols">
+          <article class="panel">
+            <div class="panel-label">TOOLBOX <span>↗</span></div>
+            <h3>Your most-used tools</h3>
+            <div id="tools" class="rankings"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-label">LANGUAGES <span>⌘</span></div>
+            <h3>What you’re building with</h3>
+            <div id="languages" class="rankings"></div>
+          </article>
+          <article class="panel cost">
+            <div class="panel-label">API EQUIVALENT <span>≈</span></div>
+            <strong id="cost">$0.00</strong>
+            <p>Estimated from recorded tokens.<br />Not a subscription bill.</p>
+            <div id="sources"></div>
+            <small id="unpriced"></small>
+          </article>
+        </div>
+        <article class="panel hour-panel">
+          <div class="panel-label">
+            YOUR DAILY RHYTHM <span>UTC hours</span>
+          </div>
+          <div id="histogram" aria-label="Hourly activity histogram"></div>
+        </article>
+      </section>
+      <section id="settings">
+        <div class="section-head">
+          <h2>Make yourself at home.</h2>
+          <span class="muted">Saved on this device</span>
+        </div>
+        <article class="panel settings">
+          <div
+            class="tabs"
+            role="tablist"
+            aria-label="Settings categories"
+          ></div>
+          <form id="settings-form">
+            <div id="settings-content"></div>
+            <div class="save-row">
+              <span id="save-status" role="status"></span
+              ><button type="submit" class="primary">Save changes ↗</button>
+            </div>
+          </form>
+        </article>
+      </section>
+      <footer>
+        <span>&gt;_ codex-rpc · open source · MIT</span
+        ><a href="/cards/stats.svg" target="_blank" rel="noopener"
+          >Open your live stats card ↗</a
+        >
+      </footer>
+    </main>
+  </body>
+</html>
