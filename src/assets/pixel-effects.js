@@ -1,25 +1,26 @@
 // codex-rpc motion composition uses the original blue pet as an unchanged sprite.
 // Integer translation preserves its identity; independent FX never cover pixels.
-export const effectsVersion = "pixel-fx-3";
+import { drawBonusScene } from "./scene-props.js";
+export const effectsVersion = "pixel-fx-4";
 const blue = [116, 161, 245], pale = [229, 240, 255], mint = [126, 232, 188], pink = [247, 139, 153];
 export function motionOffset(original, state, elapsedMs, width = 192, height = 208) {
-  const step = Math.floor(elapsedMs / 100), t = elapsedMs / 1000;
+  const phase = elapsedMs / 4000 * Math.PI * 2;
   let dx = 0, dy = 0;
-  if (state === "working" || state === "writing") {
+  if (["working", "writing", "terminal", "testing", "installing"].includes(state)) {
     dx = 0; dy = 0;
   } else if (state === "thinking") {
-    dx = Math.round(Math.sin(t * Math.PI * 2 / 2) * 8); dy = Math.round(-Math.abs(Math.sin(t * Math.PI * 2)) * 4);
-  } else if (state === "patching") {
-    dx = [0, 0, 4, 4, 0, -2][step % 6]; dy = [0, -3, -9, -6, 0, 0][step % 6];
+    dx = Math.round(Math.sin(phase) * 6); dy = Math.round(-1 + Math.cos(phase * 2));
+  } else if (state === "patching" || state === "building") {
+    dx = Math.round(Math.sin(phase) * 2); dy = Math.round(-2.5 * (1 - Math.cos(phase * 2)));
   } else if (state === "error") {
-    dx = [-5, 4, -3, 5, -4, 3, -2, 2][step % 8]; dy = step % 2 ? -5 : -1;
+    dx = Math.round(Math.sin(phase * 8) * 2); dy = Math.round(-1 + Math.cos(phase * 4));
   } else if (state === "done") {
-    const celebrating = step % 40 < 28;
-    dx = celebrating ? Math.round(Math.sin(t * Math.PI * 2) * 5) : 0;
-    dy = celebrating ? Math.round(-Math.abs(Math.sin(t * Math.PI * 2)) * 10) : 0;
-  } else if (state === "waiting") {
-    dx = Math.round(Math.sin(t * Math.PI) * 2); dy = Math.round(-Math.abs(Math.sin(t * Math.PI)) * 3);
-  } else dy = Math.round(Math.sin(t * Math.PI / 3) * 2);
+    dx = Math.round(Math.sin(phase) * 3); dy = Math.round(-4 * (1 - Math.cos(phase * 2)));
+  } else if (state === "celebrating") {
+    dx = Math.round(Math.sin(phase) * 2); dy = Math.round(-2 * (1 - Math.cos(phase * 2)));
+  } else if (state === "idle" || state === "idle-cozy") {
+    dy = Math.round(Math.sin(phase) * (state === "idle" ? 2 : 1));
+  } else dy = Math.round(-1 + Math.cos(phase));
   let minX = width, minY = height, maxX = 0, maxY = 0;
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++)
     if (original[(y * width + x) * 4 + 3]) {
@@ -37,7 +38,7 @@ export function moveSprite(original, state, elapsedMs, width = 192, height = 208
   return rgba;
 }
 export function petEffects(original, state, elapsedMs, width = 192, height = 208) {
-  const rgba = Buffer.from(original), step = Math.floor(elapsedMs / 100), phase = step % 40;
+  const rgba = Buffer.from(original), turn = ((elapsedMs % 4000) + 4000) % 4000 / 4000, phase = turn * Math.PI * 2;
   const rect = (x, y, w, h, color) => {
     x = Math.round(x); y = Math.round(y);
     for (let py = y; py < y + h; py++) for (let px = x; px < x + w; px++) {
@@ -57,57 +58,60 @@ export function petEffects(original, state, elapsedMs, width = 192, height = 208
       rect(x + 5, y + 14, 7, 2, [172, 69, 89]);
     } else { rect(x + 4, y + 6, 8, 2, blue); rect(x + 4, y + 11, 6, 2, blue); }
   };
-  if (state === "working" || state === "writing") {
-    // Writing motion is confined to articulated paws and keyboard contact.
-    return rgba;
-  } else if (state === "thinking") {
-    // Pacing plus a rotating pixel gear / planning glyph constellation.
-    const angle = step * Math.PI / 8;
+  if (drawBonusScene({ state, phase, turn, rect, glyph, spark, card })) return rgba;
+  if (state === "working" || state === "writing") return rgba;
+  if (state === "thinking") {
     for (let i = 0; i < 6; i++) {
-      const a = angle + i * Math.PI / 3;
+      const a = phase + i * Math.PI / 3;
       rect(160 + Math.cos(a) * 14, 18 + Math.sin(a) * 14, 3, 3, i % 2 ? pale : blue);
     }
-    glyph([".###.", "#...#", "...#.", "..#..", ".....", "..#.."], 12, 24 + Math.sin(angle) * 4, 2, mint);
-    for (let i = 0; i < 3; i++) rect(176 + i * 4, 70 + (step * 3 + i * 12) % 45, 2, 2, blue);
+    glyph([".###.", "#...#", "...#.", "..#..", ".....", "..#.."], 12, 22 + Math.sin(phase) * 3, 2, mint);
   } else if (state === "patching") {
-    const progress = step % 18;
-    card(7 + progress, 10 + Math.round(Math.sin(progress / 18 * Math.PI) * 12), mint, true);
-    card(165 - progress, 32 - progress * 2, pale, true);
+    const slide = (1 - Math.cos(phase)) / 2;
+    card(7 + slide * 18, 10 + Math.sin(phase) * 3, mint, true);
+    card(165 - slide * 14, 10 - Math.sin(phase) * 3, pale, true);
     rect(4, 197, 184, 3, [72, 94, 145]);
-    const stamp = progress > 12 && progress < 16;
-    if (stamp) { spark(174, 153, mint); glyph(["....#", "...#.", "#.#..", ".#..."], 9, 158, 2, mint); }
+    if (slide > 0.8) glyph(["....#", "...#.", "#.#..", ".#..."], 9, 158, 2, mint);
   } else if (state === "error") {
-    // A consistent panic expression; no rapid rotation through different faces.
     for (let i = 0; i < 3; i++) {
-      const rise = (step * 3 + i * 11) % 31, x = 56 + i * 30 + Math.round(Math.sin((step + i) / 3) * 5), y = 29 - rise;
+      const a = phase + i * Math.PI * 2 / 3, x = 56 + i * 30 + Math.sin(a) * 5, y = 12 + Math.cos(a) * 10;
       rect(x + 3, y, 10, 3, [158, 168, 194]); rect(x, y + 3, 16, 5, [132, 147, 177]); rect(x + 3, y + 8, 10, 2, [106, 122, 158]);
     }
-    glyph(["##", "##", "##", "##", "..", "##"], 177, 72 + (step % 2) * 2, 2, pink);
-    for (let i = 0; i < 3; i++) rect(3, 94 + i * 11, step % 2 ? 9 : 14, 2, pink);
+    glyph(["##", "##", "##", "##", "..", "##"], 177, 72 + Math.sin(phase * 2) * 2, 2, pink);
   } else if (state === "done") {
-    // Victory jumps with falling confetti; final frames settle without FX spam.
-    if (phase < 30) for (let i = 0; i < 12; i++) {
-      const x = (17 + i * 43 + step * (i % 2 ? -1 : 1) + 192) % 192, y = (i * 19 + step * 5) % 175;
-      rect(x, y, i % 3 === 0 ? 4 : 2, i % 3 === 0 ? 2 : 4, [mint, pink, blue, pale][i % 4]);
+    for (let i = 0; i < 10; i++) {
+      const a = phase + i * Math.PI * 2 / 10;
+      rect(95 + Math.cos(a) * (75 + i % 3 * 4), 70 + Math.sin(a) * 60, 2 + i % 2 * 2, 2, [mint, pink, blue, pale][i % 4]);
     }
-    if (phase < 24 && step % 5 === 1) { spark(12, 64, mint); spark(174, 88, pale); }
   } else if (state === "waiting") {
-    glyph([".########.", "#........#", "#........#", "#........#", ".#######..", "...#......"], 157, 7, 2, blue);
-    for (let i = 0; i < Math.min(3, Math.floor(step / 3) % 6 + 1); i++) rect(162 + i * 4, 12, 2, 2, pale);
+    glyph([".########.", "#........#", "#........#", "#........#", ".#######..", "...#......"], 157, 7 + Math.sin(phase) * 2, 2, blue);
+    for (let i = 0; i < 3; i++) rect(162 + i * 4, 12 + Math.sin(phase + i) * 2, 2, 2, pale);
   } else if (state === "idle") {
-    const rise = (step % 30) / 3;
-    glyph(["#####", "...#.", "..#..", ".#...", "#####"], 157, 28 - rise, 2, blue);
-    glyph(["###", ".#.", "###"], 176, 12 - rise / 2, 2, pale);
+    glyph(["#####", "...#.", "..#..", ".#...", "#####"], 157, 24 - Math.sin(phase) * 4, 2, blue);
+    glyph(["###", ".#.", "###"], 176, 10 - Math.sin(phase + 0.5) * 3, 2, pale);
   }
+
   return rgba;
 }
 export const effectDescriptions = {
-  idle: "Original closed-eye pose breathes while Z pixels rise in a slow snoozing loop",
-  thinking: "Chin-stroking pet paces with a rotating planning gear and floating question glyphs",
+  idle: "Soft sleeping breath and floating Z pixels in a seamless loop",
+  thinking: "Smooth chin-stroking pace with a rotating planning constellation",
   writing: "Stationary head and laptop with alternating articulated paw presses on the keyboard",
   working: "Legacy alias of writing: steady seated keyboard typing",
-  patching: "Focused arms and body stamp sliding plus/minus file cards onto a pixel workbench",
+  patching: "Focused stance and smooth sliding plus/minus cards above a pixel workbench",
   error: "Consistent original panic squint shakes beneath rising smoke and an alert glyph",
-  done: "Original smiling victory poses jump through confetti, then briefly settle",
-  waiting: "Approval/attention wave with accumulating speech-bubble dots, distinct from success",
+  done: "Smiling victory bounce through a seamless orbit of colorful confetti",
+  waiting: "Gentle attention pose with bobbing speech-bubble dots, distinct from success",
+  reading: "An open pixel book with softly turning pages and a reading marker",
+  searching: "A scanning search grid with an orbiting magnifier and highlighted result",
+  terminal: "Steady real paw typing beside a tiny terminal with animated command rows",
+  testing: "A test matrix lights passing checks while the seated pet types",
+  building: "Interlocking pixel blocks stack and lift in a smooth construction rhythm",
+  installing: "An install arrow floats over a smoothly filling package progress bar",
+  reviewing: "A two-color diff sheet with a moving review highlight",
+  debugging: "A magnifying glass sweeps a tiny bug and diagnostic pixels",
+  connecting: "Linked network nodes exchange a smoothly traveling connection signal",
+  focus: "A quiet focused pose surrounded by a sparse rotating halo",
+  celebrating: "A restrained smiling bounce with golden stars and soft confetti",
+  "idle-cozy": "A sleepy blue companion under a crescent moon and twinkling stars",
 };

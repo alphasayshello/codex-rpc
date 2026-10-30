@@ -11,8 +11,8 @@ function inside(x,y) {
   return hit;
 }
 export function typingSprite(original, elapsedMs, width=192) {
-  const frame=Buffer.from(original), phase=Math.floor(elapsedMs/100)%8;
-  const stroke=[0,-2,-4,-2,0,0,0,0];
+  const frame=Buffer.from(original), phase=((elapsedMs%800)+800)%800;
+  const stroke=(offset)=>{const t=((phase+offset)%800)/400;return t<1?-4*Math.sin(Math.PI*t)**2:0;};
   const sample=(x,y)=>original.subarray((y*width+x)*4,(y*width+x)*4+4);
   const set=(x,y,pixel)=>frame.set(pixel,(y*width+x)*4);
   const edge=y=>Math.round(139-y*.245);
@@ -31,10 +31,10 @@ export function typingSprite(original, elapsedMs, width=192) {
       set(px,py,sample(x,y));
     }
   };
-  paw(true,stroke[(phase+4)%8]);
-  paw(false,stroke[phase]);
+  paw(true,stroke(400));
+  paw(false,stroke(0));
   // A key lights only on contact, without moving the laptop itself.
   const key=(x,pressed)=>{if(pressed)for(let dx=0;dx<3;dx++)set(x+dx,167,[126,232,188,255]);};
-  key(77,phase===0); key(89,phase===4);
+  key(77,phase<50||phase>750); key(89,Math.abs(phase-400)<50);
   return frame;
 }

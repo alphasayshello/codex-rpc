@@ -6,7 +6,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { decodePNG, encodePNG } from "./png.js";
-import { typingSprite } from "./typing.js";
+import { typingSprite, typingRegion } from "./typing.js";
+import { buildGallery } from "./gallery.js";
 import { petEffects, moveSprite, effectsVersion, effectDescriptions } from "./pixel-effects.js";
 import {
   badgeSpecs,
@@ -24,24 +25,49 @@ const out = path.resolve(
 export const width = 192,
   height = 208;
 export const visualStates = ["idle", "thinking", "writing", "patching", "error", "done"];
+export const bonusStates = ["reading", "searching", "terminal", "testing", "building", "installing", "reviewing", "debugging", "connecting", "focus", "celebrating", "idle-cozy"];
+export const renderStates = [...visualStates, ...bonusStates, "waiting"];
 export const states = {
-  idle: { row: 0, sourceFrames: [1], frameCount: 60, sourceEvery: 10, sourceState: "idle, original closed-eye sleeping pose" },
-  thinking: { row: 6, sourceFrames: [0, 3, 4, 3], frameCount: 40, sourceEvery: 4, sourceState: "waiting, consistent neutral chin-stroking poses" },
-  writing: { row: 7, sourceFrames: [0], frameCount: 32, sourceEvery: 2, sourceState: "running, fixed original neutral laptop pose, articulated alternating paw presses" },
-  patching: { row: 4, sourceFrames: [0, 1, 2, 1], frameCount: 36, sourceEvery: 3, sourceState: "jumping, neutral focused arms-in-motion poses" },
-  error: { row: 5, sourceFrames: [1], frameCount: 32, sourceEvery: 2, sourceState: "scared, consistent original panic squint pose" },
-  done: { row: 8, sourceFrames: [1, 2, 1], frameCount: 40, sourceEvery: 4, sourceState: "happy, consistent original smiling victory jump poses" },
-  working: { row: 7, sourceFrames: [0], frameCount: 32, sourceEvery: 2, aliasOf: "writing", sourceState: "legacy working alias for steady neutral laptop typing" },
-  waiting: { row: 3, sourceFrames: [0, 1, 2, 1], frameCount: 40, sourceEvery: 4, sourceState: "waving, consistent neutral approval/attention poses" },
+  idle: { row: 0, sourceFrames: [1], sourceState: "original closed-eye sleeping pose", family: "rest" },
+  thinking: { row: 6, sourceFrames: [0], sourceState: "original neutral chin-stroking pose", family: "research" },
+  writing: { row: 7, sourceFrames: [0], frameCount: 64, typing: true, sourceState: "fixed original neutral laptop pose with sampled articulated paws", family: "work" },
+  patching: { row: 4, sourceFrames: [1], sourceState: "original neutral focused arms-out pose", family: "work" },
+  error: { row: 5, sourceFrames: [1], sourceState: "original consistent panic squint pose", family: "system" },
+  done: { row: 8, sourceFrames: [1], sourceState: "original consistent smiling victory pose", family: "celebration" },
+  reading: { row: 6, sourceFrames: [0], family: "research", sourceState: "original neutral chin-stroking reader" },
+  searching: { row: 6, sourceFrames: [0], family: "research", sourceState: "original neutral chin-stroking searcher" },
+  terminal: { row: 7, sourceFrames: [0], typing: true, family: "work", sourceState: "original fixed laptop pose with sampled articulated paws" },
+  testing: { row: 7, sourceFrames: [0], typing: true, family: "work", sourceState: "original fixed laptop pose with sampled articulated paws" },
+  building: { row: 4, sourceFrames: [1], family: "work", sourceState: "original neutral arms-out building pose" },
+  installing: { row: 7, sourceFrames: [0], typing: true, family: "system", sourceState: "original fixed laptop pose with sampled articulated paws" },
+  reviewing: { row: 6, sourceFrames: [0], family: "research", sourceState: "original neutral chin-stroking reviewer" },
+  debugging: { row: 6, sourceFrames: [0], family: "research", sourceState: "original neutral chin-stroking debugger" },
+  connecting: { row: 0, sourceFrames: [0], family: "system", sourceState: "original neutral standing pose" },
+  focus: { row: 6, sourceFrames: [0], family: "research", sourceState: "original neutral focused pose" },
+  celebrating: { row: 8, sourceFrames: [1], family: "celebration", sourceState: "original consistent smiling victory pose" },
+  "idle-cozy": { row: 0, sourceFrames: [1], family: "rest", sourceState: "original closed-eye sleeping pose" },
+  working: { row: 7, sourceFrames: [0], frameCount: 64, typing: true, aliasOf: "writing", sourceState: "legacy alias of fixed-body writing", family: "legacy" },
+  waiting: { row: 3, sourceFrames: [0], sourceEvery: 20, sourceState: "original consistent neutral attention pose", family: "live" },
 };
-for (const spec of Object.values(states)) {
+for (const [id, spec] of Object.entries(states)) {
+  spec.label = id.split("-").map((word) => word[0].toUpperCase() + word.slice(1)).join(" ");
+  spec.description = effectDescriptions[id];
+  spec.recommendedKey = spec.aliasOf || id;
+  spec.frameCount ||= 80;
+  spec.sourceEvery ||= 20;
   spec.frames = spec.sourceFrames.length;
-  spec.fps = 10;
+  spec.fps = 20;
   spec.animation = Array.from({ length: spec.frameCount }, (_, i) => ({
-    sourceFrame: Math.floor(i / spec.sourceEvery) % spec.frames, delay: 10,
+    sourceFrame: Math.floor(i / spec.sourceEvery) % spec.frames, delay: 5,
   }));
   spec.delays = spec.animation.map((frame) => frame.delay);
 }
+export const animationCatalog = Object.entries(states).map(([id, spec]) => ({
+  id, label: spec.label, description: spec.description, family: spec.family,
+  recommendedKey: spec.recommendedKey, path: `/assets/pet/codex-pet-${id}.gif`,
+  previewPath: `/assets/pet/codex-pet-${id}.svg`, gif: `codex-pet-${id}.gif`,
+  svg: `codex-pet-${id}.svg`, fps: spec.fps, frameCount: spec.frameCount,
+}));
 const sourcePath = path.join(out, "source/codex-spritesheet-v4.png");
 let atlas;
 function source() {
@@ -73,7 +99,7 @@ export function animatedSprite(state, frame = 0) {
   const spec = states[state], index = frame % spec.animation.length;
   const elapsed = spec.animation.slice(0, index).reduce((n, f) => n + f.delay * 10, 0);
   const base = sprite(state, spec.animation[index].sourceFrame);
-  if (state === "writing" || state === "working") return typingSprite(base, elapsed);
+  if (spec.typing) return state === "writing" || state === "working" ? typingSprite(base, elapsed) : petEffects(typingSprite(base, elapsed), state, elapsed);
   return petEffects(moveSprite(base, state, elapsed), state, elapsed);
 }
 // Median-cut palette over all used original frames. GIF requires <=256 colors;
@@ -266,14 +292,8 @@ export function svg(state, frame = 0) {
   const png = encodePNG(width, height, sprite(state, frame));
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Original blue Codex Pet ${state}"><image width="${width}" height="${height}" href="data:image/png;base64,${png.toString("base64")}"/></svg>`;
 }
-const animationGalleryCSS = `html{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#212121;color:#ececec;font:14px/1.6 system-ui,sans-serif}main{max-width:1000px;margin:40px auto;padding:0 24px}h1{font-size:28px}p{color:#b4b4b4}section{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}article{padding:16px;border:1px solid #444;border-radius:16px;text-align:center}article p{font-size:12px}img{max-width:100%;object-fit:contain;image-rendering:pixelated}h2{text-transform:capitalize;font-size:17px}.badges{display:flex;flex-wrap:wrap;gap:12px;margin:24px 0}figure{margin:0;width:80px;text-align:center}figcaption{font-size:12px;color:#b4b4b4}a{color:#bcd7ff}details{margin-top:32px}summary{cursor:pointer}.sheet{width:100%;height:auto}`;
-function animationGallery() {
-  const cards = [...visualStates, "waiting"].map((state) => `<article><img src="codex-pet-${state}.gif" width="192" height="208" alt="Blue Codex Pet ${state}, with subtle pixel effects"><h2>${state}</h2><p>${effectDescriptions[state]}</p></article>`).join("");
-  const badges = Object.entries(badgeSpecs).map(([kind, spec]) => `<figure><img src="codex-status-${kind}.gif" width="72" height="72" alt="Animated ${spec.label} status badge"><figcaption>${spec.label}</figcaption></figure>`).join("");
-  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>codex-rpc · animation gallery</title><link rel="stylesheet" href="animation-gallery.css"><main><h1>A little pet. A little more life.</h1><p>Original blue Codex Pet poses, with separately authored codex-rpc pixel effects. The original mascot is retained; writing articulates sampled paws over the keyboard while its head and laptop stay still. Six distinct loops run at 10 fps: seated typing, pacing, patching, panic, celebration and snoozing, with a consistent expression per state.</p><section>${cards}</section><h2>Optional animated status badges</h2><p>24-pixel glyphs enlarged 4×. Existing static PNG badges remain available.</p><div class="badges">${badges}</div><details><summary>See the animation contact sheet and source provenance</summary><p>Eight sampled phases per state: idle, thinking, writing, patching, error, done, then the legacy approval/waiting loop. PNG/SVG pet previews preserve exact source pixels without effects. GIFs quantize colors to their 256-color palette.</p><img class="sheet" src="animation-spritesheet.png" width="1536" height="1456" alt="Eight phase contact sheet for six visual states plus waiting"><p><a href="manifest.json">Source hashes, pose schedule and effect authorship</a></p></details></main></html>`;
-}
 function animationContactSheet() {
-  const columns = 8, sheetWidth = width * columns, rows = [...visualStates, "waiting"], rgba = Buffer.alloc(sheetWidth * height * rows.length * 4);
+  const columns = 8, sheetWidth = width * columns, rows = renderStates, rgba = Buffer.alloc(sheetWidth * height * rows.length * 4);
   for (const [row, state] of rows.entries())
     for (let column = 0; column < columns; column++) {
       const frame = animatedSprite(state, Math.floor(column * states[state].animation.length / columns));
@@ -297,8 +317,11 @@ export function generate() {
   }
   fs.writeFileSync(path.join(out, "status-badges.svg"), badgeGallery());
   fs.writeFileSync(path.join(out, "codex-status-done.gif"), statusGIF("waiting"));
-  fs.writeFileSync(path.join(out, "animation-gallery.html"), animationGallery());
-  fs.writeFileSync(path.join(out, "animation-gallery.css"), animationGalleryCSS);
+  const gallery = buildGallery({ states, visualStates, bonusStates, effectDescriptions });
+  fs.writeFileSync(path.join(out, "animation-gallery.html"), gallery.html);
+  fs.writeFileSync(path.join(out, "animation-gallery.css"), gallery.css);
+  fs.writeFileSync(path.join(out, "animation-gallery.js"), gallery.js);
+  fs.writeFileSync(path.join(out, "animation-catalog.json"), JSON.stringify(animationCatalog, null, 2) + "\n");
   fs.writeFileSync(path.join(out, "animation-spritesheet.png"), animationContactSheet());
   for (const state of Object.keys(states)) {
     fs.writeFileSync(path.join(out, `codex-pet-${state}.gif`), gif(state));
@@ -345,10 +368,10 @@ export function generate() {
         sourceSHA256: sha(path.join(out, "source/codex-spritesheet-v4.webp")),
         normalizedPNG_SHA256: sha(sourcePath),
         cell: { width, height },
-        visualStates,
-        pipeline: { fps: 10, aliases: { working: "writing", waiting: "approval attention, distinct from done" } },
+        visualStates, bonusStates, renderStates, animationCatalog,
+        pipeline: { fps: 20, aliases: { working: "writing", waiting: "approval attention, distinct from done" } },
         states,
-        effects: { version: effectsVersion, authorship: "codex-rpc original pixel effects, not OpenAI source artwork", policy: "Non-writing poses translate at integer coordinates without cropping, with FX in alpha zero transparent space. Writing holds the original laptop pose fixed outside x67..103,y144..172 and articulates sampled paw pixels above a reconstructed keyboard/chest underlay; the face, body outline, feet and laptop remain unchanged before palette quantization", states: effectDescriptions },
+        effects: { version: effectsVersion, authorship: "codex-rpc original pixel effects, not OpenAI source artwork", policy: "Non-typing poses translate at integer coordinates without cropping, with FX in alpha zero transparent space. Laptop typing scenes hold the original pose fixed outside x67..103,y144..172 and articulate sampled paw pixels above a reconstructed keyboard/chest underlay; the face, body outline, feet and laptop remain unchanged before palette quantization", articulation: { states: Object.keys(states).filter((id) => states[id].typing), region: typingRegion, interpolation: "Continuous sinusoidal paw presses sampled every 50ms; base pose and laptop remain fixed" }, states: effectDescriptions },
         previews: "Pet PNG/SVG files contain exact original source pixels without effects; animated GIFs add the separately authored effects",
         badges: { grid: 24, scale: 4, icons: badgeSpecs, aliases: { done: "waiting" }, animation: { delays: badgeDelays, transparent: true, authorship: "codex-rpc original status UI glyphs" } },
       },
@@ -363,6 +386,6 @@ if (
 ) {
   generate();
   console.log(
-    "Generated six dynamic Codex Pet visual loops, a legacy working alias and waiting approval loop, animated/static pixel badges, original PNG/SVG previews, animation gallery/contact sheet and provenance manifest.",
+    "Generated six live visual loops, twelve bonus scenes, and legacy compatibility aliases at 20 fps, animated/static pixel badges, original PNG/SVG previews, animation gallery/contact sheet and provenance manifest.",
   );
 }

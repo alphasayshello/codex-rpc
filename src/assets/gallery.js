@@ -1,0 +1,118 @@
+const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const titleCase = (value) => value.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+const base = "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/";
+
+export function buildGallery({ states = {}, visualStates = [], bonusStates = [], effectDescriptions = {} } = {}) {
+  const core = [...new Set([...visualStates, "waiting"].filter((id) => states[id]))];
+  const bonus = Array.isArray(bonusStates) ? bonusStates.map((value) => typeof value === "string" ? value : value.id) : Object.keys(bonusStates);
+  const ids = [...new Set([...core, ...bonus])].filter((id) => /^[a-z0-9-]+$/.test(id) && states[id]);
+  const scenes = ids.map((id) => {
+    const spec = states[id], fps = Number(spec.fps) || 20;
+    return { id, label: spec.label || titleCase(id), description: spec.description || effectDescriptions[id] || "An original blue Codex Pet pose, brought to life with small pixel details.",
+      kind: core.includes(id) ? "core" : "bonus", family: spec.family || (core.includes(id) ? "canonical" : "work"), fps,
+      duration: Number.isFinite(spec.frameCount) ? (spec.frameCount / fps).toFixed(1) : null, recommended: spec.recommendedKey || id };
+  });
+  const first = scenes.find((scene) => scene.id === "writing") || scenes[0];
+  if (!first) throw new Error("Animation gallery requires at least one scene");
+  const families = [...new Set(scenes.map((scene) => scene.family))].sort();
+  const sceneCard = (scene) => `<button type="button" class="scene-card" data-scene="${escape(scene.id)}" data-kind="${scene.kind}" data-family="${escape(scene.family)}" data-label="${escape(scene.label)}" data-description="${escape(scene.description)}" data-fps="${scene.fps}" data-duration="${escape(scene.duration)}" data-recommended="${escape(scene.recommended)}" aria-pressed="${scene.id === first.id}"><span class="scene-stage"><img class="scene-image" src="codex-pet-${scene.id}.gif" width="192" height="208" alt="" loading="lazy" data-scene="${scene.id}"></span><span class="scene-info"><strong>${escape(scene.label)}</strong><span>${escape(titleCase(scene.family))}<span aria-hidden="true"> · </span>${scene.fps} fps</span></span><span class="selection-mark" aria-hidden="true">✓</span></button>`;
+  const html = `<!doctype html>
+<html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"><title>Codex Pet · Animation studio</title><link rel="icon" href="codex-pet-writing.svg"><link rel="stylesheet" href="animation-gallery.css"><script src="animation-gallery.js" defer></script></head>
+<body data-background="dark"><a class="skip-link" href="#scene-library">Skip to scenes</a>
+<header class="topbar"><a class="brand" href="animation-gallery.html"><span class="brand-mark" aria-hidden="true">&gt;_</span> codex-rpc <span class="brand-note">/ pet studio</span></a><a class="quiet-link" href="/">Back to dashboard <span aria-hidden="true">↗</span></a></header>
+<main><div class="page-intro"><p class="eyebrow"><span class="pixel-dot" aria-hidden="true"></span> THE ORIGINAL BLUE CODEX PET</p><h1>A little character.<br>A lot of personality.</h1><p>From the first thought to the final green check. Find the right little moment for your Discord presence.</p><div class="intro-tags"><span>${core.length} live states</span><span>${bonus.length} extra scenes</span><span>Pixel-perfect loops</span></div></div>
+<section class="preview-panel" aria-labelledby="preview-title"><div class="preview-stage"><span class="stage-corner">LIVE PREVIEW</span><img id="preview-image" class="scene-image" src="codex-pet-${first.id}.gif" width="384" height="416" alt="Codex Pet ${escape(first.label)}" data-scene="${first.id}"><span id="motion-status" class="stage-caption">Playing · seamless loop</span></div><div class="preview-details"><p id="preview-category" class="eyebrow">${first.kind === "core" ? "CANONICAL STATE" : "EXTRA SCENE"}</p><h2 id="preview-title">${escape(first.label)}</h2><p id="preview-description">${escape(first.description)}</p><dl class="preview-facts"><div><dt>Frame rate</dt><dd id="preview-fps">${first.fps} fps</dd></div><div><dt>Loop length</dt><dd id="preview-duration">${escape(first.duration || "—")}s</dd></div><div><dt>Suggested state</dt><dd id="preview-recommended">${escape(first.recommended)}</dd></div></dl><div class="asset-actions"><button id="copy-url" class="primary" type="button">Copy GIF URL <span aria-hidden="true">↗</span></button><a id="download-gif" class="secondary" href="codex-pet-${first.id}.gif" download>Download GIF</a><a id="download-svg" class="quiet-link" href="codex-pet-${first.id}.svg" download>Static SVG</a></div><label class="url-label" for="asset-url">Direct asset URL</label><input id="asset-url" class="asset-url" type="text" readonly spellcheck="false" value="${base}codex-pet-${first.id}.gif?v=smooth-1"><p id="copy-status" class="copy-status" role="status" aria-live="polite">Use this URL in your Codex Pet asset settings.</p></div></section>
+<section id="scene-library" aria-labelledby="library-heading"><div class="library-heading"><div><p class="eyebrow">THE COLLECTION</p><h2 id="library-heading">A scene for every state of mind.</h2></div><span id="scene-count" class="muted" role="status">${scenes.length} scenes</span></div><div class="library-toolbar"><div class="filters" role="group" aria-label="Scene collection"><button type="button" data-filter="all" aria-pressed="true">All scenes</button><button type="button" data-filter="core" aria-pressed="false">Live states</button><button type="button" data-filter="bonus" aria-pressed="false">Extra scenes</button></div><label class="select-label">Mood <select id="family-filter"><option value="all">All moods</option>${families.map((family) => `<option value="${escape(family)}">${escape(titleCase(family))}</option>`).join("")}</select></label><label class="search-label"><span class="sr-only">Search scenes</span><input id="scene-search" type="search" placeholder="Find a scene…"></label></div>
+<div class="view-toolbar"><div class="motion-controls"><button id="play-toggle" class="secondary" type="button" aria-pressed="true">Pause animations</button><label class="check-label"><input id="reduce-motion" type="checkbox"> Reduce motion</label></div><label class="select-label">Preview background <select id="background-select"><option value="dark">Dark</option><option value="light">Light</option><option value="checkerboard">Checkerboard</option></select></label></div>
+<section class="scene-section" data-section="core" aria-labelledby="core-heading"><div class="group-heading"><h3 id="core-heading">Live states</h3><p>The familiar lifecycle, with a little more life.</p></div><div class="scene-grid">${scenes.filter((scene) => scene.kind === "core").map(sceneCard).join("")}</div></section><section class="scene-section" data-section="bonus" aria-labelledby="bonus-heading"><div class="group-heading"><h3 id="bonus-heading">Extra scenes</h3><p>Fresh loops for reading, building, debugging, and everything in between.</p></div><div class="scene-grid">${scenes.filter((scene) => scene.kind === "bonus").map(sceneCard).join("")}</div></section><p id="empty-scenes" class="empty-scenes" hidden>No scenes match. Try another mood or clear your search.</p></section>
+<details class="provenance"><summary>About this little pet</summary><p>The original blue Codex Pet artwork is preserved. Motion and surrounding pixel effects are authored for codex-rpc. Static previews retain the source pixels; GIF colors use an indexed palette.</p><a class="quiet-link" href="manifest.json">View source provenance and animation metadata ↗</a><a class="quiet-link" href="animation-spritesheet.png">Open the motion contact sheet ↗</a></details>
+<footer><span><span class="brand-mark" aria-hidden="true">&gt;_</span> codex-rpc · made for your flow</span><span>Open source · local first · MIT</span></footer></main></body></html>`;
+  return { html, css: galleryCSS, js: galleryJS };
+}
+
+const galleryCSS = `
+:root{color-scheme:dark;--bg:#202124;--surface:#26272b;--stage:#1b1c20;--subtle:#303136;--border:#3a3c43;--text:#eeeef1;--muted:#aaaeb8;--blue:#a3bcff;--blue-bg:#30426a;--focus:#99b8ff;--grid:#24262d}
+:root[data-theme=light]{color-scheme:light;--bg:#fcfcfd;--surface:#fff;--stage:#f2f5fc;--subtle:#eff0f3;--border:#e1e3e9;--text:#252833;--muted:#687181;--blue:#355fc9;--blue-bg:#eaf0ff;--focus:#355fc9;--grid:#e9edf5}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.6 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit;max-width:100%;min-width:0}button,a,input,select{touch-action:manipulation}button,a{cursor:pointer}a{color:inherit;text-decoration:none}button{border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:10px 14px;min-height:42px}button:hover,a.secondary:hover{background:var(--subtle)}:focus-visible{outline:2px solid var(--focus);outline-offset:4px}[hidden]{display:none!important}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.skip-link{position:fixed;top:8px;left:12px;transform:translateY(-150%);padding:12px;z-index:50;background:var(--blue-bg);border-radius:8px}.skip-link:focus{transform:none}
+.topbar,main{max-width:1280px;margin:auto;padding-left:40px;padding-right:40px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:88px;border-bottom:1px solid var(--border)}.brand{font-weight:600;display:flex;align-items:center;gap:10px;font-size:16px}.brand-mark{color:var(--blue);font-family:ui-monospace,SFMono-Regular,monospace;font-weight:700}.brand-note{color:var(--muted);font-size:13px;font-weight:400}.quiet-link{color:var(--muted);font-size:12px;display:inline-flex;align-items:center;min-height:40px}.quiet-link:hover{color:var(--blue)}.page-intro{padding:64px 0 36px;max-width:740px}.eyebrow{font-size:10px;font-weight:600;letter-spacing:1.6px;color:var(--blue);display:flex;align-items:center;gap:8px;margin:0 0 16px}.pixel-dot{width:6px;height:6px;background:var(--blue);display:inline-block}.page-intro h1{font-size:clamp(32px,4vw,48px);font-weight:550;letter-spacing:-1.8px;line-height:1.13;margin:0 0 18px}.page-intro>p:last-of-type{font-size:15px;max-width:560px;color:var(--muted);line-height:1.7}.intro-tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:24px}.intro-tags span{font-size:11px;border:1px solid var(--border);padding:4px 10px;border-radius:20px;color:var(--muted)}
+.preview-panel{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);border:1px solid var(--border);border-radius:20px;overflow:hidden;background:var(--surface)}.preview-stage{position:relative;display:flex;align-items:center;justify-content:center;min-height:430px;background:radial-gradient(ellipse at 50% 45%,#7297ef13,transparent 65%),var(--stage);padding:40px;isolation:isolate}.preview-stage:after{content:'';position:absolute;bottom:62px;left:25%;right:25%;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);z-index:-1}.stage-corner{position:absolute;top:22px;left:24px;color:var(--muted);font-size:9px;letter-spacing:1.3px}.stage-caption{position:absolute;bottom:22px;font-size:11px;color:var(--muted)}.preview-stage img{width:280px;max-width:100%;height:auto;image-rendering:pixelated}.preview-details{padding:42px;min-width:0}.preview-details h2{font-size:30px;font-weight:550;letter-spacing:-.8px;margin:0 0 14px}.preview-details>p:not(.eyebrow):not(.copy-status){color:var(--muted);font-size:13px;min-height:44px}.preview-facts{display:flex;gap:28px;flex-wrap:wrap;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:18px 0;margin:24px 0}.preview-facts dt{font-size:10px;color:var(--muted)}.preview-facts dd{font-size:13px;margin:5px 0 0;font-variant-numeric:tabular-nums}.asset-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:22px}.primary{background:var(--blue-bg);border-color:transparent;color:var(--blue);font-weight:550}.primary:hover{filter:brightness(1.1);background:var(--blue-bg)}.secondary{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;font-size:12px}.url-label{display:block;font-size:10px;color:var(--muted);margin-bottom:7px}.asset-url{width:100%;background:var(--stage);border:1px solid var(--border);border-radius:9px;padding:10px;font-size:10px;font-family:ui-monospace,SFMono-Regular,monospace}.copy-status{font-size:10px;color:var(--muted);min-height:18px;margin:9px 0 0}
+#scene-library{scroll-margin-top:24px;margin-top:64px}.library-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:24px}.library-heading h2{font-size:23px;letter-spacing:-.6px;font-weight:550;margin:0}.library-heading .eyebrow{margin-bottom:9px}.muted{color:var(--muted);font-size:12px}.library-toolbar,.view-toolbar{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.library-toolbar{padding-bottom:18px;border-bottom:1px solid var(--border)}.view-toolbar{justify-content:space-between;padding:16px 0 8px;color:var(--muted)}.filters{display:flex;padding:4px;background:var(--stage);border:1px solid var(--border);border-radius:12px;gap:3px}.filters button{background:transparent;border-color:transparent;font-size:11px;padding:6px 12px;min-height:34px}.filters button[aria-pressed=true]{background:var(--surface);border-color:var(--border);color:var(--blue)}.select-label{display:flex;align-items:center;gap:9px;font-size:11px;color:var(--muted)}select,input[type=search]{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 12px;min-height:40px;font-size:12px}.search-label{margin-left:auto}input[type=search]{width:210px}.motion-controls{display:flex;align-items:center;gap:18px}.motion-controls button{font-size:11px;min-height:36px;padding:7px 12px}.check-label{display:flex;gap:8px;align-items:center;font-size:11px;cursor:pointer}.check-label input{accent-color:var(--blue)}
+.group-heading{display:flex;align-items:baseline;gap:16px;margin:27px 0 16px}.group-heading h3{font-size:15px;font-weight:550;margin:0}.group-heading p{font-size:12px;color:var(--muted);margin:0}.scene-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.scene-card{position:relative;min-width:0;overflow:hidden;padding:0;border:1px solid var(--border);background:var(--surface);border-radius:14px;text-align:left}.scene-card:hover{background:var(--surface);border-color:var(--muted)}.scene-card[aria-pressed=true]{border-color:var(--blue)}.scene-stage{display:flex;align-items:center;justify-content:center;min-height:184px;background:var(--stage)}.scene-stage img{display:block;width:144px;height:156px;max-width:100%;object-fit:contain;image-rendering:pixelated}.scene-info{display:flex;flex-direction:column;gap:4px;padding:14px 16px}.scene-info strong{font-size:12px;font-weight:550}.scene-info>span{color:var(--muted);font-size:10px}.selection-mark{display:none;position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:6px;background:var(--blue-bg);color:var(--blue);text-align:center;line-height:22px;font-size:12px}.scene-card[aria-pressed=true] .selection-mark{display:block}.empty-scenes{padding:35px 0;color:var(--muted)}body[data-background=checkerboard] .preview-stage,body[data-background=checkerboard] .scene-stage{background-color:var(--stage);background-image:repeating-conic-gradient(var(--grid) 0% 25%,transparent 0% 50%);background-size:24px 24px}.provenance{margin-top:44px;padding:22px 0;border-top:1px solid var(--border);color:var(--muted);font-size:12px}.provenance summary{cursor:pointer;color:var(--text)}.provenance p{max-width:760px}.provenance a{margin-right:24px}footer{display:flex;justify-content:space-between;gap:16px;color:var(--muted);font-size:11px;padding:24px 0 32px;border-top:1px solid var(--border)}footer .brand-mark{margin-right:8px}
+@media(max-width:1000px){.scene-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.preview-details{padding:30px}.preview-stage{padding:25px}.preview-facts{gap:20px}.search-label{margin-left:0}}
+@media(max-width:760px){.topbar,main{padding-left:20px;padding-right:20px}.topbar{min-height:72px}.brand-note{display:none}.page-intro{padding-top:40px}.page-intro h1{font-size:36px;letter-spacing:-1.2px}.preview-panel{grid-template-columns:minmax(0,1fr)}.preview-stage{min-height:300px}.preview-stage img{width:220px}.preview-details{padding:26px}.scene-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.library-heading{align-items:flex-start;flex-direction:column;gap:10px}.library-heading h2{font-size:21px}.library-toolbar{gap:12px}.filters{width:100%;justify-content:space-between}.filters button{flex:1}.search-label{flex:1;min-width:130px}input[type=search]{width:100%}.select-label{flex-wrap:wrap}.view-toolbar{align-items:flex-start;gap:15px}.motion-controls{gap:12px;flex-wrap:wrap}.group-heading{display:block}.group-heading p{margin-top:6px}.scene-stage{min-height:150px}.scene-stage img{width:120px;height:130px}.scene-info{padding:12px}.preview-facts{gap:24px}.asset-actions{gap:8px}.asset-actions .quiet-link{margin-left:3px}.brand{font-size:14px}.topbar>.quiet-link{font-size:10px}footer{flex-direction:column}.stage-caption{bottom:14px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}`;
+
+const galleryJS = `
+const $ = (selector) => document.querySelector(selector);
+const cards = [...document.querySelectorAll('.scene-card')];
+const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
+const storage = {get(key){try{return localStorage.getItem(key)}catch{return null}},set(key,value){try{localStorage.setItem(key,value)}catch{}}};
+let selected = cards.find(card=>card.getAttribute('aria-pressed')==='true') || cards[0];
+let paused = storage.get('codex-pet-gallery-paused')==='true';
+let reduced = storage.get('codex-pet-gallery-reduced') == null ? motionPreference.matches : storage.get('codex-pet-gallery-reduced')==='true';
+let filter = 'all';
+function motion(){
+  const still = paused || reduced;
+  for(const image of document.querySelectorAll('.scene-image')){
+    const path = 'codex-pet-'+image.dataset.scene+(still?'.svg':'.gif');
+    if(image.getAttribute('src')!==path) image.src=path;
+  }
+  $('#play-toggle').textContent=reduced?'Motion reduced':paused?'Play animations':'Pause animations';
+  $('#play-toggle').disabled=reduced;
+  $('#play-toggle').setAttribute('aria-pressed',String(!still));
+  $('#reduce-motion').checked=reduced;
+  $('#motion-status').textContent=reduced?'Reduced motion · static preview':paused?'Paused · static preview':'Playing · seamless loop';
+}
+function choose(card){
+  selected=card;
+  for(const other of cards)other.setAttribute('aria-pressed',String(other===card));
+  const id=card.dataset.scene;
+  $('#preview-image').dataset.scene=id;
+  $('#preview-image').alt='Codex Pet '+card.dataset.label;
+  $('#preview-title').textContent=card.dataset.label;
+  $('#preview-category').textContent=card.dataset.kind==='core'?'CANONICAL STATE':'EXTRA SCENE';
+  $('#preview-description').textContent=card.dataset.description;
+  $('#preview-fps').textContent=card.dataset.fps+' fps';
+  $('#preview-duration').textContent=card.dataset.duration?card.dataset.duration+'s':'Not recorded';
+  $('#preview-recommended').textContent=card.dataset.recommended;
+  $('#download-gif').href='codex-pet-'+id+'.gif';
+  $('#download-svg').href='codex-pet-'+id+'.svg';
+  $('#asset-url').value='${base}codex-pet-'+id+'.gif?v=smooth-1';
+  $('#copy-status').textContent='Use this URL in your Codex Pet asset settings.';
+  motion();
+}
+function applyFilters(){
+  const family=$('#family-filter').value, query=$('#scene-search').value.toLowerCase().trim();
+  let count=0;
+  for(const card of cards){
+    const matches=(filter==='all'||card.dataset.kind===filter)&&(family==='all'||card.dataset.family===family)&&(!query||(card.dataset.label+' '+card.dataset.description).toLowerCase().includes(query));
+    card.hidden=!matches;if(matches)count++;
+  }
+  for(const group of document.querySelectorAll('.scene-section'))group.hidden=![...group.querySelectorAll('.scene-card')].some(card=>!card.hidden);
+  $('#scene-count').textContent=count+' '+(count===1?'scene':'scenes');
+  $('#empty-scenes').hidden=count>0;
+}
+for(const card of cards){card.addEventListener('click',()=>choose(card));card.addEventListener('keydown',event=>{
+  const shown=cards.filter(item=>!item.hidden);let index=shown.indexOf(card);
+  if(event.key==='ArrowRight'||event.key==='ArrowDown')index=(index+1)%shown.length;
+  else if(event.key==='ArrowLeft'||event.key==='ArrowUp')index=(index-1+shown.length)%shown.length;
+  else if(event.key==='Home')index=0;else if(event.key==='End')index=shown.length-1;else return;
+  event.preventDefault();shown[index]?.focus();
+})}
+for(const button of document.querySelectorAll('[data-filter]'))button.addEventListener('click',()=>{
+  filter=button.dataset.filter;
+  for(const other of document.querySelectorAll('[data-filter]'))other.setAttribute('aria-pressed',String(other===button));
+  applyFilters();
+});
+$('#family-filter').addEventListener('change',applyFilters);$('#scene-search').addEventListener('input',applyFilters);
+$('#play-toggle').addEventListener('click',()=>{paused=!paused;storage.set('codex-pet-gallery-paused',String(paused));motion()});
+$('#reduce-motion').addEventListener('change',()=>{reduced=$('#reduce-motion').checked;storage.set('codex-pet-gallery-reduced',String(reduced));motion()});
+motionPreference.addEventListener('change',()=>{if(storage.get('codex-pet-gallery-reduced')==null){reduced=motionPreference.matches;motion()}});
+function background(value){document.body.dataset.background=value;document.documentElement.dataset.theme=value==='light'?'light':'dark';$('#background-select').value=value;storage.set('codex-pet-gallery-background',value)}
+$('#background-select').addEventListener('change',()=>background($('#background-select').value));
+$('#copy-url').addEventListener('click',async()=>{
+  try{await navigator.clipboard.writeText($('#asset-url').value);$('#copy-status').textContent='GIF URL copied. Ready for your presence settings.'}
+  catch{$('#asset-url').focus();$('#asset-url').select();$('#copy-status').textContent='Select and copy the URL above.'}
+});
+const savedBackground=storage.get('codex-pet-gallery-background');background(['dark','light','checkerboard'].includes(savedBackground)?savedBackground:'dark');choose(selected);applyFilters();
+`;

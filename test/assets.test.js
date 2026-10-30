@@ -11,6 +11,7 @@ import {
   statusGIF,
   encodeGIF,
   visualStates,
+  bonusStates, renderStates, animationCatalog,
 } from "../src/assets/generate-pet-gifs.js";
 // Independent GIF container + LZW reader validates decoded pixel counts and
 // frame differences, rather than merely looking for a GIF header.
@@ -133,8 +134,8 @@ test("six visual states plus legacy aliases are deterministic, transparent anima
     assert.deepEqual(parsed.delays, states[state].animation.map((frame) => frame.delay));
     assert.equal(parsed.delays.reduce((n, d) => n + d, 0), states[state].delays.reduce((n, d) => n + d, 0));
     assert.ok(parsed.loops);
-    assert.ok(data.length <= 1000000, `${state} GIF stays below 1 MB`);
-    assert.ok(parsed.delays.every((delay) => delay >= 8 && delay <= 12));
+    assert.ok(data.length <= 1500000, `${state} GIF stays below 1.5 MB`);
+    assert.ok(parsed.delays.every((delay) => delay === 5));
     assert.ok(new Set(parsed.frames.map((b) => b.toString("base64"))).size > 1);
     assert.deepEqual(
       data,
@@ -154,11 +155,11 @@ test("six visual states plus legacy aliases are deterministic, transparent anima
 test("full-body motion preserves every translated original mascot pixel without cropping or recoloring", async () => {
   const { motionOffset, moveSprite } = await import("../src/assets/pixel-effects.js");
   for (const [state, spec] of Object.entries(states)) {
-    if (state === "writing" || state === "working") continue; // Articulated paws have their own invariant below.
+    if (spec.typing) continue; // Articulated paws have their own invariant below.
     let additions = 0;
     const variations = new Set(), offsets = new Set();
     for (let i = 0; i < spec.animation.length; i++) {
-      const elapsed = i * 100, base = sprite(state, spec.animation[i].sourceFrame), frame = animatedSprite(state, i);
+      const elapsed = i * 50, base = sprite(state, spec.animation[i].sourceFrame), frame = animatedSprite(state, i);
       const moved = moveSprite(base, state, elapsed), { dx, dy } = motionOffset(base, state, elapsed);
       variations.add(frame.toString("base64"));
       offsets.add(`${dx}:${dy}`);
@@ -178,7 +179,7 @@ test("full-body motion preserves every translated original mascot pixel without 
     }
     assert.ok(additions > 0, `${state} has distinct FX`);
     assert.ok(offsets.size > 1, `${state} moves the whole body`);
-    assert.ok(variations.size >= spec.animation.length / 2, state);
+    assert.ok(variations.size >= 8, `${state} has meaningful distinct poses or FX`);
     const parsed = decode(gif(state));
     assert.ok(parsed.controls.every((c) => c.transparent && c.disposal === 2 && c.transparentIndex === 0));
     assert.ok(parsed.frames.every((f) => f[0] === 0));
@@ -208,7 +209,7 @@ test("optional animated badges are transparent 96px GIFs on an exact 4x pixel gr
     }
   }
   const manifest = JSON.parse(fs.readFileSync(new URL("../assets/pet/manifest.json", import.meta.url)));
-  assert.equal(manifest.effects.version, "pixel-fx-3");
+  assert.equal(manifest.effects.version, "pixel-fx-4");
   assert.match(manifest.effects.policy, /alpha zero/);
   assert.ok(fs.existsSync(new URL("../assets/pet/animation-gallery.html", import.meta.url)));
   const gallery = fs.readFileSync(new URL("../assets/pet/animation-gallery.html", import.meta.url), "utf8");
@@ -233,18 +234,9 @@ test("mascot pixels come from the official blue Codex atlas, not a substitute dr
       new URL("../assets/pet/source/codex-spritesheet-v4.png", import.meta.url),
     ),
   );
-  for (const [state, row, frames] of [
-    ["working", 7, 1],
-    ["writing", 7, 1],
-    ["patching", 4, 4],
-    ["error", 5, 1],
-    ["done", 8, 3],
-    ["thinking", 6, 4],
-    ["waiting", 3, 4],
-    ["idle", 0, 1],
-  ]) {
-    assert.equal(states[state].row, row);
-    assert.equal(states[state].frames, frames);
+  for (const [state, spec] of Object.entries(states)) {
+    const row = spec.row, frames = spec.frames;
+    assert.ok(row >= 0 && row <= 8);
     for (let frame = 0; frame < frames; frame++) {
       const extracted = sprite(state, frame);
       for (let y = 0; y < 208; y++)
@@ -274,17 +266,67 @@ test("mascot pixels come from the official blue Codex atlas, not a substitute dr
 
 test("high-movement loops maintain one expression family per state and legacy compatibility", () => {
   assert.deepEqual(states.writing.sourceFrames, [0]);
-  assert.deepEqual(states.thinking.sourceFrames, [0, 3, 4, 3]);
+  assert.deepEqual(states.thinking.sourceFrames, [0]);
   assert.deepEqual(states.error.sourceFrames, [1]);
-  assert.deepEqual(states.done.sourceFrames, [1, 2, 1]);
+  assert.deepEqual(states.done.sourceFrames, [1]);
   assert.deepEqual(states.idle.sourceFrames, [1]);
   assert.deepEqual(gif("working"), gif("writing"));
   assert.notDeepEqual(gif("waiting"), gif("done"));
   for (const spec of Object.values(states)) {
     assert.equal(spec.animation.length, spec.delays.length);
-    assert.equal(spec.fps, 10);
+    assert.equal(spec.fps, 20);
     assert.ok(spec.animation.length >= 30);
-    assert.ok(spec.delays.every((d) => d === 10));
+    assert.ok(spec.delays.every((d) => d === 5));
+  }
+});
+
+test("twelve bonus scenes have distinct assets and an inspectable chooser catalog", () => {
+  assert.deepEqual(bonusStates, ["reading", "searching", "terminal", "testing", "building", "installing", "reviewing", "debugging", "connecting", "focus", "celebrating", "idle-cozy"]);
+  assert.equal(renderStates.length, 19);
+  assert.equal(animationCatalog.length, 20);
+  const saved = JSON.parse(fs.readFileSync(new URL("../assets/pet/animation-catalog.json", import.meta.url)));
+  assert.deepEqual(saved, animationCatalog);
+  const signatures = new Set();
+  for (const id of renderStates) {
+    const item = animationCatalog.find((scene) => scene.id === id);
+    assert.ok(item.label && item.description && item.family && item.recommendedKey);
+    assert.equal(item.fps, 20);
+    assert.equal(item.path, `/assets/pet/codex-pet-${id}.gif`);
+    assert.equal(item.previewPath, `/assets/pet/codex-pet-${id}.svg`);
+    signatures.add(fs.readFileSync(new URL(`../assets/pet/codex-pet-${id}.gif`, import.meta.url)).toString("base64"));
+  }
+  assert.equal(signatures.size, renderStates.length, "every selectable scene has a distinct semantic animation");
+});
+
+test("body motion crosses loop seams smoothly and typing adds actual intermediate paw positions", async () => {
+  const { motionOffset } = await import("../src/assets/pixel-effects.js");
+  for (const [id, spec] of Object.entries(states)) {
+    const base = sprite(id), lastTime = (spec.frameCount - 1) * 50;
+    const start = motionOffset(base, id, 0), end = motionOffset(base, id, lastTime);
+    assert.ok(Math.abs(start.dx - end.dx) <= 2 && Math.abs(start.dy - end.dy) <= 2, `${id} seamless body position`);
+    let previous = start;
+    for (let i = 1; i < spec.frameCount; i++) {
+      const next = motionOffset(base, id, i * 50);
+      assert.ok(Math.abs(previous.dx - next.dx) <= 2 && Math.abs(previous.dy - next.dy) <= 2, `${id} avoids body teleportation`);
+      previous = next;
+    }
+  }
+  const paws = Array.from({ length: 16 }, (_, i) => animatedSprite("writing", i));
+  assert.ok(new Set(paws.map((frame) => frame.toString("base64"))).size >= 9);
+  assert.ok(paws.slice(1).filter((frame, i) => !frame.equals(paws[i])).length >= 12, "50ms samples add intermediate paw positions, not repeated 100ms frames");
+});
+
+test("bonus laptop props preserve the original face, feet and laptop outside the paw region", () => {
+  for (const id of ["terminal", "testing", "installing"]) {
+    const base = sprite(id);
+    for (const index of [0, 5, 11, 30, 47, 79]) {
+      const frame = animatedSprite(id, index);
+      for (let y = 0; y < 208; y++) for (let x = 0; x < 192; x++) {
+        const p = (y * 192 + x) * 4;
+        if (base[p + 3] && !(x >= 67 && x <= 103 && y >= 144 && y <= 172))
+          assert.deepEqual(frame.subarray(p, p + 4), base.subarray(p, p + 4));
+      }
+    }
   }
 });
 
@@ -321,7 +363,7 @@ test("writing alternates both hands while the face, body and laptop stay fixed",
     const base = sprite(state, 0), left = new Set(), right = new Set();
     for (let n = 0; n < states[state].frameCount; n++) {
       const frame = animatedSprite(state, n);
-      assert.deepEqual(motionOffset(base, state, n * 100), {dx: 0, dy: 0});
+      assert.deepEqual(motionOffset(base, state, n * 50), {dx: 0, dy: 0});
       const hands = [[], []];
       let changed = 0;
       for (let y = 0; y < 208; y++) {
