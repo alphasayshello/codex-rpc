@@ -140,6 +140,11 @@ test("dashboard serves APIs/assets, live SVG, settings CSRF protection and range
   assert.equal((await fetch(url + "/assets/pet/animation-gallery.js")).headers.get("content-type"), "text/javascript");
   assert.equal((await fetch(url + "/assets/pet/animation-catalog.json")).status, 200);
   assert.equal((await fetch(url + "/assets/pet/manifest.json")).status, 200);
+  const layout = await fetch(url + "/assets/pet/source/codex-spritesheet-v4.png");
+  assert.equal(layout.headers.get("content-type"), "image/png");
+  const layoutBytes = Buffer.from(await layout.arrayBuffer());
+  assert.equal(layoutBytes.readUInt32BE(16), 1536);
+  assert.equal(layoutBytes.readUInt32BE(20), 1872);
   assert.equal((await fetch(url + "/assets/pet/codex-pet-not-a-scene.gif")).status, 404);
   assert.equal((await fetch(url + "/assets/pet/codex-pet-constructor.gif")).status, 404);
   assert.equal((await fetch(url + "/not-a-route")).status, 404);

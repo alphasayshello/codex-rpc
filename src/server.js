@@ -215,6 +215,7 @@ export function createServer() {
         "/app.js": ["../web/app.js", "text/javascript"],
         "/style.css": ["../web/style.css", "text/css"],
         "/assets/pet/animation-gallery.js": ["../assets/pet/animation-gallery.js", "text/javascript"],
+        "/assets/pet/source/codex-spritesheet-v4.png": ["../assets/pet/source/codex-spritesheet-v4.png", "image/png"],
         "/assets/pet/manifest.json": ["../assets/pet/manifest.json", "application/json"],
         "/assets/pet/animation-catalog.json": ["../assets/pet/animation-catalog.json", "application/json"],
         "/assets/pet/animation-gallery.css": ["../assets/pet/animation-gallery.css", "text/css"],

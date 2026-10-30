@@ -593,6 +593,52 @@ app
     await js("Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.testCopiedAsset=value}}});document.querySelector('#copy-url').click()");
     await until(() => js("document.querySelector('#copy-status').textContent.includes('GIF URL copied')"));
     assert.equal(await js("window.testCopiedAsset"), await js("document.querySelector('#asset-url').value"));
+    // The prompt builder stays in this page. Literal character data must not
+    // become HTML, and copying uses the same isolated clipboard mock as above.
+    assert.equal(await js("document.querySelector('#pet-brief').maxLength"), 1000);
+    assert.equal(await js("document.querySelector('#pet-prompt').readOnly"), true);
+    const defaultBrief = await js("document.querySelector('#pet-brief').value");
+    const defaultPrompt = await js("document.querySelector('#pet-prompt').value");
+    const format = await js("document.querySelector('.prompt-format').textContent");
+    assert.match(format, /1536\s*×\s*1872/);
+    assert.match(format, /8 columns\s*×\s*9 rows/);
+    assert.match(format, /192\s*×\s*208/);
+    assert.match(defaultPrompt, /1536\s*×\s*1872/);
+    assert.match(defaultPrompt, /8 columns\s*×\s*9 rows/);
+    assert.match(defaultPrompt, /192\s*×\s*208/);
+    const promptConfig = JSON.stringify(config());
+    await js("window.promptFetches=[];window.promptOriginalFetch=window.fetch;window.fetch=(...args)=>{window.promptFetches.push(String(args[0]));return window.promptOriginalFetch(...args)};void 0");
+    const htmlBrief = '  A violet robot \"friend\" with a backslash \\ and <img src=x onerror=\"window.PET_PROMPT_XSS=true\"> & </textarea>\n kind eyes.  ';
+    await js(`document.querySelector('#pet-brief').value=${JSON.stringify(htmlBrief)};document.querySelector('#pet-brief').dispatchEvent(new Event('input'))`);
+    const cleanBrief = htmlBrief.replace(/[\x00-\x1f\x7f]/g, " ").trim().slice(0, 1000);
+    const literalBrief = JSON.stringify(cleanBrief).replaceAll("<", "\\u003c").replaceAll(">", "\\u003e").replaceAll("&", "\\u0026");
+    const changedPrompt = await js("document.querySelector('#pet-prompt').value");
+    assert.ok(changedPrompt.includes(literalBrief));
+    assert.ok(!changedPrompt.includes("<img"));
+    assert.equal(await js("document.querySelector('#create-pet img')===null&&!window.PET_PROMPT_XSS"), true);
+    assert.match(await js("document.querySelector('#pet-prompt-status').textContent"), /updated locally/);
+    await js("document.querySelector('#copy-pet-prompt').click()");
+    await until(() => js("document.querySelector('#pet-prompt-status').textContent.startsWith('Prompt copied')"));
+    assert.equal(await js("window.testCopiedAsset"), changedPrompt);
+    await js("navigator.clipboard.writeText=async()=>{throw new Error('Clipboard unavailable in test')};document.querySelector('#copy-pet-prompt').click()");
+    await until(() => js("document.querySelector('#pet-prompt-status').textContent==='Select and copy the prompt above.'"));
+    assert.equal(await js("document.activeElement.id"), "pet-prompt");
+    assert.equal(await js("document.querySelector('#pet-prompt').selectionStart"), 0);
+    assert.equal(await js("document.querySelector('#pet-prompt').selectionEnd"), changedPrompt.length);
+    await js("navigator.clipboard.writeText=async value=>{window.testCopiedAsset=value};document.querySelector('#pet-brief').value='Z'.repeat(1100);document.querySelector('#pet-brief').dispatchEvent(new Event('input'))");
+    const limitedPrompt = await js("document.querySelector('#pet-prompt').value");
+    assert.ok(limitedPrompt.includes('Z'.repeat(1000)));
+    assert.ok(!limitedPrompt.includes('Z'.repeat(1001)));
+    await js("document.querySelector('#reset-pet-prompt').click()");
+    assert.equal(await js("document.querySelector('#pet-brief').value"), defaultBrief);
+    assert.equal(await js("document.querySelector('#pet-prompt').value"), defaultPrompt);
+    assert.equal(await js("document.activeElement.id"), "pet-brief");
+    assert.deepEqual(await js("window.promptFetches"), []);
+    await js("window.fetch=window.promptOriginalFetch;void 0");
+    assert.equal(JSON.stringify(config()), promptConfig);
+    assert.match(await js("document.querySelector('.prompt-note').textContent"), /does not import or replace artwork automatically/);
+    const reference = await js("fetch('source/codex-spritesheet-v4.png').then(async response=>{const buffer=await response.arrayBuffer();const view=new DataView(buffer);return {status:response.status,type:response.headers.get('content-type'),width:view.getUint32(16),height:view.getUint32(20)}})");
+    assert.deepEqual(reference, { status: 200, type: "image/png", width: 1536, height: 1872 });
     await js("document.querySelector('.scene-card[data-scene=testing]').focus()");
     await key("End");
     assert.equal(await js("document.activeElement.dataset.scene"), "idle-cozy");
@@ -633,9 +679,15 @@ app
     await until(() => js("[...document.querySelectorAll('.scene-card[data-kind=bonus] img')].every(image=>image.complete&&image.naturalWidth>0)"));
     assert.equal(await js("[...document.querySelectorAll('.scene-card[data-kind=bonus]')].every(card=>{const box=card.getBoundingClientRect();return box.top>=0&&box.bottom<=innerHeight})"), true);
     await capture("pet-collection.png");
+    await js("scrollTo({top:document.querySelector('#create-pet').getBoundingClientRect().top+scrollY-24,behavior:'instant'});new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))");
+    await capture("pet-prompt.png");
+    window.setSize(430, 1050);
+    await js("scrollTo({top:document.querySelector('#create-pet').getBoundingClientRect().top+scrollY-24,behavior:'instant'});new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))");
+    assert.equal(await js("document.documentElement.scrollWidth<=innerWidth"), true);
+    await capture("pet-prompt-mobile.png");
     assert.deepEqual(errors, []);
     console.log(
-      "Verified actual-hook file/diff/command telemetry, stable thinking and operation/session timers, 20 GIF and 20 SVG asset routes, 19-scene gallery controls and settings picker, six canonical lifecycle states, asset keys, privacy and button suppression; output-only recaps, motion persistence, stable mascot across SSE, pin isolation, safe timeline, themes, keyboard/mobile navigation, responsive layout, settings, heatmap and pause. Screenshots in docs/.",
+      "Verified actual-hook file/diff/command telemetry, stable thinking and operation/session timers, 20 GIF and 20 SVG asset routes, 19-scene gallery controls, settings picker and safe local ChatGPT prompt builder, six canonical lifecycle states, asset keys, privacy and button suppression; output-only recaps, motion persistence, stable mascot across SSE, pin isolation, safe timeline, themes, keyboard/mobile navigation, responsive layout, settings, heatmap and pause. Screenshots in docs/.",
     );
   })
   .catch((e) => {
