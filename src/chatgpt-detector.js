@@ -4,6 +4,7 @@ import { applyEvent } from "./hook.js";
 import { config, readJSON, writeJSON } from "./store.js";
 import { emptyStats, mergeStats } from "./scanner.js";
 const exec = promisify(execFile);
+export const backgroundExecOptions = (timeout) => ({ timeout, windowsHide: true });
 export async function detectChatGPT({
   platform = process.platform,
   run = exec,
@@ -16,7 +17,7 @@ export async function detectChatGPT({
           "-e",
           'tell application "System Events" to get {name, frontmost} of every application process whose name is "ChatGPT"',
         ],
-        { timeout: 1500 },
+        backgroundExecOptions(1500),
       );
       return {
         running: stdout.includes("ChatGPT"),
@@ -33,7 +34,7 @@ export async function detectChatGPT({
           "-Command",
           "Get-Process -Name ChatGPT -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id",
         ],
-        { timeout: 2000 },
+        backgroundExecOptions(2000),
       );
       return {
         running: !!stdout.trim(),
@@ -41,13 +42,13 @@ export async function detectChatGPT({
         method: "Windows process (foreground unavailable)",
       };
     }
-    const { stdout } = await run("pgrep", ["-x", "ChatGPT"], { timeout: 1500 });
+    const { stdout } = await run("pgrep", ["-x", "ChatGPT"], backgroundExecOptions(1500));
     let foreground = null;
     try {
       const active = await run(
         "xdotool",
         ["getactivewindow", "getwindowclassname"],
-        { timeout: 1000 },
+        backgroundExecOptions(1000),
       );
       foreground = /chatgpt/i.test(active.stdout);
     } catch {}

@@ -62,7 +62,7 @@ export function completionSource(shell, target, platform = process.platform) {
         : "'" + target.replaceAll("'", "'\\''") + "'";
   return (shell === "powershell" ? ". " : "source ") + quote;
 }
-export function installCompletion(shell) {
+export function installCompletion(shell, { run = execFileSync } = {}) {
   shell ||= defaultShell();
   const text = completion(shell),
     dir = path.join(home(), "completions");
@@ -73,7 +73,7 @@ export function installCompletion(shell) {
   if (shell === "powershell") {
     for (const executable of ["pwsh", "powershell.exe"]) {
       try {
-        profile = execFileSync(
+        profile = run(
           executable,
           [
             "-NoProfile",
@@ -81,7 +81,7 @@ export function installCompletion(shell) {
             "-Command",
             "$PROFILE.CurrentUserAllHosts",
           ],
-          { encoding: "utf8", timeout: 2000 },
+          { encoding: "utf8", timeout: 2000, windowsHide: true },
         ).trim();
         if (profile) break;
       } catch {}

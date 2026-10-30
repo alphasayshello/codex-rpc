@@ -81,7 +81,8 @@ test("service descriptors cover macOS, Linux and Windows and retain separate hom
   assert.match(serviceDefinition("darwin").content, /<plist/);
   assert.match(serviceDefinition("darwin").content, /CODEX_HOME/);
   assert.match(serviceDefinition("linux").content, /\[Service\]/);
-  assert.match(serviceDefinition("win32").content, /start "" \/min/);
+  assert.match(serviceDefinition("win32").path, /\.vbs$/);
+  assert.match(serviceDefinition("win32").content, /, 0, False/);
 });
 test("daemon CLI start/status/pause/resume/restart/stop stays within sandbox", async (t) => {
   const { env } = sandbox(t);
@@ -175,7 +176,7 @@ test("setup refreshes bundled GIF URLs and restarts an existing daemon without c
     timeout: 20000,
   });
   assert.notEqual(readJSON("daemon.json").pid, original);
-  assert.match(config().assets.working, /\?v=calm-1$/);
+  assert.match(config().assets.working, /\?v=motion-2$/);
   assert.equal(
     config().assets.thinking,
     "https://my-assets.example/thinking.gif",

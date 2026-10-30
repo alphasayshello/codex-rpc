@@ -21,19 +21,19 @@ export const root = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
-const runtimeExecutable = () =>
+export const runtimeExecutable = (platform = process.platform) =>
   process.env.CODEX_RPC_SEA &&
   fs.existsSync(
     path.join(
       home(),
       "bin",
-      process.platform === "win32" ? "codex-rpc.exe" : "codex-rpc",
+      platform === "win32" ? "codex-rpc.exe" : "codex-rpc",
     ),
   )
     ? path.join(
         home(),
         "bin",
-        process.platform === "win32" ? "codex-rpc.exe" : "codex-rpc",
+        platform === "win32" ? "codex-rpc.exe" : "codex-rpc",
       )
     : process.execPath;
 const cli = () => path.join(home(), "runtime/bin/codex-rpc.js");
@@ -72,8 +72,8 @@ export function unregisterHook() {
     fs.writeFileSync(target, text, { mode: 0o600 });
   }
 }
-export function serviceDefinition(platform = process.platform) {
-  const node = runtimeExecutable(),
+export function serviceDefinition(platform = process.platform, { executable = runtimeExecutable(platform) } = {}) {
+  const node = executable,
     command = [node, cli(), "daemon"];
   if (platform === "darwin")
     return {
@@ -89,13 +89,31 @@ export function serviceDefinition(platform = process.platform) {
     };
   }
   if (platform === "win32") {
-    const q = (s) => '"' + s.replace(/%/g, "%%").replace(/"/g, '""') + '"';
+    // No cmd.exe or batch expansion: paths containing &, !, %, quotes or
+    // spaces are literals inside an encoded PowerShell ProcessStartInfo script.
+    // WScript hides PowerShell, which creates Node without a console window.
+    const ps = (value) => "'" + value.replaceAll("'", "''") + "'";
+    const quoteArgument = (value) => '"' + value.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/g, '$1$1') + '"';
+    const script = [
+      `$env:CODEX_RPC_HOME = ${ps(home())}`,
+      `$env:CODEX_HOME = ${ps(codexHome())}`,
+      "$start = New-Object System.Diagnostics.ProcessStartInfo",
+      `$start.FileName = ${ps(node)}`,
+      `$start.Arguments = ${ps(command.slice(1).map(quoteArgument).join(" "))}`,
+      "$start.UseShellExecute = $false",
+      "$start.CreateNoWindow = $true",
+      "$start.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden",
+      "[System.Diagnostics.Process]::Start($start) | Out-Null",
+    ].join("\r\n");
+    const encoded = Buffer.from(script, "utf16le").toString("base64");
+    const directory = path.join(
+      process.env.APPDATA || path.join(os.homedir(), "AppData/Roaming"),
+      "Microsoft/Windows/Start Menu/Programs/Startup",
+    );
     return {
-      path: path.join(
-        process.env.APPDATA || path.join(os.homedir(), "AppData/Roaming"),
-        "Microsoft/Windows/Start Menu/Programs/Startup/codex-rpc.cmd",
-      ),
-      content: `@echo off\r\nset "CODEX_RPC_HOME=${home().replace(/%/g, "%%")}"\r\nset "CODEX_HOME=${codexHome().replace(/%/g, "%%")}"\r\nstart "" /min ${command.map(q).join(" ")}\r\n`,
+      path: path.join(directory, "codex-rpc.vbs"),
+      legacyPath: path.join(directory, "codex-rpc.cmd"),
+      content: `' codex-rpc hidden startup v1\r\nOption Explicit\r\nDim shell\r\nSet shell = CreateObject("WScript.Shell")\r\nshell.Run "powershell.exe -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand ${encoded}", 0, False\r\n`,
     };
   }
   throw Error("Unsupported service platform");
@@ -105,30 +123,46 @@ export function installService({
   definition = serviceDefinition(platform),
   run = execFileSync,
   uid = process.getuid?.() ?? 0,
+  verifyScriptHost = platform === "win32" && process.platform === "win32",
 } = {}) {
   const d = definition;
   fs.mkdirSync(path.dirname(d.path), { recursive: true });
   fs.writeFileSync(d.path, d.content, { mode: 0o600 });
   let warning;
+  if (platform === "win32") {
+    warning = removeLegacyStartup(d.legacyPath);
+    if (verifyScriptHost) {
+      fs.mkdirSync(home(), { recursive: true, mode: 0o700 });
+      const probe = file(`script-host-probe-${randomUUID()}.vbs`);
+      try {
+        fs.writeFileSync(probe, "WScript.Quit 0\r\n", { mode: 0o600 });
+        run("cscript.exe", ["//B", "//Nologo", probe], { stdio: "pipe", timeout: 5000, windowsHide: true });
+      } catch (e) {
+        warning = [warning, "Windows autostart requires Windows Script Host with VBScript support, which is unavailable or disabled. Use codex-rpc start manually; check Windows optional features or your administrator's script policy. " + e.message].filter(Boolean).join(" ");
+      } finally {
+        fs.rmSync(probe, { force: true });
+      }
+    }
+  }
   try {
     if (platform === "darwin") {
       // Refresh an already loaded agent, whose cached arguments/environment
       // otherwise survive a setup upgrade. Missing agents are harmless.
       try {
         run("launchctl", ["bootout", `gui/${uid}/dev.codex-rpc`], {
-          stdio: "pipe",
+          stdio: "pipe", windowsHide: true,
         });
       } catch {}
       run(
         "launchctl",
         ["bootstrap", `gui/${uid}`, d.path],
-        { stdio: "pipe" },
+        { stdio: "pipe", windowsHide: true },
       );
     }
     if (platform === "linux") {
-      run("systemctl", ["--user", "daemon-reload"], { stdio: "pipe" });
+      run("systemctl", ["--user", "daemon-reload"], { stdio: "pipe", windowsHide: true });
       run("systemctl", ["--user", "enable", "codex-rpc.service"], {
-        stdio: "pipe",
+        stdio: "pipe", windowsHide: true,
       });
     }
   } catch (e) {
@@ -136,34 +170,44 @@ export function installService({
   }
   return { path: d.path, warning };
 }
-export function removeService() {
-  const d = serviceDefinition();
+function removeLegacyStartup(target) {
+  if (!target || !fs.existsSync(target)) return;
+  const text = fs.readFileSync(target, "utf8");
+  if (/^@echo off\r?\n/i.test(text) && text.includes("CODEX_RPC_HOME=") &&
+    text.includes('start "" /min') && /codex-rpc/.test(text) && /daemon/.test(text)) {
+    fs.rmSync(target, { force: true });
+  } else return "Existing Startup codex-rpc.cmd was preserved because it is not a recognized codex-rpc launcher.";
+}
+export function removeService({ platform = process.platform, definition = serviceDefinition(platform), run = execFileSync } = {}) {
+  const d = definition;
   try {
-    if (process.platform === "darwin")
-      execFileSync(
+    if (platform === "darwin")
+      run(
         "launchctl",
         ["bootout", `gui/${process.getuid()}/dev.codex-rpc`],
-        { stdio: "pipe" },
+        { stdio: "pipe", windowsHide: true },
       );
-    if (process.platform === "linux")
-      execFileSync(
+    if (platform === "linux")
+      run(
         "systemctl",
         ["--user", "disable", "--now", "codex-rpc.service"],
-        { stdio: "pipe" },
+        { stdio: "pipe", windowsHide: true },
       );
   } catch {}
   fs.rmSync(d.path, { force: true });
+  if (platform === "win32") removeLegacyStartup(d.legacyPath);
 }
-export async function startDaemon() {
+export async function startDaemon({ launch = spawn, isAlive = alive, sleep = delay } = {}) {
   const old = readJSON("daemon.json");
-  if (alive(old.pid)) return old;
+  if (isAlive(old.pid)) return old;
   fs.mkdirSync(home(), { recursive: true, mode: 0o700 });
   const entry = fs.existsSync(cli())
     ? cli()
     : path.join(root, "bin/codex-rpc.js");
-  const child = spawn(runtimeExecutable(), [entry, "daemon"], {
+  const child = launch(runtimeExecutable(), [entry, "daemon"], {
     stdio: "ignore",
     detached: true,
+    windowsHide: true,
     env: process.env,
   });
   let failure;
@@ -172,10 +216,10 @@ export async function startDaemon() {
   });
   child.unref();
   for (let i = 0; i < 200; i++) {
-    await delay(50);
+    await sleep(50);
     if (failure) throw failure;
     const state = readJSON("daemon.json");
-    if (alive(state.pid)) return state;
+    if (isAlive(state.pid)) return state;
   }
   throw Error("Daemon failed to start; inspect ~/.codex-rpc/daemon.log");
 }
