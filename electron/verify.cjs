@@ -7,6 +7,7 @@ const fs = require("node:fs"),
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "codex-rpc-render-"));
 process.env.CODEX_RPC_HOME = path.join(temp, "rpc");
 process.env.CODEX_HOME = path.join(temp, "codex");
+app.setPath("userData", path.join(temp, "electron-profile"));
 let dashboard, window;
 app.commandLine.appendSwitch("disable-gpu");
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -124,6 +125,28 @@ app
     const js = (source) => window.webContents.executeJavaScript(source).catch((error) => {
       throw new Error(`${error.message}\nRenderer check: ${source}`);
     });
+    const output = path.resolve(__dirname, "../docs");
+    fs.mkdirSync(output, { recursive: true });
+    const capture = async (name) => {
+      await wait(250); // Let sidebar/theme CSS transitions finish before capture.
+      window.webContents.invalidate();
+      await js("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+      fs.writeFileSync(path.join(output, name), (await window.webContents.capturePage()).toPNG());
+    };
+    const reload = async () => {
+      await window.loadURL(`http://127.0.0.1:${dashboard.address().port}`);
+      await window.webContents.insertCSS("* { transition: none !important; animation: none !important; scroll-behavior: auto !important; }");
+      await until(() => js("document.querySelector('#connection').textContent==='Live on this device'"));
+    };
+    const key = async (keyCode, modifiers = []) => {
+      // Hidden BrowserWindows cannot receive native focus. Dispatch to the
+      // focused DOM node to exercise the drawer's keyboard handlers directly.
+      await js(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key:${JSON.stringify(keyCode)},shiftKey:${modifiers.includes("shift")},bubbles:true,cancelable:true}))`);
+      await wait(50);
+    };
+    // Hidden compositor animation clocks are not reliable; verify stable end
+    // states while leaving native GIF animation untouched.
+    await window.webContents.insertCSS("* { transition: none !important; animation: none !important; scroll-behavior: auto !important; }");
     await until(() =>
       js(
         "document.querySelector('#connection').textContent==='Live on this device'",
@@ -147,15 +170,46 @@ app
       await js("document.documentElement.scrollWidth <= innerWidth"),
       true,
     );
-    const output = path.resolve(__dirname, "../docs");
-    fs.mkdirSync(output, { recursive: true });
-    fs.writeFileSync(
-      path.join(output, "dashboard.png"),
-      (await window.webContents.capturePage()).toPNG(),
-    );
+    assert.equal(await js("document.documentElement.dataset.theme"), "dark");
+    await js("document.querySelector('#theme-toggle').click()");
+    assert.equal(await js("document.documentElement.dataset.theme"), "light");
+    assert.equal(await js("localStorage.getItem('codex-rpc-theme')"), "light");
+    await reload();
+    assert.equal(await js("document.documentElement.dataset.theme"), "light");
+    await capture("dashboard-light.png");
+    await js("document.querySelector('#theme-toggle').focus()");
+    assert.equal(await js("document.activeElement.id"), "theme-toggle");
+    assert.equal(await js("document.activeElement.tagName"), "BUTTON");
+    await js("document.activeElement.click()");
+    await until(() => js("document.documentElement.dataset.theme==='dark'"));
+    assert.equal(await js("localStorage.getItem('codex-rpc-theme')"), "dark");
+    await reload();
+    assert.equal(await js("document.documentElement.dataset.theme"), "dark");
+    await js("document.querySelector('#sidebar-toggle').click()");
+    assert.equal(await js("document.querySelector('#sidebar-toggle').getAttribute('aria-expanded')"), "false");
+    assert.equal(await js("localStorage.getItem('codex-rpc-sidebar-collapsed')"), "true");
+    await reload();
+    assert.equal(await js("document.body.classList.contains('sidebar-collapsed')"), true);
+    assert.equal(await js("document.querySelector('#sidebar').inert"), true);
+    await js("document.querySelector('#sidebar-toggle').focus()");
+    assert.equal(await js("document.activeElement.tagName"), "BUTTON");
+    await js("document.activeElement.click()");
+    assert.equal(await js("document.querySelector('#sidebar-toggle').getAttribute('aria-expanded')"), "true");
+    assert.equal(await js("localStorage.getItem('codex-rpc-sidebar-collapsed')"), "false");
+    assert.equal(await js("getComputedStyle(document.querySelector('#sidebar')).visibility"), "visible");
+    assert.equal(await js("Math.round(document.querySelector('#sidebar').getBoundingClientRect().left)"), 0);
+    await capture("dashboard.png");
     await js("document.querySelector('.chat-panel').scrollIntoView({block:'center'})");
     await wait(100);
-    fs.writeFileSync(path.join(output, "chat.png"), (await window.webContents.capturePage()).toPNG());
+    await capture("chat.png");
+    await js("document.querySelector('#settings-tab-0').focus()");
+    await key("ArrowDown");
+    assert.equal(await js("document.activeElement.id"), "settings-tab-1");
+    assert.equal(await js("document.querySelector('#settings-content').getAttribute('aria-labelledby')"), "settings-tab-1");
+    await key("End");
+    assert.equal(await js("document.activeElement.id"), "settings-tab-6");
+    await key("Home");
+    assert.equal(await js("document.activeElement.id"), "settings-tab-0");
     for (const tab of [
       "Presence",
       "Discord",
@@ -180,8 +234,7 @@ app
       await until(() => config().presence.stats === mode);
       await until(() => js("document.querySelector('#save-status').textContent==='Saved on this device.'"));
     }
-    await window.loadURL(`http://127.0.0.1:${dashboard.address().port}`);
-    await until(() => js("document.querySelector('#connection').textContent==='Live on this device'"));
+    await reload();
     assert.equal(await js("document.querySelector('[data-key=\"presence.stats\"]').value"), "chat");
     await js(
       "Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent==='Codex Pet Assets').click(); document.querySelector('#settings').scrollIntoView({behavior:'instant'})",
@@ -189,12 +242,7 @@ app
     await wait(100);
     assert.ok(await js("document.querySelector('#settings-content').getBoundingClientRect().top < innerHeight - 200"));
     await until(() => js("document.querySelector('#connection').textContent==='Live on this device'"));
-    window.webContents.invalidate();
-    await js("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
-    fs.writeFileSync(
-      path.join(output, "settings.png"),
-      (await window.webContents.capturePage()).toPNG(),
-    );
+    await capture("settings.png");
     const before = await js("document.querySelector('#tokens').textContent");
     await js(
       "document.querySelector('#range').value='7d';document.querySelector('#range').dispatchEvent(new Event('change'))",
@@ -228,24 +276,50 @@ app
     await js("document.querySelector('#toggle-presence').click()");
     await until(() => config().enabled === false);
     window.setSize(430, 950);
-    await js("scrollTo(0,0)");
+    await js("scrollTo({top:0,behavior:'instant'})");
     await wait(100);
+    assert.equal(await js("document.querySelector('#sidebar-toggle').getAttribute('aria-expanded')"), "false");
+    assert.equal(await js("document.querySelector('#sidebar').inert"), true);
+    assert.equal(await js("document.querySelector('#sidebar').getAttribute('aria-hidden')"), "true");
+    await js("document.querySelector('#sidebar-toggle').focus()");
+    await js("document.activeElement.click()");
+    assert.equal(await js("document.body.classList.contains('sidebar-open')"), true);
+    assert.equal(await js("document.querySelector('#main-content').inert"), true);
+    assert.equal(await js("document.activeElement.id"), "sidebar-close");
+    assert.equal(await js("document.querySelector('#sidebar-overlay').hidden"), false);
+    await js("document.querySelector('#sidebar .brand').focus()");
+    await key("Tab", ["shift"]);
+    assert.equal(await js("document.activeElement.classList.contains('sidebar-card-link')"), true);
+    await key("Tab");
+    assert.equal(await js("document.activeElement.classList.contains('brand')"), true);
+    await capture("navigation-mobile.png");
+    await key("Escape");
+    assert.equal(await js("document.querySelector('#main-content').inert"), false);
+    assert.equal(await js("document.activeElement.id"), "sidebar-toggle");
+    assert.equal(await js("document.querySelector('#sidebar-toggle').getAttribute('aria-expanded')"), "false");
+    await js("document.querySelector('#sidebar-toggle').click();document.querySelector('#sidebar nav a[href=\"#settings\"]').click()");
+    assert.equal(await js("document.querySelector('#sidebar-toggle').getAttribute('aria-expanded')"), "false");
+    assert.equal(await js("document.querySelector('#sidebar nav a[href=\"#settings\"]').getAttribute('aria-current')"), "location");
+    assert.equal(await js("document.activeElement.id"), "settings");
+    await js("document.querySelector('#sidebar-toggle').click();document.querySelector('#sidebar-overlay').click();scrollTo({top:0,behavior:'instant'})");
+    assert.equal(await js("document.querySelector('#sidebar').inert"), true);
+    await js("document.querySelector('#settings-tab-0').click()");
+    await key("ArrowRight");
+    assert.equal(await js("document.activeElement.id"), "settings-tab-1");
+    await js("scrollTo({top:0,behavior:'instant'})");
     assert.equal(
       await js("document.documentElement.scrollWidth <= innerWidth"),
       true,
     );
-    fs.writeFileSync(
-      path.join(output, "mobile.png"),
-      (await window.webContents.capturePage()).toPNG(),
-    );
+    await capture("mobile.png");
     window.setSize(430, 1300);
-    await js("document.querySelector('.chat-panel').scrollIntoView({behavior:'instant'})");
+    await js("scrollTo({top: document.querySelector('.chat-panel').getBoundingClientRect().top + scrollY - document.querySelector('.topbar').offsetHeight - 16, behavior:'instant'})");
     await wait(100);
     assert.equal(await js("document.documentElement.scrollWidth <= innerWidth"), true);
-    fs.writeFileSync(path.join(output, "chat-mobile.png"), (await window.webContents.capturePage()).toPNG());
+    await capture("chat-mobile.png");
     assert.deepEqual(errors, []);
     console.log(
-      "Verified desktop/mobile layout, per-chat metrics/tools/context, chat-mode persistence, 7 tabs, settings save, range isolation, heatmap, SSE, privacy and pause. Screenshots in docs/.",
+      "Verified dark/light theme persistence, keyboard/mobile navigation, desktop sidebar persistence, responsive layout, per-chat metrics/tools/context, chat-mode persistence, 7 tabs, settings save, range isolation, heatmap, SSE, privacy and pause. Screenshots in docs/.",
     );
   })
   .catch((e) => {

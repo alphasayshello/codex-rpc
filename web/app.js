@@ -4,6 +4,85 @@ const $ = (s) => document.querySelector(s),
       notation: "compact",
       maximumFractionDigits: 1,
     }).format(n || 0);
+// Appearance belongs to this browser, separate from shared RPC settings.
+const storage = {
+  get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+  set(key, value) { try { localStorage.setItem(key, value); } catch {} },
+};
+function setTheme(theme) {
+  const light = theme === "light";
+  document.documentElement.dataset.theme = light ? "light" : "dark";
+  $("#theme-toggle").setAttribute("aria-pressed", String(light));
+  $("#theme-label").textContent = light ? "Dark mode" : "Light mode";
+  storage.set("codex-rpc-theme", light ? "light" : "dark");
+}
+setTheme(storage.get("codex-rpc-theme") || "dark");
+$("#theme-toggle").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"));
+const mobileNavigation = matchMedia("(max-width: 760px)");
+let collapsedSidebar = storage.get("codex-rpc-sidebar-collapsed") === "true", drawerOpen = false;
+function updateSidebar() {
+  const mobile = mobileNavigation.matches;
+  const visible = mobile ? drawerOpen : !collapsedSidebar;
+  document.body.classList.toggle("sidebar-collapsed", !mobile && collapsedSidebar);
+  document.body.classList.toggle("sidebar-open", mobile && drawerOpen);
+  $("#sidebar").inert = !visible;
+  $("#main-content").inert = mobile && drawerOpen;
+  $("#sidebar").setAttribute("aria-hidden", String(!visible));
+  $("#sidebar-toggle").setAttribute("aria-expanded", String(visible));
+  $("#sidebar-overlay").hidden = !(mobile && drawerOpen);
+  $("#sidebar-close").hidden = !mobile;
+  $(".tabs").setAttribute("aria-orientation", mobile ? "horizontal" : "vertical");
+}
+function closeDrawer(restoreFocus = true) {
+  drawerOpen = false;
+  updateSidebar();
+  if (restoreFocus) $("#sidebar-toggle").focus();
+}
+$("#sidebar-toggle").addEventListener("click", () => {
+  if (mobileNavigation.matches) {
+    drawerOpen = !drawerOpen;
+    updateSidebar();
+    if (drawerOpen) $("#sidebar-close").focus();
+  } else {
+    collapsedSidebar = !collapsedSidebar;
+    storage.set("codex-rpc-sidebar-collapsed", String(collapsedSidebar));
+    updateSidebar();
+  }
+});
+$("#sidebar-close").addEventListener("click", () => closeDrawer());
+$("#sidebar-overlay").addEventListener("click", () => closeDrawer());
+mobileNavigation.addEventListener("change", () => { drawerOpen = false; updateSidebar(); });
+updateSidebar();
+const navigationLinks = [...document.querySelectorAll("nav a")];
+function selectNavigation(hash) {
+  for (const link of navigationLinks) {
+    const active = link.getAttribute("href") === hash;
+    link.classList.toggle("selected", active);
+    if (active) link.setAttribute("aria-current", "location");
+    else link.removeAttribute("aria-current");
+  }
+}
+for (const link of navigationLinks) link.addEventListener("click", () => {
+  selectNavigation(link.hash);
+  if (mobileNavigation.matches) {
+    closeDrawer(false);
+    const target = document.querySelector(link.hash);
+    target?.setAttribute("tabindex", "-1");
+    target?.focus({ preventScroll: true });
+  }
+});
+window.addEventListener("hashchange", () => selectNavigation(location.hash || "#overview"));
+selectNavigation(location.hash || "#overview");
+document.addEventListener("keydown", (event) => {
+  if (!mobileNavigation.matches || !drawerOpen) return;
+  if (event.key === "Escape") { event.preventDefault(); closeDrawer(); }
+  if (event.key === "Tab") {
+    const items = [...$("#sidebar").querySelectorAll("a[href], button:not([hidden]):not([disabled])")].filter((node) => node.getClientRects().length);
+    const first = items[0], last = items.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }
+});
 let cfg,
   token,
   tab = "Presence",
@@ -89,13 +168,7 @@ function heatmap(a) {
     } else {
       b.title = `${day}: ${format(stats.tokens)} tokens, ${stats.prompts || 0} prompts`;
       b.setAttribute("aria-label", b.title);
-      b.style.background = [
-        "#202f36",
-        "#285a48",
-        "#318565",
-        "#44bc8b",
-        "#67efbd",
-      ][value ? Math.max(1, Math.ceil((value / max) * 4)) : 0];
+      b.style.background = `var(--heat-${value ? Math.max(1, Math.ceil((value / max) * 4)) : 0})`;
       b.addEventListener("click", () => {
         $("#day-detail").textContent =
           `${day} · ${format(stats.tokens)} tokens · ${stats.toolCalls || 0} tools · $${(stats.cost || 0).toFixed(4)}`;
@@ -341,20 +414,38 @@ function field(label, key, type = "text", hint = "") {
 function settings() {
   const tabs = $(".tabs");
   tabs.replaceChildren();
-  for (const name of categories) {
+  tabs.setAttribute("aria-orientation", mobileNavigation.matches ? "horizontal" : "vertical");
+  function activate(name) {
+    tab = name;
+    settings();
+    document.getElementById(`settings-tab-${categories.indexOf(name)}`).focus();
+  }
+  for (const [index, name] of categories.entries()) {
     const b = document.createElement("button");
     b.type = "button";
     b.role = "tab";
+    b.id = `settings-tab-${index}`;
+    b.tabIndex = name === tab ? 0 : -1;
+    b.setAttribute("aria-controls", "settings-content");
     b.setAttribute("aria-selected", name === tab);
     b.textContent = name;
-    b.addEventListener("click", () => {
-      tab = name;
-      settings();
+    b.addEventListener("click", () => activate(name));
+    b.addEventListener("keydown", (event) => {
+      const previous = mobileNavigation.matches ? "ArrowLeft" : "ArrowUp";
+      const next = mobileNavigation.matches ? "ArrowRight" : "ArrowDown";
+      let selected;
+      if (event.key === previous) selected = (index + categories.length - 1) % categories.length;
+      if (event.key === next) selected = (index + 1) % categories.length;
+      if (event.key === "Home") selected = 0;
+      if (event.key === "End") selected = categories.length - 1;
+      if (selected !== undefined) { event.preventDefault(); activate(categories[selected]); }
     });
     tabs.append(b);
   }
   const content = $("#settings-content");
   content.replaceChildren();
+  content.setAttribute("role", "tabpanel");
+  content.setAttribute("aria-labelledby", `settings-tab-${categories.indexOf(tab)}`);
   const intro = document.createElement("p");
   const descriptions = {
     Presence: "The card on your profile, with as much detail as you choose.",
@@ -480,11 +571,11 @@ try {
   const stream = new EventSource("/events");
   stream.onopen = () => {
     $("#connection").textContent = "Live on this device";
-    $("#stream-dot").style.background = "#78edbe";
+    $("#stream-dot").style.background = "var(--success, #4daa77)";
   };
   stream.onerror = () => {
     $("#connection").textContent = "Reconnecting…";
-    $("#stream-dot").style.background = "#f9ce78";
+    $("#stream-dot").style.background = "var(--warning, #c5975d)";
   };
   stream.addEventListener("update", refresh);
 } catch (e) {

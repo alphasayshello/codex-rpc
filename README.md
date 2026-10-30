@@ -124,6 +124,8 @@ No subscription quota requests or credential reads. `usage` means recorded local
 
 ## on your machine
 
+A ChatGPT-inspired workspace with neutral dark and light themes, a collapsible sidebar, and a mobile navigation drawer. Switch appearance at the bottom of the sidebar; appearance stays in this browser. Settings support keyboard navigation and all seven categories.
+
 The **THIS CHAT** headline counts output tokens only. Its separate breakdown follows the selected live conversation: input/output/reasoning/cached tokens, cache reuse, latest request/context window when reported, prompts, tool calls, active time, line changes and API-equivalent cost. Running and recent tools show names and recorded durations, never raw arguments. Unknown values show **—**, not a lifetime total.
 
 Dashboard range: **7d · 30d · 90d · 1y · all**. The year heatmap stays year-wide; headline totals, languages, tools, costs, source breakdown and hour chart follow the range. UTC dates keep the CLI, cards, and scanner consistent.
