@@ -1,0 +1,152 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import http from "node:http";
+import { sandbox } from "./helpers.js";
+import { serve } from "../src/server.js";
+import { writeJSON, config } from "../src/store.js";
+import { emptyStats } from "../src/scanner.js";
+import {
+  statsSVG,
+  heatmapSVG,
+  badgeSVG,
+  generateCards,
+} from "../src/statcards.js";
+import { rangeAggregate, insights, heatmap } from "../src/tui.js";
+test("dashboard serves APIs/assets, live SVG, settings CSRF protection and ranges", async (t) => {
+  sandbox(t);
+  const server = await serve(0);
+  t.after(() => server.closeDashboard());
+  const url = `http://127.0.0.1:${server.address().port}`;
+  writeJSON("state.json", { status: "working", source: "codex" });
+  writeJSON("aggregate.json", {
+    totals: { ...emptyStats(), tokens: 123 },
+    days: {},
+    streak: { current: 0 },
+  });
+  assert.equal(
+    (await (await fetch(url + "/api/state")).json()).status,
+    "working",
+  );
+  assert.equal(
+    (await (await fetch(url + "/api/aggregate")).json()).totals.tokens,
+    123,
+  );
+  assert.equal((await fetch(url + "/api/aggregate?range=oops")).status, 400);
+  assert.equal(
+    await new Promise((resolve, reject) => {
+      http
+        .get(url + "/", { headers: { host: "evil.example" } }, (r) => {
+          r.resume();
+          resolve(r.statusCode);
+        })
+        .on("error", reject);
+    }),
+    403,
+  );
+  assert.equal(
+    (await fetch(url + "/api/config", { method: "POST", body: "{}" })).status,
+    403,
+  );
+  const { token } = await (await fetch(url + "/api/session")).json();
+  const headers = {
+    "x-codex-rpc-token": token,
+    "content-type": "application/json",
+  };
+  assert.equal(
+    (
+      await fetch(url + "/api/config", {
+        method: "POST",
+        headers: { ...headers, origin: "https://evil.example" },
+        body: "{}",
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await fetch(url + "/api/config", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ ...config(), privacy: "public" }),
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await fetch(url + "/api/config", {
+        method: "POST",
+        headers,
+        body: '{"privacy":"invalid"}',
+      })
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await fetch(url + "/api/control", {
+        method: "POST",
+        headers,
+        body: '{"action":"pause"}',
+      })
+    ).status,
+    200,
+  );
+  assert.equal(config().enabled, false);
+  for (const route of [
+    "/",
+    "/app.js",
+    "/style.css",
+    "/assets/pet/codex-pet-working.gif",
+    "/cards/stats.svg",
+    "/cards/heatmap.svg",
+    "/cards/tokens.svg",
+  ])
+    assert.equal((await fetch(url + route)).status, 200, route);
+  assert.equal((await fetch(url + "/not-a-route")).status, 404);
+  const controller = new AbortController();
+  t.after(() => controller.abort());
+  const response = await fetch(url + "/events", { signal: controller.signal });
+  assert.match(response.headers.get("content-type"), /event-stream/);
+  const reader = response.body.getReader();
+  assert.match(
+    new TextDecoder().decode((await reader.read()).value),
+    /event: update/,
+  );
+  const next = reader.read();
+  writeJSON("state.json", { status: "waiting" });
+  assert.match(new TextDecoder().decode((await next).value), /event: update/);
+  controller.abort();
+});
+test("cards embed pet, expose 12 month heatmap and four badges; insights and range boundaries", (t) => {
+  const { temp } = sandbox(t);
+  const now = new Date("2026-10-29T12:00:00Z");
+  const s = { ...emptyStats(), tokens: 100, activeSeconds: 3600 };
+  const a = {
+    totals: { ...s, activeHours: 1 },
+    days: {
+      "2026-10-29": s,
+      "2026-10-28": s,
+      "2026-10-01": s,
+      "2026-10-30": s,
+    },
+    streak: { current: 2, longest: 3 },
+  };
+  const svg = statsSVG(a);
+  assert.match(svg, /^<svg/);
+  assert.match(svg, /data:image\/svg\+xml;base64/);
+  assert.ok(svg.endsWith("</svg>"));
+  const h = heatmapSVG(a, now);
+  assert.ok((h.match(/<rect /g) || []).length >= 365);
+  for (const metric of ["tokens", "sessions", "hours", "streak"])
+    assert.match(badgeSVG(metric, a), new RegExp(metric));
+  assert.throws(() => badgeSVG("bogus", a));
+  assert.equal(rangeAggregate(a, "7d", now).totals.tokens, 200);
+  assert.equal(rangeAggregate(a, "30d", now).totals.tokens, 300);
+  assert.equal(insights(a, now).split("\n").length, 5);
+  assert.equal(heatmap(a.days, now).split("\n").length, 7);
+  writeJSON("aggregate.json", a);
+  generateCards(temp + "/cards");
+  assert.equal(fs.readdirSync(temp + "/cards").length, 7);
+});
