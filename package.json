@@ -24,7 +24,8 @@
     "VERSIONING.md",
     "LICENSE",
     "docs",
-    "config.example.json"
+    "config.example.json",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
     "test": "node --test",
@@ -40,5 +41,13 @@
     "rpc",
     "analytics",
     "chatgpt"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alphasayshello/codex-rpc.git"
+  },
+  "homepage": "https://github.com/alphasayshello/codex-rpc#readme",
+  "bugs": {
+    "url": "https://github.com/alphasayshello/codex-rpc/issues"
+  }
 }

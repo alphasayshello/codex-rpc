@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { gif, svg, pixels } from "../src/assets/generate-pet-gifs.js";
+import {
+  gif,
+  svg,
+  pixels,
+  sprite,
+  states,
+} from "../src/assets/generate-pet-gifs.js";
 // Independent GIF container + LZW reader validates decoded pixel counts and
 // frame differences, rather than merely looking for a GIF header.
 function decode(data) {
@@ -87,13 +93,13 @@ function decode(data) {
   }
   return { width, height, frames, loops };
 }
-test("four deterministic GIF89a files contain eight decoded looping animation frames; SVG previews exist", () => {
+test("four deterministic GIF89a files contain decoded original-sprite looping animation frames; SVG previews exist", () => {
   for (const state of ["working", "thinking", "waiting", "idle"]) {
     const data = gif(state),
       parsed = decode(data);
     assert.equal(parsed.width, 192);
-    assert.equal(parsed.height, 192);
-    assert.equal(parsed.frames.length, 8);
+    assert.equal(parsed.height, 208);
+    assert.equal(parsed.frames.length, states[state].frames);
     assert.ok(parsed.loops);
     assert.ok(new Set(parsed.frames.map((b) => b.toString("base64"))).size > 1);
     assert.deepEqual(
@@ -108,5 +114,51 @@ test("four deterministic GIF89a files contain eight decoded looping animation fr
         new URL(`../assets/pet/codex-pet-${state}.svg`, import.meta.url),
       ),
     );
+  }
+});
+
+test("mascot pixels come from the official blue Codex atlas, not a substitute drawing", async () => {
+  const { createHash } = await import("node:crypto");
+  const { decodePNG } = await import("../src/assets/png.js");
+  const source = fs.readFileSync(
+    new URL("../assets/pet/source/codex-spritesheet-v4.webp", import.meta.url),
+  );
+  assert.equal(
+    createHash("sha256").update(source).digest("hex"),
+    "5cd7af9cfeae88fe9c6e47a72460e0dc4c6fb04baf7fdc6cca14a212f0bf44d1",
+  );
+  const atlas = decodePNG(
+    fs.readFileSync(
+      new URL("../assets/pet/source/codex-spritesheet-v4.png", import.meta.url),
+    ),
+  );
+  for (const [state, row, frames] of [
+    ["working", 7, 6],
+    ["thinking", 6, 6],
+    ["waiting", 3, 4],
+    ["idle", 0, 6],
+  ]) {
+    assert.equal(states[state].row, row);
+    assert.equal(states[state].frames, frames);
+    for (let frame = 0; frame < frames; frame++) {
+      const extracted = sprite(state, frame);
+      for (let y = 0; y < 208; y++)
+        for (let x = 0; x < 192; x++) {
+          const src = ((row * 208 + y) * atlas.width + frame * 192 + x) * 4,
+            dst = (y * 192 + x) * 4;
+          assert.equal(extracted[dst + 3], atlas.rgba[src + 3]);
+          if (extracted[dst + 3])
+            assert.deepEqual(
+              extracted.subarray(dst, dst + 3),
+              atlas.rgba.subarray(src, src + 3),
+            );
+        }
+    }
+    const preview = decodePNG(
+      fs.readFileSync(
+        new URL(`../assets/pet/codex-pet-${state}.png`, import.meta.url),
+      ),
+    );
+    assert.deepEqual(preview.rgba, sprite(state));
   }
 });

@@ -1,6 +1,12 @@
 import { config, readJSON, alive } from "./store.js";
 import { emptyStats, streaks, mergeStats } from "./scanner.js";
-export const pet = "  /\\__/\\\n [ ▪  ▪ ]  codex pet\n  /|__|\\   >_";
+export const pet = [
+  "   .-~~~~-.",
+  "  ( | >_ | )  Codex",
+  "    |____|",
+  "     | >_|",
+  "    /|___|",
+].join("\n");
 const compact = (n) =>
   Intl.NumberFormat("en", {
     notation: "compact",
@@ -72,7 +78,7 @@ export function renderStatus({ usage = false } = {}) {
     t = a.totals || emptyStats();
   const lines = [
     color(36, "codex-rpc / a little presence."),
-    pet,
+    color(34, pet),
     `\n${config().enabled ? "enabled" : "paused"} · daemon ${alive(d.pid) ? "running" : "stopped"} · Discord ${d.connected ? "connected" : "offline"}`,
     `Live: ${s.status || "idle"} · ${s.model || "unknown model"} · ${config().privacy === "public" ? s.project || "Codex" : "private project"}`,
     `${compact(t.tokens)} tokens · ${t.sessions} sessions · ${(t.activeHours || 0).toFixed(1)}h · ${a.streak?.current || 0} day streak`,

@@ -1,136 +1,228 @@
 #!/usr/bin/env node
-// Deterministic, dependency-free GIF89a encoder. Frequent LZW CLEAR codes keep
-// code width fixed; larger files are a deliberate tradeoff for inspectability.
+// Extract existing OpenAI Codex pet frames; never invent or redraw the mascot.
+// PNG decode, palette quantization and GIF89a encoding use Node built-ins only.
 import fs from "node:fs";
-import { deflateSync } from "node:zlib";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
+import { decodePNG, encodePNG } from "./png.js";
 const out = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../assets/pet",
 );
-const colors = [
-  "#101820",
-  "#263943",
-  "#e6e2d5",
-  "#a4b8b0",
-  "#67efbd",
-  "#f9ce78",
-  "#fffaf0",
-  "#587283",
-];
-const scale = 4,
-  size = 48;
-export function pixels(state, frame) {
-  const p = Array(size * size).fill(0);
-  const rect = (x, y, w, h, c) => {
-    for (let j = y; j < y + h; j++)
-      for (let i = x; i < x + w; i++)
-        if (i >= 0 && j >= 0 && i < size && j < size) p[j * size + i] = c;
-  };
-  const bob = state === "idle" ? 1 : frame % 4 === 0 ? -1 : 0;
-  rect(10, 40, 28, 2, 1);
-  rect(17, 29 + bob, 15, 10, 3);
-  rect(14, 34, 5, 4, 2);
-  rect(31, 34, 5, 4, 2);
-  rect(14, 15 + bob, 22, 15, 2);
-  rect(12, 17 + bob, 2, 10, 3);
-  rect(36, 17 + bob, 2, 10, 3);
-  rect(15, 11 + bob, 5, 4, 2);
-  rect(30, 11 + bob, 5, 4, 2);
-  rect(17, 10 + bob, 2, 2, 4);
-  rect(32, 10 + bob, 2, 2, 4);
-  rect(17, 19 + bob, 16, 8, 0);
-  const blink = state === "idle" || frame === 5;
-  rect(19, 21 + bob, 3, blink ? 1 : 3, 4);
-  rect(28, 21 + bob, 3, blink ? 1 : 3, 4);
-  rect(24, 26 + bob, 3, 1, 3);
-  if (state === "working" || state === "waiting") {
-    rect(16, 32, 20, 9, 7);
-    rect(18, 33, 16, 6, 0);
-    rect(12, 41, 28, 2, 3);
-    rect(22, 35, 3, 1, 4);
-    rect(25, 36, 3, 1, 4);
-    if (state === "working") {
-      rect(frame % 2 ? 14 : 34, 35, 3, 2, 2);
-      rect(5 + (frame % 3), 16 - (frame % 3), 2, 2, 5);
-      rect(39, 22 - (frame % 4), 2, 2, 4);
-      rect(7, 24, 1, 3, 5);
+export const width = 192,
+  height = 208;
+export const states = {
+  working: {
+    row: 7,
+    frames: 6,
+    delay: 14,
+    sourceState: "running (laptop work)",
+  },
+  thinking: {
+    row: 6,
+    frames: 6,
+    delay: 28,
+    sourceState: "waiting (pondering pose)",
+  },
+  waiting: {
+    row: 3,
+    frames: 4,
+    delay: 22,
+    sourceState: "waving (asking for attention)",
+  },
+  idle: { row: 0, frames: 6, delay: 30, sourceState: "idle (calm blink)" },
+};
+const sourcePath = path.join(out, "source/codex-spritesheet-v4.png");
+let atlas;
+function source() {
+  if (!atlas) {
+    atlas = decodePNG(fs.readFileSync(sourcePath));
+    if (atlas.width !== 1536 || atlas.height !== 1872)
+      throw Error("Unexpected original Codex sprite layout");
+  }
+  return atlas;
+}
+export function sprite(state, frame = 0) {
+  const spec = states[state];
+  if (!spec) throw Error("Unknown pet state");
+  const sheet = source(),
+    rgba = Buffer.alloc(width * height * 4),
+    column = frame % spec.frames;
+  for (let y = 0; y < height; y++)
+    sheet.rgba.copy(
+      rgba,
+      y * width * 4,
+      ((spec.row * height + y) * sheet.width + column * width) * 4,
+      ((spec.row * height + y) * sheet.width + (column + 1) * width) * 4,
+    );
+  for (let i = 0; i < rgba.length; i += 4)
+    if (!rgba[i + 3]) rgba.fill(0, i, i + 4);
+  return rgba;
+}
+// Median-cut palette over all used original frames. GIF requires <=256 colors;
+// transparent pixels keep index zero. Exact source pixels remain in PNG/SVG.
+function paletteFor(frames) {
+  const histogram = new Map();
+  for (const rgba of frames)
+    for (let i = 0; i < rgba.length; i += 4) {
+      if (rgba[i + 3] < 128) continue;
+      const key =
+        ((rgba[i] >> 3) << 10) | ((rgba[i + 1] >> 3) << 5) | (rgba[i + 2] >> 3);
+      const color = histogram.get(key) || { key, n: 0, r: 0, g: 0, b: 0 };
+      color.n++;
+      color.r += rgba[i];
+      color.g += rgba[i + 1];
+      color.b += rgba[i + 2];
+      histogram.set(key, color);
     }
+  const colors = [...histogram.values()].map((c) => ({
+    ...c,
+    r: c.r / c.n,
+    g: c.g / c.n,
+    b: c.b / c.n,
+  }));
+  const box = (values) => {
+    const ranges = ["r", "g", "b"].map(
+      (k) =>
+        Math.max(...values.map((c) => c[k])) -
+        Math.min(...values.map((c) => c[k])),
+    );
+    return { values, ranges, weight: values.reduce((n, c) => n + c.n, 0) };
+  };
+  const boxes = [box(colors)];
+  while (boxes.length < 255) {
+    let index = -1,
+      score = -1;
+    for (let i = 0; i < boxes.length; i++) {
+      const b = boxes[i],
+        s = Math.max(...b.ranges) * Math.sqrt(b.weight);
+      if (b.values.length > 1 && s > score) {
+        score = s;
+        index = i;
+      }
+    }
+    if (index < 0) break;
+    const b = boxes.splice(index, 1)[0],
+      channel = ["r", "g", "b"][b.ranges.indexOf(Math.max(...b.ranges))];
+    b.values.sort((a, z) => a[channel] - z[channel] || a.key - z.key);
+    let weight = 0,
+      split = 1;
+    for (let i = 0; i < b.values.length - 1; i++) {
+      weight += b.values[i].n;
+      if (weight >= b.weight / 2) {
+        split = i + 1;
+        break;
+      }
+    }
+    boxes.push(box(b.values.slice(0, split)), box(b.values.slice(split)));
   }
-  if (state === "thinking") {
-    rect(35, 10 - (frame % 2), 3, 3, 3);
-    rect(38, 4, 8, 5, frame % 2 ? 4 : 3);
-    rect(40, 3, 4, 7, frame % 2 ? 4 : 3);
-    for (let i = 0; i < 3; i++) rect(39 + i * 2, 6, 1, 1, 0);
-    rect(8, 13, 2, 2, frame % 2 ? 4 : 7);
-  }
-  if (state === "waiting") {
-    rect(36, 4, 9, 8, 6);
-    rect(35, 12, 3, 2, 6);
-    rect(39, 6, 4, 1, 0);
-    rect(42, 7, 1, 2, 0);
-    rect(40, 9, 2, 1, 0);
-    if (frame % 4 < 3) rect(40, 11, 1, 1, 0);
-  }
-  if (state === "idle") {
-    const y = 12 - (frame % 4);
-    rect(36, y, 5, 1, 4);
-    rect(39, y + 1, 1, 1, 4);
-    rect(38, y + 2, 1, 1, 4);
-    rect(36, y + 3, 5, 1, 4);
-    rect(42, y - 5, 3, 1, 3);
-    rect(43, y - 4, 1, 1, 3);
-    rect(42, y - 3, 3, 1, 3);
-  }
-  return p;
-}
-export function svg(state, frame = 0) {
-  const p = pixels(state, frame);
-  let shapes = "";
-  for (let y = 0; y < size; y++)
-    for (let x = 0; x < size; x++)
-      if (p[y * size + x])
-        shapes += `<rect x="${x}" y="${y}" width="1" height="1" fill="${colors[p[y * size + x]]}"/>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="192" height="192" role="img" aria-label="Codex Pet ${state}" shape-rendering="crispEdges"><rect width="48" height="48" fill="${colors[0]}"/>${shapes}</svg>`;
-}
-function u16(n) {
-  return Buffer.from([n & 255, n >> 8]);
-}
-export function gif(state) {
-  const chunks = [
-    Buffer.from("GIF89a"),
-    u16(size * scale),
-    u16(size * scale),
-    Buffer.from([0xf2, 0, 0]),
-    Buffer.from(
-      colors.flatMap((c) =>
-        [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)),
+  const palette = [
+    [0, 0, 0],
+    ...boxes.map((b) =>
+      ["r", "g", "b"].map((k) =>
+        Math.round(b.values.reduce((n, c) => n + c[k] * c.n, 0) / b.weight),
       ),
     ),
+  ];
+  while (palette.length < 256) palette.push([0, 0, 0]);
+  const lookup = new Map();
+  for (const c of colors) {
+    let best = 1,
+      distance = Infinity;
+    for (let i = 1; i <= boxes.length; i++) {
+      const p = palette[i],
+        d = (c.r - p[0]) ** 2 + (c.g - p[1]) ** 2 + (c.b - p[2]) ** 2;
+      if (d < distance) {
+        distance = d;
+        best = i;
+      }
+    }
+    lookup.set(c.key, best);
+  }
+  return { palette, lookup };
+}
+let indexed;
+function indexedFrames() {
+  if (!indexed) {
+    const entries = Object.entries(states).flatMap(([state, spec]) =>
+      Array.from({ length: spec.frames }, (_, i) => ({
+        state,
+        rgba: sprite(state, i),
+      })),
+    );
+    const { palette, lookup } = paletteFor(entries.map((e) => e.rgba));
+    indexed = { palette, frames: {} };
+    for (const { state, rgba } of entries) {
+      const indices = Buffer.alloc(width * height);
+      for (let i = 0; i < indices.length; i++) {
+        const j = i * 4;
+        indices[i] =
+          rgba[j + 3] < 128
+            ? 0
+            : lookup.get(
+                ((rgba[j] >> 3) << 10) |
+                  ((rgba[j + 1] >> 3) << 5) |
+                  (rgba[j + 2] >> 3),
+              );
+      }
+      (indexed.frames[state] ||= []).push(indices);
+    }
+  }
+  return indexed;
+}
+export function pixels(state, frame = 0) {
+  return indexedFrames().frames[state][frame % states[state].frames];
+}
+const u16 = (n) => Buffer.from([n & 255, n >> 8]);
+function lzw(indices) {
+  const bytes = [];
+  let acc = 0,
+    bits = 0;
+  const code = (n) => {
+    acc |= n << bits;
+    bits += 9;
+    while (bits >= 8) {
+      bytes.push(acc & 255);
+      acc >>>= 8;
+      bits -= 8;
+    }
+  };
+  for (let i = 0; i < indices.length; i += 200) {
+    code(256);
+    for (const value of indices.subarray(i, i + 200)) code(value);
+  }
+  code(257);
+  if (bits) bytes.push(acc & 255);
+  return Buffer.from(bytes);
+}
+export function gif(state) {
+  const spec = states[state],
+    { palette, frames } = indexedFrames();
+  const chunks = [
+    Buffer.from("GIF89a"),
+    u16(width),
+    u16(height),
+    Buffer.from([0xf7, 0, 0]),
+    Buffer.from(palette.flat()),
     Buffer.from([0x21, 0xff, 11]),
     Buffer.from("NETSCAPE2.0"),
     Buffer.from([3, 1, 0, 0, 0]),
   ];
-  for (let f = 0; f < 8; f++) {
+  for (const frame of frames[state]) {
     chunks.push(
-      Buffer.from([0x21, 0xf9, 4, 4, 18, 0, 0, 0, 0x2c]),
+      Buffer.from([0x21, 0xf9, 4, 9]),
+      u16(spec.delay),
+      Buffer.from([0, 0, 0x2c]),
       u16(0),
       u16(0),
-      u16(size * scale),
-      u16(size * scale),
-      Buffer.from([0, 3]),
+      u16(width),
+      u16(height),
+      Buffer.from([0, 8]),
     );
-    const p = pixels(state, f),
-      data = []; // 4-bit codes: CLEAR(8), color, repeated. END(9).
-    for (let y = 0; y < size * scale; y++)
-      for (let x = 0; x < size * scale; x++)
-        data.push(
-          8 | (p[Math.floor(y / scale) * size + Math.floor(x / scale)] << 4),
-        );
-    data.push(9);
+    const data = lzw(frame);
     for (let i = 0; i < data.length; i += 255) {
-      const b = Buffer.from(data.slice(i, i + 255));
+      const b = data.subarray(i, i + 255);
       chunks.push(Buffer.from([b.length]), b);
     }
     chunks.push(Buffer.from([0]));
@@ -138,65 +230,62 @@ export function gif(state) {
   chunks.push(Buffer.from([0x3b]));
   return Buffer.concat(chunks);
 }
-function badgePNG() {
-  const crc = (b) => {
-    let c = 0xffffffff;
-    for (const v of b) {
-      c ^= v;
-      for (let i = 0; i < 8; i++) c = (c >>> 1) ^ (c & 1 ? 0xedb88320 : 0);
-    }
-    return (c ^ 0xffffffff) >>> 0;
-  };
-  const chunk = (type, data) => {
-    const label = Buffer.from(type),
-      len = Buffer.alloc(4),
-      check = Buffer.alloc(4);
-    len.writeUInt32BE(data.length);
-    check.writeUInt32BE(crc(Buffer.concat([label, data])));
-    return Buffer.concat([len, label, data, check]);
-  };
-  const header = Buffer.alloc(13);
-  header.writeUInt32BE(64);
-  header.writeUInt32BE(64, 4);
-  header[8] = 8;
-  header[9] = 2;
-  const data = Buffer.alloc(64 * (1 + 64 * 3));
-  for (let y = 0; y < 64; y++)
-    for (let x = 0; x < 64; x++) {
-      const on =
-        (x >= 16 && x <= 30 && Math.abs(y - 30 - (x - 23)) <= 2) ||
-        (x >= 16 && x <= 30 && Math.abs(y - 30 + (x - 23)) <= 2) ||
-        (x >= 34 && x < 49 && y >= 40 && y < 44);
-      const color = on ? [103, 239, 189] : [16, 24, 32];
-      for (let i = 0; i < 3; i++) data[y * 193 + 1 + x * 3 + i] = color[i];
-    }
-  return Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    chunk("IHDR", header),
-    chunk("IDAT", deflateSync(data)),
-    chunk("IEND", Buffer.alloc(0)),
-  ]);
+export function svg(state, frame = 0) {
+  const png = encodePNG(width, height, sprite(state, frame));
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Original blue Codex Pet ${state}"><image width="${width}" height="${height}" href="data:image/png;base64,${png.toString("base64")}"/></svg>`;
 }
 export function generate() {
   fs.mkdirSync(out, { recursive: true });
-  fs.writeFileSync(path.join(out, "codex-badge.png"), badgePNG());
-  fs.writeFileSync(
-    path.join(out, "codex-badge.svg"),
-    '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#101820"/><path d="m17 19 12 12-12 12m18 0h14" fill="none" stroke="#67efbd" stroke-width="5"/></svg>',
-  );
-  for (const state of ["working", "thinking", "waiting", "idle"]) {
+  for (const state of Object.keys(states)) {
     fs.writeFileSync(path.join(out, `codex-pet-${state}.gif`), gif(state));
     fs.writeFileSync(path.join(out, `codex-pet-${state}.svg`), svg(state));
+    fs.writeFileSync(
+      path.join(out, `codex-pet-${state}.png`),
+      encodePNG(width, height, sprite(state)),
+    );
   }
-  const previews = ["working", "thinking", "waiting", "idle"]
+  const badge = Buffer.alloc(64 * 64 * 4),
+    original = sprite("idle");
+  for (let y = 0; y < 64; y++)
+    for (let x = 0; x < 64; x++) {
+      const p =
+        (Math.floor((y * height) / 64) * width + Math.floor((x * width) / 64)) *
+        4;
+      original.copy(badge, (y * 64 + x) * 4, p, p + 4);
+    }
+  const badgePNG = encodePNG(64, 64, badge);
+  fs.writeFileSync(path.join(out, "codex-badge.png"), badgePNG);
+  fs.writeFileSync(
+    path.join(out, "codex-badge.svg"),
+    `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><image width="64" height="64" href="data:image/png;base64,${badgePNG.toString("base64")}"/></svg>`,
+  );
+  const previews = Object.keys(states)
     .map(
       (s, i) =>
-        `<image href="data:image/svg+xml;base64,${Buffer.from(svg(s)).toString("base64")}" x="${i * 190 + 18}" y="70" width="160" height="160"/><text x="${i * 190 + 98}" y="250" text-anchor="middle" fill="#a4b8b0" font-family="monospace" font-size="14">${s}</text>`,
+        `<image href="data:image/svg+xml;base64,${Buffer.from(svg(s)).toString("base64")}" x="${i * 190 + 18}" y="58" width="160" height="174"/><text x="${i * 190 + 98}" y="255" text-anchor="middle" fill="#a4b8b0" font-family="monospace" font-size="14">${s}</text>`,
     )
     .join("");
   fs.writeFileSync(
     path.join(out, "preview-banner.svg"),
-    `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="280" viewBox="0 0 800 280"><rect width="800" height="280" rx="16" fill="#101820"/><text x="32" y="42" fill="#67efbd" font-family="monospace" font-size="26">codex-rpc / a little presence.</text>${previews}</svg>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="280" viewBox="0 0 800 280"><rect width="800" height="280" rx="16" fill="#101820"/><text x="32" y="42" fill="#8faeff" font-family="monospace" font-size="26">codex-rpc / a little presence.</text>${previews}</svg>`,
+  );
+  const sha = (p) =>
+    createHash("sha256").update(fs.readFileSync(p)).digest("hex");
+  fs.writeFileSync(
+    path.join(out, "manifest.json"),
+    JSON.stringify(
+      {
+        petId: "codex",
+        source:
+          "https://cdn.openai.com/c6d7b0d0-3abf-40b5-9d0c-ecd2b9364692/codex-spritesheet-v4.webp",
+        sourceSHA256: sha(path.join(out, "source/codex-spritesheet-v4.webp")),
+        normalizedPNG_SHA256: sha(sourcePath),
+        cell: { width, height },
+        states,
+      },
+      null,
+      2,
+    ) + "\n",
   );
 }
 if (
@@ -204,5 +293,7 @@ if (
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   generate();
-  console.log("Generated four animated GIFs, four SVGs, and preview banner.");
+  console.log(
+    "Extracted original blue Codex Pet: four looping GIFs, PNG/SVG previews, badge, banner and provenance manifest.",
+  );
 }

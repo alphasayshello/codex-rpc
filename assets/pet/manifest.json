@@ -1,0 +1,36 @@
+{
+  "petId": "codex",
+  "source": "https://cdn.openai.com/c6d7b0d0-3abf-40b5-9d0c-ecd2b9364692/codex-spritesheet-v4.webp",
+  "sourceSHA256": "5cd7af9cfeae88fe9c6e47a72460e0dc4c6fb04baf7fdc6cca14a212f0bf44d1",
+  "normalizedPNG_SHA256": "edbbb31451e8303f33c39a92ada95b4ca4bc74229df3e26a9589147331fcafe5",
+  "cell": {
+    "width": 192,
+    "height": 208
+  },
+  "states": {
+    "working": {
+      "row": 7,
+      "frames": 6,
+      "delay": 14,
+      "sourceState": "running (laptop work)"
+    },
+    "thinking": {
+      "row": 6,
+      "frames": 6,
+      "delay": 28,
+      "sourceState": "waiting (pondering pose)"
+    },
+    "waiting": {
+      "row": 3,
+      "frames": 4,
+      "delay": 22,
+      "sourceState": "waving (asking for attention)"
+    },
+    "idle": {
+      "row": 0,
+      "frames": 6,
+      "delay": 30,
+      "sourceState": "idle (calm blink)"
+    }
+  }
+}

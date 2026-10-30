@@ -13,7 +13,17 @@ export const defaults = {
   privacy: "private",
   clientId: "1565535814308470814",
   buttons: [],
-  assets: { working: "", thinking: "", waiting: "", idle: "", badge: "" },
+  assets: {
+    working:
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-working.gif",
+    thinking:
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-thinking.gif",
+    waiting:
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-waiting.gif",
+    idle: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-idle.gif",
+    badge:
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-badge.png",
+  },
   timing: { idleMs: 300000, pollMs: 2000, scanMs: 60000, presenceMs: 15000 },
   chatgpt: { enabled: true },
   stats: { enabled: true },
