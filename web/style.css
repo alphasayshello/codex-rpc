@@ -235,7 +235,7 @@ select {
   margin: 0 -6px;
   min-height: 186px;
 }
-.pet-live img {
+.pet-live #pet {
   image-rendering: pixelated;
   width: 150px;
   height: 150px;
@@ -652,7 +652,37 @@ footer a:hover {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pet-live img {
+  .pet-live #pet {
     content: url("/assets/pet/codex-pet-idle.svg");
   }
+}
+
+.pet-avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: 150px;
+  height: 160px;
+}
+.pet-live #status-badge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 42px;
+  height: 42px;
+  border: 4px solid var(--panel);
+  border-radius: 50%;
+  image-rendering: pixelated;
+}
+#live-source {
+  color: #8cc49e;
+}
+
+.badge-gallery {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 22px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  image-rendering: pixelated;
 }

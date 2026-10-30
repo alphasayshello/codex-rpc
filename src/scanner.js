@@ -11,6 +11,7 @@ import {
   isMain,
   alive,
 } from "./store.js";
+import { taskTitle } from "./presence.js";
 import { estimateCost } from "./pricing.js";
 import { applyEvent, normalizeEvent } from "./hook.js";
 export function emptyStats() {
@@ -118,6 +119,7 @@ export async function parseFile(filename) {
   const modernUsage = {},
     legacyUsage = {},
     fallbackPrompts = {};
+  let currentTask;
   let hasModernUsage = false,
     hasPromptEvents = false;
   const stream = fs.createReadStream(filename, { encoding: "utf8" });
@@ -145,6 +147,14 @@ export async function parseFile(filename) {
     }
     if (row.session_id) session = row.session_id;
     if (row.model || p.model) model = row.model || p.model;
+    const title = taskTitle(
+      p.type === "user_message"
+        ? p.message
+        : p.role === "user"
+          ? p.content
+          : undefined,
+    );
+    if (title) currentTask = title;
     const parsed = Date.parse(
       row.timestamp ||
         p.timestamp ||
@@ -264,8 +274,18 @@ export async function parseFile(filename) {
       result.totals.sourceSessions[source]++;
       result.days[day].sourceSessions[source]++;
     }
-    const event = normalizeEvent({ ...row, source, model, sessionId: session });
-    if (event) result.latest = { ...event, type: event.status };
+    const event = normalizeEvent({
+      ...row,
+      source,
+      model,
+      task: currentTask,
+      sessionId: session,
+    });
+    if (event) {
+      if (config().privacy !== "public" || !config().presence.showTask)
+        delete event.task;
+      result.latest = { ...event, type: event.status };
+    }
   }
   for (const bucket of [
     hasModernUsage ? modernUsage : legacyUsage,
@@ -325,7 +345,7 @@ export async function scan({ live = false } = {}) {
   }
   try {
     const cache = readJSON("scanner-cache.json", { files: {} }),
-      next = { schemaVersion: 2, files: {} };
+      next = { schemaVersion: 3, files: {} };
     if (!config().enabled || !config().stats.enabled)
       return readJSON("aggregate.json", {
         schemaVersion: 1,
@@ -354,7 +374,7 @@ export async function scan({ live = false } = {}) {
       const st = fs.statSync(filename),
         old = cache.files[filename];
       const cached =
-        cache.schemaVersion === 2 &&
+        cache.schemaVersion === 3 &&
         old &&
         old.size === st.size &&
         old.mtimeMs === st.mtimeMs;

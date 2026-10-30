@@ -65,7 +65,7 @@ test("daemon consumes a real live log, connects, clears on pause and reconnects 
     ),
   );
   const activity = mock.received.find((x) => x.args?.activity).args.activity;
-  assert.match(activity.state, /gpt-5/);
+  assert.match(activity.assets.large_text, /gpt-5/);
   assert.ok(!JSON.stringify(activity).includes("secret"));
   assert.ok(!JSON.stringify(activity).includes("echo private"));
   await exec(process.execPath, [cli, "pause"], { env });

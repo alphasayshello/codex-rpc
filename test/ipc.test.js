@@ -30,6 +30,7 @@ test("Discord handshake, fragmented frames, activity ack, ping/pong, and disconn
     { totals: { activeHours: 20 }, streak: { current: 4 } },
     {
       ...config(),
+      presence: { ...config().presence, stats: "tokens" },
       assets: { working: "https://example.com/pet.gif", badge: "codex" },
     },
   );

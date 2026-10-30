@@ -9,6 +9,7 @@ export const commands = [
   "status",
   "usage",
   "insights",
+  "preview",
   "serve",
   "statcards",
   "doctor",

@@ -10,27 +10,177 @@
   "states": {
     "working": {
       "row": 7,
-      "frames": 6,
-      "delay": 14,
-      "sourceState": "running (laptop work)"
+      "sourceFrames": [
+        0,
+        4,
+        0,
+        4,
+        0,
+        2,
+        0,
+        4
+      ],
+      "delays": [
+        70,
+        70,
+        70,
+        70,
+        90,
+        12,
+        70,
+        70
+      ],
+      "sourceState": "running (steady laptop work with one blink)",
+      "frames": 8
     },
     "thinking": {
       "row": 6,
-      "frames": 6,
-      "delay": 28,
-      "sourceState": "waiting (pondering pose)"
+      "sourceFrames": [
+        0,
+        3,
+        4,
+        3
+      ],
+      "delays": [
+        100,
+        90,
+        110,
+        90
+      ],
+      "sourceState": "waiting (calm pondering)",
+      "frames": 4
     },
     "waiting": {
       "row": 3,
-      "frames": 4,
-      "delay": 22,
-      "sourceState": "waving (asking for attention)"
+      "sourceFrames": [
+        0,
+        0,
+        1,
+        2,
+        1,
+        3,
+        0
+      ],
+      "delays": [
+        100,
+        100,
+        25,
+        35,
+        25,
+        100,
+        100
+      ],
+      "sourceState": "waving (occasional attention wave)",
+      "frames": 7
     },
     "idle": {
       "row": 0,
-      "frames": 6,
-      "delay": 30,
-      "sourceState": "idle (calm blink)"
+      "sourceFrames": [
+        0,
+        2,
+        3,
+        4,
+        0,
+        1,
+        0
+      ],
+      "delays": [
+        90,
+        90,
+        90,
+        90,
+        90,
+        12,
+        90
+      ],
+      "sourceState": "idle (relaxed breathing and a rare blink)",
+      "frames": 7
+    }
+  },
+  "badges": {
+    "grid": 24,
+    "scale": 4,
+    "icons": {
+      "working": {
+        "color": [
+          105,
+          137,
+          233
+        ],
+        "label": "Command"
+      },
+      "thinking": {
+        "color": [
+          152,
+          121,
+          211
+        ],
+        "label": "Thinking"
+      },
+      "waiting": {
+        "color": [
+          103,
+          184,
+          132
+        ],
+        "label": "Done"
+      },
+      "idle": {
+        "color": [
+          123,
+          139,
+          151
+        ],
+        "label": "Idle"
+      },
+      "approval": {
+        "color": [
+          219,
+          169,
+          78
+        ],
+        "label": "Approval"
+      },
+      "editing": {
+        "color": [
+          84,
+          173,
+          190
+        ],
+        "label": "Editing"
+      },
+      "reading": {
+        "color": [
+          110,
+          151,
+          207
+        ],
+        "label": "Reading"
+      },
+      "review": {
+        "color": [
+          92,
+          177,
+          161
+        ],
+        "label": "Review"
+      },
+      "ready": {
+        "color": [
+          109,
+          173,
+          145
+        ],
+        "label": "Ready"
+      },
+      "error": {
+        "color": [
+          209,
+          111,
+          117
+        ],
+        "label": "Error"
+      }
     }
   }
 }

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { taskTitle } from "./presence.js";
 import { isMain, readJSON, writeJSON, config, file } from "./store.js";
 const states = {
   working: "working",
@@ -17,6 +18,8 @@ const states = {
   function_call_output: "thinking",
   custom_tool_call_output: "thinking",
   turn_aborted: "waiting",
+  error: "waiting",
+  task_failed: "waiting",
   "approval-request": "waiting",
   "agent-turn-complete": "waiting",
   task_complete: "waiting",
@@ -43,6 +46,23 @@ export function normalizeEvent(input) {
     project:
       input.project ||
       (input.cwd || p.cwd ? path.basename(input.cwd || p.cwd) : undefined),
+    task: taskTitle(
+      input.task ||
+        (type === "user_message"
+          ? p.message
+          : p.role === "user"
+            ? p.content
+            : input["input-messages"]?.at(-1)),
+    ),
+    waitingReason: ["error", "task_failed"].includes(type)
+      ? "error"
+      : type === "approval-request"
+        ? "approval"
+        : ["done", "approval", "error", "ready"].includes(input.waitingReason)
+          ? input.waitingReason
+          : ["agent-turn-complete", "task_complete", "waiting"].includes(type)
+            ? "done"
+            : undefined,
     model: input.model || p.model,
     tool: input.tool || p.name,
     tokens: input.tokens ?? p.info?.total_token_usage?.total_tokens,
@@ -64,7 +84,15 @@ export function applyEvent(input) {
     (e.timestamp &&
       prior.eventTime === eventTime &&
       prior.status === e.status &&
-      (e.tokens === undefined || prior.tokens === e.tokens))
+      [
+        "sessionId",
+        "project",
+        "task",
+        "model",
+        "tool",
+        "tokens",
+        "waitingReason",
+      ].every((k) => e[k] === undefined || prior[k] === e[k]))
   )
     return prior;
   const next = {
@@ -78,12 +106,23 @@ export function applyEvent(input) {
         ? time
         : prior.startedAt,
   };
-  for (const k of ["sessionId", "project", "model", "tool", "tokens"])
+  for (const k of [
+    "sessionId",
+    "project",
+    "task",
+    "waitingReason",
+    "model",
+    "tool",
+    "tokens",
+  ])
     if (e[k] !== undefined) next[k] = e[k];
   if (e.status !== "working") delete next.tool;
+  if (e.status !== "waiting") delete next.waitingReason;
+  if (c.privacy === "private" || !c.presence.showTask) delete next.task;
   if (c.privacy === "private") {
     delete next.project;
     delete next.file;
+    delete next.task;
   }
   writeJSON(`${source}-state.json`, next);
   const other = readJSON(

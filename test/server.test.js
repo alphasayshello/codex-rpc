@@ -24,6 +24,7 @@ test("dashboard serves APIs/assets, live SVG, settings CSRF protection and range
     days: {},
     streak: { current: 0 },
   });
+  assert.equal((await (await fetch(url + "/api/presence")).json()).type, 3);
   assert.equal(
     (await (await fetch(url + "/api/state")).json()).status,
     "working",
@@ -99,6 +100,8 @@ test("dashboard serves APIs/assets, live SVG, settings CSRF protection and range
     "/app.js",
     "/style.css",
     "/assets/pet/codex-pet-working.gif",
+    "/assets/pet/codex-status-editing.png",
+    "/assets/pet/status-badges.svg",
     "/cards/stats.svg",
     "/cards/heatmap.svg",
     "/cards/tokens.svg",

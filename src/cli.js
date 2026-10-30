@@ -1,5 +1,6 @@
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { buildActivity } from "./presence.js";
 import { readJSON, writeJSON, config } from "./store.js";
 import { scan } from "./scanner.js";
 import { main as hook, applyEvent } from "./hook.js";
@@ -10,7 +11,31 @@ import { doctor } from "./doctor.js";
 import { serve } from "./server.js";
 import { generateCards } from "./statcards.js";
 import { completion, installCompletion } from "./completion.js";
-export const help = `codex-rpc / a little presence.\n\nUsage: codex-rpc <command>\n\n  setup         Wire notify, enable detector, install service, start daemon\n  status        Live state and lifetime totals (--watch to refresh)\n  usage         Heatmap, hourly histogram, tools, languages, API estimates\n  insights      Five contextual lines about your week\n  serve         Local dashboard + seven settings tabs (port 47474)\n  statcards     Generate stats.svg, heatmap.svg, badges and Markdown\n  doctor        Diagnose hooks, daemon, detector, IPC, stats, privacy\n  pause/resume  Disable or enable presence and collection\n  start/restart/stop  Manage the background daemon\n  uninstall     Remove integration; retain local analytics/config\n  completion install [bash|zsh|fish|powershell]\n  scan          Refresh lifetime analytics\n  hook          Accept JSON argument or stdin lifecycle events\n  run -- ...    Wrap the Codex CLI for session start/end detection\n  help/version\n\nSetup flags: --no-service --no-start\nServe flags: --port <port>  Statcards: --output <directory>\nUse CODEX_RPC_HOME / CODEX_HOME to isolate state and input logs.\n`;
+export const help = `codex-rpc / a little presence.
+
+Usage: codex-rpc <command>
+
+  setup         Wire notify, enable detector, install service, start daemon
+  status        Live state and lifetime totals (--watch to refresh)
+  usage         Heatmap, hourly histogram, tools, languages, API estimates
+  insights      Five contextual lines about your week
+  preview       Show the exact Discord text and assets for all four states
+  serve         Local dashboard + seven settings tabs (port 47474)
+  statcards     Generate stats.svg, heatmap.svg, badges and Markdown
+  doctor        Diagnose hooks, daemon, detector, IPC, stats, privacy
+  pause/resume  Disable or enable presence and collection
+  start/restart/stop  Manage the background daemon
+  uninstall     Remove integration; retain local analytics/config
+  completion install [bash|zsh|fish|powershell]
+  scan          Refresh lifetime analytics
+  hook          Accept JSON argument or stdin lifecycle events
+  run -- ...    Wrap the Codex CLI for session start/end detection
+  help/version
+
+Setup flags: --no-service --no-start
+Serve flags: --port <port>  Statcards: --output <directory>
+Use CODEX_RPC_HOME / CODEX_HOME to isolate state and input logs.
+`;
 export async function main(args = process.argv.slice(2)) {
   const [cmd = "help", ...rest] = args;
   const option = (name, fallback) => {
@@ -78,8 +103,7 @@ export async function main(args = process.argv.slice(2)) {
     }
     case "status":
     case "usage": {
-      const render = () =>
-        console.log(renderStatus({ usage: true }));
+      const render = () => console.log(renderStatus({ usage: true }));
       render();
       if (rest.includes("--watch")) {
         const timer = setInterval(() => {
@@ -88,6 +112,22 @@ export async function main(args = process.argv.slice(2)) {
         }, 3000);
         for (const signal of ["SIGINT", "SIGTERM"])
           process.once(signal, () => clearInterval(timer));
+      }
+      break;
+    }
+    case "preview": {
+      const state = readJSON("state.json"),
+        aggregate = readJSON("aggregate.json"),
+        settings = { ...config(), enabled: true };
+      for (const status of ["working", "thinking", "waiting", "idle"]) {
+        const activity = buildActivity(
+          { ...state, status },
+          aggregate,
+          settings,
+        );
+        console.log(
+          `\n${status.toUpperCase()} · ${activity.type === 3 ? "Watching" : "Playing"}\n${activity.details}\n${activity.state}\n${activity.assets.large_image}`,
+        );
       }
       break;
     }

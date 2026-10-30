@@ -55,17 +55,27 @@
         <div class="overview-grid">
           <article class="live panel">
             <div class="panel-label">
-              <span class="dot"></span> LIVE PRESENCE
+              <span class="dot"></span>
+              <span id="activity-type">WATCHING CODEX RPC</span>
               <span id="live-status" class="pill">idle</span>
             </div>
             <div class="pet-live">
-              <img
-                id="pet"
-                src="/assets/pet/codex-pet-idle.gif"
-                alt="Codex Pet idle"
-                width="160"
-                height="160"
-              />
+              <div class="pet-avatar">
+                <img
+                  id="pet"
+                  src="/assets/pet/codex-pet-idle.gif"
+                  alt="Codex Pet idle"
+                  width="160"
+                  height="160"
+                />
+                <img
+                  id="status-badge"
+                  src="/assets/pet/codex-status-idle.png"
+                  alt="Activity status"
+                  width="42"
+                  height="42"
+                />
+              </div>
               <div>
                 <h3 id="live-action">Ready when you are.</h3>
                 <p id="live-model">No active model</p>

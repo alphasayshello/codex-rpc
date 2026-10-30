@@ -13,16 +13,16 @@ export const defaults = {
   privacy: "private",
   clientId: "1565535814308470814",
   buttons: [],
+  presence: { type: 3, showTask: true, stats: "cost", showChurn: true },
   assets: {
     working:
-      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-working.gif",
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-working.gif?v=calm-1",
     thinking:
-      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-thinking.gif",
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-thinking.gif?v=calm-1",
     waiting:
-      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-waiting.gif",
-    idle: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-idle.gif",
-    badge:
-      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-badge.png",
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-waiting.gif?v=calm-1",
+    idle: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-idle.gif?v=calm-1",
+    badge: "",
   },
   timing: { idleMs: 300000, pollMs: 2000, scanMs: 60000, presenceMs: 15000 },
   chatgpt: { enabled: true },
@@ -59,6 +59,7 @@ export function config() {
     ...defaults,
     ...c,
     assets: { ...defaults.assets, ...c.assets },
+    presence: { ...defaults.presence, ...c.presence },
     timing: { ...defaults.timing, ...c.timing },
     chatgpt: { ...defaults.chatgpt, ...c.chatgpt },
     stats: { ...defaults.stats, ...c.stats },
@@ -70,6 +71,19 @@ export function validateConfig(c) {
   for (const k of Object.keys(c))
     if (!(k in defaults)) throw Error(`Unknown setting: ${k}`);
   const n = { ...config(), ...c };
+  if (
+    c.presence !== undefined &&
+    (!c.presence || typeof c.presence !== "object" || Array.isArray(c.presence))
+  )
+    throw Error("Invalid presence settings");
+  n.presence = { ...config().presence, ...n.presence };
+  if (
+    ![0, 3].includes(n.presence.type) ||
+    !["cost", "tokens"].includes(n.presence.stats) ||
+    typeof n.presence.showTask !== "boolean" ||
+    typeof n.presence.showChurn !== "boolean"
+  )
+    throw Error("Invalid presence settings");
   if (!["private", "public"].includes(n.privacy))
     throw Error("privacy must be private or public");
   if (typeof n.enabled !== "boolean" || !/^\d{0,22}$/.test(n.clientId))

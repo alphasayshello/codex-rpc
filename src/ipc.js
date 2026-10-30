@@ -182,47 +182,7 @@ export class DiscordIPC extends EventEmitter {
     this.socket?.destroy();
   }
 }
-export function buildActivity(state = {}, aggregate = {}, c = {}) {
-  if (c.enabled === false) return null;
-  const status = ["working", "thinking", "waiting", "idle"].includes(
-    state.status,
-  )
-    ? state.status
-    : "idle";
-  const privateMode = c.privacy !== "public";
-  const project = privateMode ? "a private project" : state.project || "Codex";
-  const actions = {
-    working: "Working on",
-    thinking: "Thinking about",
-    waiting: "Waiting in",
-    idle: "Resting in",
-  };
-  const details =
-    state.source === "chatgpt"
-      ? "ChatGPT App · Pair Programming"
-      : `${actions[status]} ${project}`;
-  const tokens = Number(state.tokens ?? aggregate.totals?.tokens) || 0;
-  const activity = {
-    type: 0,
-    details: details.slice(0, 128),
-    state:
-      `${state.model || "Codex"} · ${Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(tokens)} tokens · ${state.tool ? `running ${state.tool}` : status}`.slice(
-        0,
-        128,
-      ),
-    assets: {
-      large_text: `Codex Pet · ${status}`,
-      small_text: `${aggregate.streak?.current || 0} day streak · ${(aggregate.totals?.activeHours || 0).toFixed(1)} all-time hours`,
-    },
-  };
-  if (c.assets?.[status]) activity.assets.large_image = c.assets[status];
-  else activity.assets.large_image = `codex-pet-${status}`;
-  activity.assets.small_image = c.assets?.badge || "codex-badge";
-  if (state.startedAt)
-    activity.timestamps = { start: Math.floor(state.startedAt / 1000) };
-  if (c.buttons?.length) activity.buttons = c.buttons.slice(0, 2);
-  return activity;
-}
+export { buildActivity } from "./presence.js";
 export function existingSockets() {
   return socketPaths().filter(
     (p) => process.platform === "win32" || fs.existsSync(p),

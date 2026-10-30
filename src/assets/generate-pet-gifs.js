@@ -6,6 +6,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { decodePNG, encodePNG } from "./png.js";
+import {
+  badgeSpecs,
+  statusIcon,
+  statusIconSVG,
+  badgeGallery,
+} from "./status-icons.js";
+export { statusIcon } from "./status-icons.js";
 const out = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../assets/pet",
@@ -15,24 +22,31 @@ export const width = 192,
 export const states = {
   working: {
     row: 7,
-    frames: 6,
-    delay: 14,
-    sourceState: "running (laptop work)",
+    sourceFrames: [0, 4, 0, 4, 0, 2, 0, 4],
+    delays: [70, 70, 70, 70, 90, 12, 70, 70],
+    sourceState: "running (steady laptop work with one blink)",
   },
   thinking: {
     row: 6,
-    frames: 6,
-    delay: 28,
-    sourceState: "waiting (pondering pose)",
+    sourceFrames: [0, 3, 4, 3],
+    delays: [100, 90, 110, 90],
+    sourceState: "waiting (calm pondering)",
   },
   waiting: {
     row: 3,
-    frames: 4,
-    delay: 22,
-    sourceState: "waving (asking for attention)",
+    sourceFrames: [0, 0, 1, 2, 1, 3, 0],
+    delays: [100, 100, 25, 35, 25, 100, 100],
+    sourceState: "waving (occasional attention wave)",
   },
-  idle: { row: 0, frames: 6, delay: 30, sourceState: "idle (calm blink)" },
+  idle: {
+    row: 0,
+    sourceFrames: [0, 2, 3, 4, 0, 1, 0],
+    delays: [90, 90, 90, 90, 90, 12, 90],
+    sourceState: "idle (relaxed breathing and a rare blink)",
+  },
 };
+for (const spec of Object.values(states))
+  spec.frames = spec.sourceFrames.length;
 const sourcePath = path.join(out, "source/codex-spritesheet-v4.png");
 let atlas;
 function source() {
@@ -48,7 +62,7 @@ export function sprite(state, frame = 0) {
   if (!spec) throw Error("Unknown pet state");
   const sheet = source(),
     rgba = Buffer.alloc(width * height * 4),
-    column = frame % spec.frames;
+    column = spec.sourceFrames[frame % spec.frames];
   for (let y = 0; y < height; y++)
     sheet.rgba.copy(
       rgba,
@@ -209,10 +223,10 @@ export function gif(state) {
     Buffer.from("NETSCAPE2.0"),
     Buffer.from([3, 1, 0, 0, 0]),
   ];
-  for (const frame of frames[state]) {
+  for (const [index, frame] of frames[state].entries()) {
     chunks.push(
       Buffer.from([0x21, 0xf9, 4, 9]),
-      u16(spec.delay),
+      u16(spec.delays[index]),
       Buffer.from([0, 0, 0x2c]),
       u16(0),
       u16(0),
@@ -236,6 +250,17 @@ export function svg(state, frame = 0) {
 }
 export function generate() {
   fs.mkdirSync(out, { recursive: true });
+  for (const kind of Object.keys(badgeSpecs)) {
+    fs.writeFileSync(
+      path.join(out, `codex-status-${kind}.png`),
+      statusIcon(kind),
+    );
+    fs.writeFileSync(
+      path.join(out, `codex-status-${kind}.svg`),
+      statusIconSVG(kind),
+    );
+  }
+  fs.writeFileSync(path.join(out, "status-badges.svg"), badgeGallery());
   for (const state of Object.keys(states)) {
     fs.writeFileSync(path.join(out, `codex-pet-${state}.gif`), gif(state));
     fs.writeFileSync(path.join(out, `codex-pet-${state}.svg`), svg(state));
@@ -282,6 +307,7 @@ export function generate() {
         normalizedPNG_SHA256: sha(sourcePath),
         cell: { width, height },
         states,
+        badges: { grid: 24, scale: 4, icons: badgeSpecs },
       },
       null,
       2,

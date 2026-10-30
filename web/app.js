@@ -122,32 +122,47 @@ async function refresh() {
   if (refreshing) return;
   refreshing = true;
   try {
-    const [s, a, year] = await Promise.all([
+    const [s, a, year, activity] = await Promise.all([
       api("/api/state"),
       api("/api/aggregate?range=" + $("#range").value),
       api("/api/aggregate?range=1y"),
+      api("/api/presence"),
     ]);
     const t = a.totals || {},
       state = ["working", "thinking", "waiting", "idle"].includes(s.status)
         ? s.status
         : "idle";
-    $("#pet").src = `/assets/pet/codex-pet-${state}.gif`;
+    const bundled =
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/";
+    const configuredPet = activity?.assets?.large_image;
+    const petURL =
+      configuredPet?.startsWith("https://") &&
+      !configuredPet.startsWith(bundled)
+        ? configuredPet
+        : `/assets/pet/codex-pet-${state}.gif`;
+    if ($("#pet").getAttribute("src") !== petURL) $("#pet").src = petURL;
+    const configuredBadge = activity?.assets?.small_image;
+    const badgeURL =
+      configuredBadge?.startsWith("https://") &&
+      !configuredBadge.startsWith(bundled)
+        ? configuredBadge
+        : `/assets/pet/codex-status-${s.badgeKind || state}.png`;
+    if ($("#status-badge").getAttribute("src") !== badgeURL)
+      $("#status-badge").src = badgeURL;
+    $("#activity-type").textContent =
+      ((activity?.type ?? cfg.presence.type) === 3 ? "WATCHING" : "PLAYING") +
+      " CODEX RPC";
     $("#pet").alt = `Codex Pet ${state}`;
     $("#live-status").textContent = s.enabled ? state : "paused";
-    $("#live-action").textContent =
-      s.source === "chatgpt"
-        ? "ChatGPT · Pair programming"
-        : s.project
-          ? `Working on ${s.project}`
-          : {
-              working: "Making things happen.",
-              thinking: "A thought in progress.",
-              waiting: "Your move, human.",
-              idle: "Ready when you are.",
-            }[state];
-    $("#live-model").textContent = `${s.model || "Codex"} · ${s.tool || state}`;
+    $("#live-action").textContent = activity?.details || "Presence paused";
+    $("#live-model").textContent =
+      activity?.state || "Resume when you are ready.";
+    const seconds = Math.max(
+      0,
+      Math.floor((Date.now() - (s.startedAt || Date.now())) / 1000),
+    );
     $("#live-source").textContent =
-      s.source === "chatgpt" ? "ChatGPT Desktop" : "Codex CLI";
+      `${s.source === "chatgpt" ? "ChatGPT Desktop" : "Codex CLI"} · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} elapsed`;
     $("#daemon").textContent =
       `Daemon ${s.daemon?.pid ? "running" : "offline"} · Discord ${s.daemon?.connected ? "connected" : "offline"}`;
     $("#toggle-presence").textContent = s.enabled
@@ -206,6 +221,24 @@ function field(label, key, type = "text", hint = "") {
   let input;
   if (type === "textarea") {
     input = document.createElement("textarea");
+  } else if (type === "activityType" || type === "statsStyle") {
+    input = document.createElement("select");
+    const choices =
+      type === "activityType"
+        ? [
+            [3, "Watching"],
+            [0, "Playing"],
+          ]
+        : [
+            ["cost", "Today / all-time cost"],
+            ["tokens", "Model / tokens"],
+          ];
+    for (const [value, label] of choices) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      input.append(option);
+    }
   } else if (type === "privacy") {
     input = document.createElement("select");
     for (const p of ["private", "public"]) {
@@ -233,7 +266,7 @@ function field(label, key, type = "text", hint = "") {
       target[keys.at(-1)] =
         type === "checkbox"
           ? input.checked
-          : type === "number"
+          : type === "number" || type === "activityType"
             ? Number(input.value)
             : type === "textarea"
               ? JSON.parse(input.value)
@@ -277,7 +310,7 @@ function settings() {
     "Daemon Controls":
       "Manage the local background process. Pausing also stops new event collection.",
     Privacy:
-      "Private mode redacts project names from the live state and file paths from aggregate output. Existing scanner cache remains local.",
+      "Private mode redacts task titles and project names from the live state and file paths from aggregate output. Existing scanner cache remains local.",
     Stats:
       "Lifetime totals come from local Codex JSONL logs. ChatGPT process detection cannot reveal tokens.",
   };
@@ -286,6 +319,15 @@ function settings() {
   const defs = {
     Presence: [
       ["Presence enabled", "enabled", "checkbox"],
+      ["Activity type", "presence.type", "activityType"],
+      ["Stats line", "presence.stats", "statsStyle"],
+      [
+        "Show current task",
+        "presence.showTask",
+        "checkbox",
+        "Task titles are shared only in public privacy mode.",
+      ],
+      ["Show lines added / removed", "presence.showChurn", "checkbox"],
       [
         "Buttons (up to two)",
         "buttons",
@@ -299,7 +341,12 @@ function settings() {
       ["Thinking GIF URL / key", "assets.thinking"],
       ["Waiting GIF URL / key", "assets.waiting"],
       ["Idle GIF URL / key", "assets.idle"],
-      ["Small badge URL / key", "assets.badge"],
+      [
+        "Status badge override",
+        "assets.badge",
+        "text",
+        "Leave blank for automatic working / thinking / done / idle icons.",
+      ],
     ],
     Timing: Object.keys(cfg.timing).map((k) => [k, "timing." + k, "number"]),
     Privacy: [
@@ -327,6 +374,14 @@ function settings() {
       });
       content.append(b);
     }
+  }
+  if (tab === "Codex Pet Assets") {
+    const gallery = document.createElement("img");
+    gallery.src = "/assets/pet/status-badges.svg";
+    gallery.alt =
+      "Ten pixel status badges: command, thinking, done, idle, approval, editing, reading, review, ready, error";
+    gallery.className = "badge-gallery";
+    content.append(gallery);
   }
   if (tab === "Stats") {
     const link = document.createElement("a");

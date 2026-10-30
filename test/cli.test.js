@@ -22,6 +22,7 @@ test("all read-only commands exit cleanly and produce useful output", async (t) 
     "status",
     "usage",
     "insights",
+    "preview",
     "doctor",
     "statcards",
     "help",
@@ -106,6 +107,7 @@ test("daemon CLI start/status/pause/resume/restart/stop stays within sandbox", a
   assert.notEqual(readJSON("daemon.json").pid, first);
   await exec(process.execPath, [cli, "stop"], { env, timeout: 10000 });
   assert.equal(readJSON("daemon.json").pid, null);
+  assert.equal(readJSON("control.json").action, "stop");
 });
 
 test("completion install writes and idempotently registers all shell scripts in a disposable HOME", async (t) => {
@@ -148,4 +150,36 @@ test("Codex wrapper forwards arguments and records session end", async (t) => {
   );
   assert.match(stdout, /v\d+/);
   assert.equal(readJSON("state.json").status, "idle");
+});
+
+test("setup refreshes bundled GIF URLs and restarts an existing daemon without changing custom assets", async (t) => {
+  const { env } = sandbox(t);
+  const oldBase =
+    "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet";
+  writeJSON("config.json", {
+    ...config(),
+    clientId: "",
+    assets: {
+      ...config().assets,
+      working: oldBase + "/codex-pet-working.gif",
+      thinking: "https://my-assets.example/thinking.gif",
+      badge: oldBase + "/codex-badge.png",
+    },
+    chatgpt: { enabled: false },
+    stats: { enabled: false },
+  });
+  await exec(process.execPath, [cli, "start"], { env, timeout: 15000 });
+  const original = readJSON("daemon.json").pid;
+  await exec(process.execPath, [cli, "setup", "--no-service"], {
+    env,
+    timeout: 20000,
+  });
+  assert.notEqual(readJSON("daemon.json").pid, original);
+  assert.match(config().assets.working, /\?v=calm-1$/);
+  assert.equal(
+    config().assets.thinking,
+    "https://my-assets.example/thinking.gif",
+  );
+  assert.equal(config().assets.badge, "");
+  await exec(process.execPath, [cli, "stop"], { env, timeout: 15000 });
 });

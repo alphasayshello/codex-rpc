@@ -17,7 +17,9 @@ function decode(data) {
     packed = data[pos + 4];
   pos += 7;
   if (packed & 128) pos += 3 * 2 ** ((packed & 7) + 1);
-  const frames = [];
+  const frames = [],
+    delays = [];
+  let delay = 0;
   let loops = false;
   const blocks = () => {
     const chunks = [];
@@ -35,6 +37,7 @@ function decode(data) {
     if (type === 0x21) {
       const label = data[pos++];
       const b = blocks();
+      if (label === 0xf9) delay = b.readUInt16LE(1);
       if (label === 0xff && b.includes(Buffer.from("NETSCAPE2.0")))
         loops = true;
       continue;
@@ -90,8 +93,9 @@ function decode(data) {
     }
     assert.equal(decoded.length, w * h);
     frames.push(Buffer.from(decoded));
+    delays.push(delay);
   }
-  return { width, height, frames, loops };
+  return { width, height, frames, loops, delays };
 }
 test("four deterministic GIF89a files contain decoded original-sprite looping animation frames; SVG previews exist", () => {
   for (const state of ["working", "thinking", "waiting", "idle"]) {
@@ -100,6 +104,7 @@ test("four deterministic GIF89a files contain decoded original-sprite looping an
     assert.equal(parsed.width, 192);
     assert.equal(parsed.height, 208);
     assert.equal(parsed.frames.length, states[state].frames);
+    assert.deepEqual(parsed.delays, states[state].delays);
     assert.ok(parsed.loops);
     assert.ok(new Set(parsed.frames.map((b) => b.toString("base64"))).size > 1);
     assert.deepEqual(
@@ -133,10 +138,10 @@ test("mascot pixels come from the official blue Codex atlas, not a substitute dr
     ),
   );
   for (const [state, row, frames] of [
-    ["working", 7, 6],
-    ["thinking", 6, 6],
-    ["waiting", 3, 4],
-    ["idle", 0, 6],
+    ["working", 7, 8],
+    ["thinking", 6, 4],
+    ["waiting", 3, 7],
+    ["idle", 0, 7],
   ]) {
     assert.equal(states[state].row, row);
     assert.equal(states[state].frames, frames);
@@ -144,7 +149,11 @@ test("mascot pixels come from the official blue Codex atlas, not a substitute dr
       const extracted = sprite(state, frame);
       for (let y = 0; y < 208; y++)
         for (let x = 0; x < 192; x++) {
-          const src = ((row * 208 + y) * atlas.width + frame * 192 + x) * 4,
+          const src =
+              ((row * 208 + y) * atlas.width +
+                states[state].sourceFrames[frame] * 192 +
+                x) *
+              4,
             dst = (y * 192 + x) * 4;
           assert.equal(extracted[dst + 3], atlas.rgba[src + 3]);
           if (extracted[dst + 3])
@@ -160,5 +169,41 @@ test("mascot pixels come from the official blue Codex atlas, not a substitute dr
       ),
     );
     assert.deepEqual(preview.rgba, sprite(state));
+  }
+});
+
+test("work animation keeps a steady face with one blink over a long loop", () => {
+  assert.deepEqual(states.working.sourceFrames, [0, 4, 0, 4, 0, 2, 0, 4]);
+  assert.equal(states.working.sourceFrames.filter((n) => n === 2).length, 1);
+  assert.ok(states.working.delays.reduce((n, d) => n + d, 0) >= 500);
+  for (const spec of Object.values(states)) {
+    assert.equal(spec.frames, spec.delays.length);
+    assert.ok(spec.delays.every((d) => d >= 12));
+  }
+});
+
+test("ten status badges use exact 4x pixel blocks and binary alpha", async () => {
+  const { badgeSpecs, statusIcon, statusIconPixels } =
+    await import("../src/assets/status-icons.js");
+  const { decodePNG } = await import("../src/assets/png.js");
+  assert.equal(Object.keys(badgeSpecs).length, 10);
+  for (const kind of Object.keys(badgeSpecs)) {
+    const original = statusIconPixels(kind),
+      decoded = decodePNG(statusIcon(kind));
+    assert.equal(decoded.width, 96);
+    assert.equal(decoded.height, 96);
+    for (let y = 0; y < 96; y++)
+      for (let x = 0; x < 96; x++) {
+        const i = (y * 96 + x) * 4,
+          j = (Math.floor(y / 4) * 24 + Math.floor(x / 4)) * 4;
+        for (let k = 0; k < 4; k++)
+          assert.equal(decoded.rgba[i + k], original[j + k]);
+        assert.ok(decoded.rgba[i + 3] === 0 || decoded.rgba[i + 3] === 255);
+      }
+    assert.ok(
+      fs.existsSync(
+        new URL(`../assets/pet/codex-status-${kind}.svg`, import.meta.url),
+      ),
+    );
   }
 });

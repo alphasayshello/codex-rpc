@@ -72,6 +72,7 @@ app
       status: "working",
       source: "codex",
       project: "codex-rpc",
+      task: "Build codex-rpc with live presence and analytics",
       model: "o4-mini",
       tokens: 142800,
       tool: "applying a patch",

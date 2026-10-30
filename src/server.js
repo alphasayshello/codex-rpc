@@ -2,6 +2,7 @@ import http from "node:http";
 import fs from "node:fs";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { config, validateConfig, readJSON, writeJSON, home } from "./store.js";
+import { buildActivity, statusBadgeKind } from "./presence.js";
 import { rangeAggregate } from "./tui.js";
 import { emptyStats } from "./scanner.js";
 import { statsSVG, heatmapSVG, badgeSVG } from "./statcards.js";
@@ -101,9 +102,12 @@ export function createServer() {
       }
       if (url.pathname === "/api/state") {
         const state = readJSON("state.json", { status: "idle" });
+        if (config().privacy !== "public" || !config().presence.showTask)
+          delete state.task;
         if (config().privacy === "private") {
           delete state.project;
           delete state.file;
+          delete state.task;
         }
         if (
           state.updatedAt &&
@@ -112,9 +116,20 @@ export function createServer() {
           state.status = "idle";
         json(200, {
           ...state,
+          badgeKind: statusBadgeKind(state),
           daemon: readJSON("daemon.json"),
           enabled: config().enabled,
         });
+        return;
+      }
+      if (url.pathname === "/api/presence") {
+        const state = readJSON("state.json", { status: "idle" });
+        if (
+          state.updatedAt &&
+          Date.now() - state.updatedAt > config().timing.idleMs
+        )
+          state.status = "idle";
+        json(200, buildActivity(state, readJSON("aggregate.json"), config()));
         return;
       }
       if (url.pathname === "/api/aggregate") {
@@ -161,6 +176,10 @@ export function createServer() {
         "/": ["../web/index.html", "text/html"],
         "/app.js": ["../web/app.js", "text/javascript"],
         "/style.css": ["../web/style.css", "text/css"],
+        "/assets/pet/status-badges.svg": [
+          "../assets/pet/status-badges.svg",
+          "image/svg+xml",
+        ],
       };
       if (
         /^\/assets\/pet\/codex-pet-(working|thinking|waiting|idle)\.(gif|svg)$/.test(
@@ -172,6 +191,12 @@ export function createServer() {
           url.pathname.endsWith(".gif") ? "image/gif" : "image/svg+xml",
         ];
       }
+      if (
+        /^\/assets\/pet\/codex-status-(working|thinking|waiting|idle|approval|editing|reading|review|ready|error)\.png$/.test(
+          url.pathname,
+        )
+      )
+        routes[url.pathname] = [".." + url.pathname, "image/png"];
       const route = routes[url.pathname];
       if (!route) {
         json(404, { error: "Not found" });
