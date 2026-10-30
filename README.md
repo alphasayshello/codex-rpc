@@ -8,7 +8,7 @@
 
 Discord Rich Presence and local analytics for Codex, with lightweight ChatGPT Desktop detection.
 
-[Download latest](https://github.com/alphasayshello/codex-rpc/releases/latest) · [Release notes](docs/RELEASE-NOTES-v0.2.0.md) · [MIT](LICENSE) · [Security](SECURITY.md)
+[Download latest](https://github.com/alphasayshello/codex-rpc/releases/latest) · [Release notes](docs/RELEASE-NOTES-v0.3.0.md) · [MIT](LICENSE) · [Security](SECURITY.md)
 
 Node 18+ · zero runtime dependencies · no accounts · no telemetry
 
@@ -64,16 +64,28 @@ Thinking shows `Pondering solution... (Elapsed: 1:05)`. Shell work shows `Runnin
 | State | Preview | What it does |
 | --- | --- | --- |
 | Writing | <img src="assets/pet/codex-pet-writing.gif" width="88" alt="Steady seated typing" /> | Alternating paw presses; head, body and laptop stay still. |
-| Thinking | <img src="assets/pet/codex-pet-thinking.gif" width="88" alt="Planning" /> | Pacing, planning glyphs and a thoughtful pose. |
-| Patching | <img src="assets/pet/codex-pet-patching.gif" width="88" alt="Applying a patch" /> | Stamping and sliding pixel file cards. |
+| Thinking | <img src="assets/pet/codex-pet-thinking.gif" width="88" alt="Planning" /> | A gentle pace, orbiting planning pixels and a steady thoughtful expression. |
+| Patching | <img src="assets/pet/codex-pet-patching.gif" width="88" alt="Applying a patch" /> | Focused movement and sliding plus/minus file cards. |
 | Error | <img src="assets/pet/codex-pet-error.gif" width="88" alt="An error needs attention" /> | Smoke, an alert and the original panic expression. |
 | Done | <img src="assets/pet/codex-pet-done.gif" width="88" alt="Celebrating" /> | A short celebration, then idle. |
 | Idle | <img src="assets/pet/codex-pet-idle.gif" width="88" alt="Sleeping" /> | Sleeping, breathing and floating Z pixels. |
-| Waiting | <img src="assets/pet/codex-pet-waiting.gif" width="88" alt="Waiting for approval" /> | A separate approval/attention wave. |
+| Waiting | <img src="assets/pet/codex-pet-waiting.gif" width="88" alt="Waiting for approval" /> | A separate attention pose with bobbing speech-bubble dots. |
 
-The mascot is the **original blue Codex Pet**, composed from its existing sprite artwork. Loops run at 10 fps with a consistent expression within each state. Static previews and animated pixel badges ship too. Legacy `working` remains an alias for `writing`.
+The mascot is the **original blue Codex Pet**, composed from its existing sprite artwork. All 19 scenes run at 20 fps with periodic motion and a consistent expression within each scene. Static previews and animated pixel badges ship too. Legacy `working` remains an alias for `writing`.
 
-Preview everything in **Settings → Codex Pet Assets → Preview animated pets**, or open `/assets/pet/animation-gallery.html` on your local dashboard. **Reduce motion** freezes bundled artwork and disables effects; OS reduced-motion preferences are respected. Live updates preserve animations already playing.
+**Twelve extra scenes:** reading, searching, terminal, testing, building, installing, reviewing, debugging, connecting, focus, celebrating and cozy idle.
+
+<table>
+<tr><td align="center"><img src="assets/pet/codex-pet-reading.gif" width="104" alt="Reading a pixel book" /><br>Reading</td><td align="center"><img src="assets/pet/codex-pet-terminal.gif" width="104" alt="Typing beside a terminal" /><br>Terminal</td><td align="center"><img src="assets/pet/codex-pet-testing.gif" width="104" alt="Checking a test matrix" /><br>Testing</td><td align="center"><img src="assets/pet/codex-pet-idle-cozy.gif" width="104" alt="Sleeping under moonlight" /><br>Cozy idle</td></tr>
+</table>
+
+Real tool metadata selects reading, searching, terminal, testing, building, installing and reviewing automatically. Missing metadata keeps the normal writing scene. Extra decorative scenes are available as asset overrides; the daemon never invents activity or cycles them at random.
+
+Open **Pet studio** in the dashboard for a larger preview, search, category filters, dark/light/checkerboard backgrounds, GIF/SVG downloads and copyable hosted URLs. In **Settings → Codex Pet Assets**, choose a target state and click a thumbnail to change its art, then **Save changes**. Automatic scene selection continues to follow your tools. The studio is also available at `/assets/pet/animation-gallery.html`.
+
+**Make your own pet.** Pet Studio includes an editable character brief and a one-pass ChatGPT image prompt with the exact 1536 × 1872 transparent PNG sheet, 8 × 9 grid, pose map and typing alignment requirements. Copy it into ChatGPT with your character reference and the downloadable layout guide. Generated sheets require manual validation and integration; the studio does not automatically replace the bundled artwork. [Format guide](docs/PET-STUDIO.md). **Reduce motion** freezes bundled artwork and disables effects; OS reduced-motion preferences are respected. Live updates preserve animations already playing.
+
+<img src="docs/pet-studio.png" width="1000" alt="Local Pet studio with large animated preview, motion controls and a browsable collection" />
 
 Artwork provenance and composition details: [asset manifest](assets/pet/manifest.json) · [third-party notices](THIRD_PARTY_NOTICES.md).
 
@@ -86,7 +98,7 @@ Artwork provenance and composition details: [asset manifest](assets/pet/manifest
 - **Review each turn.** Recaps show output-token deltas, observed tool calls, elapsed time and outcomes. Missing baselines stay unknown.
 - **Explore lifetime usage.** Tokens, sessions, active hours, streaks, languages, tools, hotspots, hourly patterns and estimated cost.
 - **Choose a range.** 7d, 30d, 90d, 1y or all time. The current-chat panel stays independent of the history range.
-- **Make it yours.** Dark/light themes, mobile navigation, keyboard-accessible settings and seven settings tabs.
+- **Make it yours.** Dark/light themes, mobile navigation, keyboard-accessible settings and seven settings tabs. A visual picker offers 19 pet scenes, with pixel badges and a dedicated preview studio.
 
 The dashboard binds to loopback only and updates over SSE. Optional Electron wraps the same dashboard with Node integration disabled:
 
@@ -108,7 +120,7 @@ Electron is optional and is not part of the normal CLI runtime.
 | `chat [--json] [--watch]` | Current-chat usage, tools, cost and context. |
 | `usage [--watch]` | Heatmap, usage bars, hourly activity, tools and languages. |
 | `insights` | Weekly trends, hotspots, pace and streak context. |
-| `preview` | Card text and asset URLs for six scenes plus waiting. |
+| `preview [--all]` | Exact card text and asset URLs; `--all` includes all 19 scenes. |
 | `serve [--port 47474]` | Local dashboard and settings. |
 | `statcards [--output ./statcards]` | SVG stats card, year heatmap, badges and Markdown. |
 | `doctor` | Check Node, hooks, detector, daemon, Discord IPC, freshness and privacy. |
@@ -163,7 +175,7 @@ Use `CODEX_RPC_HOME` for an alternate state directory and `CODEX_HOME` for an al
 
 The default application ID is `1565535814308470814`. To use your own, create an app in the [Discord Developer Portal](https://discord.com/developers/applications) and enter its **Application ID** in settings. No bot token or client secret is needed.
 
-For each state, enter an uploaded Discord asset key (`anim_typing_large`) or a direct public HTTPS GIF URL. A custom badge overrides automatic tool badges. Uploaded application art may be static; Discord controls animation, proxying and caching. Setup refreshes old bundled URLs while preserving custom hosts. The writing fix uses a new URL version to avoid stale cached images.
+For each state, enter an uploaded Discord asset key (`anim_typing_large`) or a direct public HTTPS GIF URL. A custom badge overrides automatic tool badges. Uploaded application art may be static; Discord controls animation, proxying and caching. Setup refreshes old bundled URLs while preserving custom hosts. The smoother assets use a new URL version to avoid stale cached images.
 
 ### Windows
 
@@ -199,6 +211,6 @@ npm run release:prepare -- --sea
 
 Normal runtime supports Node 18+. Some Homebrew Node builds disable SEA; standalone builds need an official SEA-enabled build. Output goes to `dist/release/<platform>-<arch>/`, with versioned archives, the stable `codex-rpc.tgz` alias, release notes and checksums. Native executables must be built on each target platform.
 
-[Release checklist](docs/RELEASE.md) · [Paste-ready v0.2.0 notes](docs/RELEASE-NOTES-v0.2.0.md) · [Verification](docs/VERIFICATION.md) · [Versioning](VERSIONING.md)
+[Release checklist](docs/RELEASE.md) · [Paste-ready v0.3.0 notes](docs/RELEASE-NOTES-v0.3.0.md) · [Verification](docs/VERIFICATION.md) · [Versioning](VERSIONING.md)
 
 Inspired by [rar-file/claude-rpc](https://github.com/rar-file/claude-rpc): three small Node pieces joined by JSON, adapted independently for Codex. Unaffiliated with OpenAI or Discord. Original project code is MIT; bundled OpenAI artwork has separate provenance.
