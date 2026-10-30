@@ -1,3 +1,4 @@
+import { summarizeCommand } from "./watcher.js";
 import fs from "node:fs";
 import { safeFilePath } from "./paths.js";
 import { config, file, readJSON, writeJSON } from "./store.js";
@@ -22,6 +23,13 @@ function safeTool(tool, settings) {
   if (typeof tool.exitCode === "number" && Number.isSafeInteger(tool.exitCode)) safe.exitCode = tool.exitCode;
   const file = settings.privacy === "public" && safeFilePath(tool.file);
   if (file) safe.file = file;
+  for (const field of ["fileCount", "linesAdded", "linesRemoved"])
+    if (Number.isSafeInteger(tool[field]) && tool[field] >= 0) safe[field] = tool[field];
+  if (settings.privacy === "public") {
+    if (Array.isArray(tool.safeFiles)) safe.safeFiles = tool.safeFiles.slice(0, 32).map(safeFilePath).filter(Boolean);
+    const summary = summarizeCommand(tool.commandSummary);
+    if (summary) safe.commandSummary = summary;
+  }
   return safe;
 }
 function redact(state, settings) {
@@ -34,6 +42,7 @@ function redact(state, settings) {
     delete next.project;
     delete next.file;
   }
+  if (settings.privacy !== "public") { delete next.branch; delete next.commandSummary; delete next.currentFiles; }
   if (next.updatedAt && Date.now() - next.updatedAt > settings.timing.idleMs) {
     next.status = "idle";
     delete next.tool;

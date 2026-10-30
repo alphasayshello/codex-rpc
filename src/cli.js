@@ -23,7 +23,7 @@ Usage: codex-rpc <command>
   chat          Current-chat tokens, tools, cost, context (--json, --watch)
   usage         Heatmap, hourly histogram, tools, languages, API estimates
   insights      Five contextual lines about your week
-  preview       Show the exact Discord text and assets for all four states
+  preview       Show the exact Discord text and assets for six visual states and approval waiting
   serve         Local dashboard + seven settings tabs (port 47474)
   statcards     Generate stats.svg, heatmap.svg, badges and Markdown
   doctor        Diagnose hooks, daemon, detector, IPC, stats, privacy
@@ -130,14 +130,14 @@ export async function main(args = process.argv.slice(2)) {
       const state = readJSON("state.json"),
         aggregate = readJSON("aggregate.json"),
         settings = { ...config(), enabled: true };
-      for (const status of ["working", "thinking", "waiting", "idle"]) {
+      for (const [scene, status] of [["writing", "working"], ["patching", "working"], ["thinking", "thinking"], ["error", "waiting"], ["done", "waiting"], ["idle", "idle"], ["waiting", "waiting"]]) {
         const activity = buildActivity(
-          { ...state, status },
+          { ...state, status, visualState: scene, waitingReason: scene === "error" ? "error" : scene === "done" ? "done" : "approval", eventTime: Date.now() },
           aggregate,
           settings,
         );
         console.log(
-          `\n${status.toUpperCase()} · ${activity.type === 3 ? "Watching" : "Playing"}\n${activity.details}\n${activity.state}\n${activity.assets.large_image}`,
+          `\n${scene.toUpperCase()} · ${activity.type === 3 ? "Watching" : "Playing"}\n${activity.details}\n${activity.state}\n${activity.assets.large_image}`,
         );
       }
       break;

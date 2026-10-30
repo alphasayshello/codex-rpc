@@ -42,7 +42,12 @@ test("parallel tools produce deduplicated running/completed/failed rows and dura
   const disk = fs.readFileSync(path.join(rpc, liveSessionFile("chat")), "utf8");
   assert.ok(!disk.includes("SECRET"));
   assert.ok(!disk.includes('"output"'));
-  assert.ok(!disk.includes('"error"'));
+  const noErrorBodies = (value) => {
+    if (!value || typeof value !== "object") return;
+    assert.equal(Object.hasOwn(value, "error"), false);
+    Object.values(value).forEach(noErrorBodies);
+  };
+  noErrorBodies(JSON.parse(disk));
 });
 
 test("waiting closes unfinished tools as unknown, never fabricated success", (t) => {

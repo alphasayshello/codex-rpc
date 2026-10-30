@@ -25,6 +25,7 @@ test("daemon consumes a real live log, connects, clears on pause and reconnects 
   writeJSON("config.json", {
     ...config(),
     clientId: "12345678",
+    presence: { ...config().presence, stats: "chat" },
     chatgpt: { enabled: false },
     stats: { enabled: false },
     assets: { working: "https://example.com/working.gif" },

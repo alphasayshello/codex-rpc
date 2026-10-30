@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
@@ -12,7 +13,7 @@ import {
   alive,
 } from "./store.js";
 import { conversationName } from "./threads.js";
-import { estimateCost } from "./pricing.js";
+import { estimateCost, PRICES } from "./pricing.js";
 import { applyEvent, normalizeEvent } from "./hook.js";
 export function emptyStats() {
   return {
@@ -377,7 +378,7 @@ export async function scan({ live = false } = {}) {
   }
   try {
     const cache = readJSON("scanner-cache.json", { files: {} }),
-      next = { schemaVersion: 6, files: {} };
+      next = { schemaVersion: 6, pricingHash: createHash("sha256").update(JSON.stringify(PRICES)).digest("hex"), files: {} };
     if (!config().enabled || !config().stats.enabled)
       return readJSON("aggregate.json", {
         schemaVersion: 1,
@@ -408,6 +409,7 @@ export async function scan({ live = false } = {}) {
         old = cache.files[filename];
       const cached =
         cache.schemaVersion === 6 &&
+        cache.pricingHash === next.pricingHash &&
         old &&
         old.size === st.size &&
         old.mtimeMs === st.mtimeMs;

@@ -1,3 +1,4 @@
+import { getTurnRecaps } from "./recaps.js";
 import { getToolTimeline } from "./timeline.js";
 import { selectedState, listChats, pinChat, unpinChat } from "./selection.js";
 import { getChatStats } from "./chat.js";
@@ -5,7 +6,7 @@ import http from "node:http";
 import fs from "node:fs";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { config, validateConfig, readJSON, writeJSON, home } from "./store.js";
-import { buildActivity, statusBadgeKind } from "./presence.js";
+import { buildActivity, statusBadgeKind, getVisualState } from "./presence.js";
 import { rangeAggregate } from "./tui.js";
 import { emptyStats } from "./scanner.js";
 import { statsSVG, heatmapSVG, badgeSVG } from "./statcards.js";
@@ -126,6 +127,7 @@ export function createServer() {
         json(200, {
           ...state,
           badgeKind: statusBadgeKind(state),
+          visualState: getVisualState(state, config()),
           daemon: readJSON("daemon.json"),
           enabled: config().enabled,
         });
@@ -148,6 +150,11 @@ export function createServer() {
       if (url.pathname === "/api/chats") {
         const saved = readJSON("selection.json");
         json(200, { chats: listChats(), pinned: saved.sessionId ? { id: saved.sessionId, source: saved.source } : null });
+        return;
+      }
+      if (url.pathname === "/api/recaps") {
+        const state = selectedState();
+        json(200, { sessionId: state.sessionId || null, source: state.source || "codex", rows: getTurnRecaps(state, config()) });
         return;
       }
       if (url.pathname === "/api/timeline") {
@@ -199,13 +206,16 @@ export function createServer() {
         "/": ["../web/index.html", "text/html"],
         "/app.js": ["../web/app.js", "text/javascript"],
         "/style.css": ["../web/style.css", "text/css"],
+        "/assets/pet/animation-gallery.css": ["../assets/pet/animation-gallery.css", "text/css"],
+        "/assets/pet/animation-gallery.html": ["../assets/pet/animation-gallery.html", "text/html"],
+        "/assets/pet/animation-spritesheet.png": ["../assets/pet/animation-spritesheet.png", "image/png"],
         "/assets/pet/status-badges.svg": [
           "../assets/pet/status-badges.svg",
           "image/svg+xml",
         ],
       };
       if (
-        /^\/assets\/pet\/codex-pet-(working|thinking|waiting|idle)\.(gif|svg)$/.test(
+        /^\/assets\/pet\/codex-pet-(working|thinking|waiting|idle|writing|patching|error|done)\.(gif|svg)$/.test(
           url.pathname,
         )
       ) {
@@ -215,18 +225,21 @@ export function createServer() {
         ];
       }
       if (
-        /^\/assets\/pet\/codex-status-(working|thinking|waiting|idle|approval|editing|reading|review|ready|error)\.png$/.test(
+        /^\/assets\/pet\/codex-status-(working|thinking|waiting|idle|approval|editing|reading|review|ready|error|done)\.(png|gif)$/.test(
           url.pathname,
         )
       )
-        routes[url.pathname] = [".." + url.pathname, "image/png"];
+        routes[url.pathname] = [".." + url.pathname, url.pathname.endsWith(".gif") ? "image/gif" : "image/png"];
       const route = routes[url.pathname];
       if (!route) {
         json(404, { error: "Not found" });
         return;
       }
+      let bytes;
+      try { bytes = fs.readFileSync(new URL(route[0], import.meta.url)); }
+      catch (error) { if (error.code === "ENOENT") { json(404, { error: "Not found" }); return; } throw error; }
       res.writeHead(200, { "Content-Type": route[1] });
-      res.end(fs.readFileSync(new URL(route[0], import.meta.url)));
+      res.end(bytes);
     } catch (e) {
       json(
         e.statusCode === 400 || e instanceof SyntaxError ||

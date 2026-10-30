@@ -340,3 +340,24 @@ header h1 { margin: 5px 0; font-size: 26px; }
   .timeline-metadata { justify-content: flex-start; }
   .timeline-duration { min-width: 0; text-align: left; }
 }
+
+/* Low-frequency, stepped pixel motion; no layout-jumping counter animations. */
+.pixel-signal { display: inline-flex; align-items: center; gap: 3px; height: 16px; margin-right: 5px; }
+.pixel-signal i { display: block; width: 3px; height: 7px; background: currentColor; }
+.live[data-state="working"] .pixel-signal i, .live[data-state="thinking"] .pixel-signal i { animation: pixel-signal 1.8s steps(3, end) infinite; }
+.pixel-signal i:nth-child(2) { animation-delay: .3s !important; }
+.pixel-signal i:nth-child(3) { animation-delay: .6s !important; }
+@keyframes pixel-signal { 0%, 100% { transform: scaleY(.45); opacity: .55; } 50% { transform: scaleY(1); opacity: 1; } }
+#settings-content { animation: pixel-arrive 160ms steps(4, end); }
+@keyframes pixel-arrive { from { opacity: .6; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+.tool-chip.running::before { animation: pixel-signal 2.4s steps(2, end) infinite; display: inline-block; }
+.turn-recaps { margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--border); }
+#turn-recaps { list-style: none; padding: 0; margin: 0; max-height: 260px; overflow: auto; }
+.recap-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto auto; gap: 14px; align-items: center; padding: 14px 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.recap-row strong { font-weight: 500; } .recap-row > span:not(.timeline-status), .recap-row time { color: var(--muted); }
+:root[data-motion="reduced"] *, :root[data-motion="reduced"] *::before { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+@media (prefers-reduced-motion: reduce) { .pixel-signal i, .tool-chip.running::before, #settings-content { animation: none !important; } }
+@media (max-width: 760px) { .recap-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; } .recap-row > span:not(.timeline-status) { grid-column: 1; grid-row: 2; } .recap-row time { grid-column: 2; grid-row: 2; } }
+
+:root[data-motion="reduced"] .pet-live #pet { content: url("/assets/pet/codex-pet-idle.svg"); }
+:root[data-motion="reduced"] .pet-live #status-badge { content: url("/assets/pet/codex-status-idle.png"); }

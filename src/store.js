@@ -14,18 +14,22 @@ export const defaults = {
   privacy: "private",
   clientId: "1565535814308470814",
   buttons: [],
-  presence: { type: 3, showTask: true, stats: "chat", showChurn: true },
+  presence: { type: 3, showTask: true, stats: "telemetry", showChurn: true, timer: "operation" },
   assets: {
     working:
-      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-working.gif?v=calm-1",
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-working.gif?v=motion-2",
     thinking:
-      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-thinking.gif?v=calm-1",
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-thinking.gif?v=motion-2",
     waiting:
-      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-waiting.gif?v=calm-1",
-    idle: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-idle.gif?v=calm-1",
+      "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-waiting.gif?v=motion-2",
+    idle: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-idle.gif?v=motion-2",
+    writing: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-writing.gif?v=motion-2",
+    patching: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-patching.gif?v=motion-2",
+    error: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-error.gif?v=motion-2",
+    done: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-done.gif?v=motion-2",
     badge: "",
   },
-  timing: { idleMs: 300000, pollMs: 2000, scanMs: 60000, presenceMs: 15000 },
+  timing: { idleMs: 300000, pollMs: 2000, scanMs: 60000, presenceMs: 15000, successMs: 15000 },
   chatgpt: { enabled: true },
   stats: { enabled: true },
 };
@@ -81,7 +85,8 @@ export function validateConfig(c) {
   n.presence = { ...config().presence, ...n.presence };
   if (
     ![0, 3].includes(n.presence.type) ||
-    !["chat", "cost", "tokens"].includes(n.presence.stats) ||
+    !["telemetry", "chat", "cost", "tokens"].includes(n.presence.stats) ||
+    !["operation", "session"].includes(n.presence.timer) ||
     typeof n.presence.showTask !== "boolean" ||
     typeof n.presence.showChurn !== "boolean"
   )

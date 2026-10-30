@@ -55,6 +55,7 @@ test("state-specific pet assets, public naming, disabled clearing and cross-plat
   for (const status of ["working", "thinking", "waiting", "idle"]) {
     const c = {
       enabled: true,
+      presence: { stats: "chat" },
       privacy: "public",
       assets: { [status]: `https://host/${status}.gif` },
       buttons: [{ label: "View GitHub", url: "https://github.com" }],
@@ -62,7 +63,7 @@ test("state-specific pet assets, public naming, disabled clearing and cross-plat
     const a = buildActivity({ status, project: "demo" }, {}, c);
     assert.equal(a.assets.large_image, `https://host/${status}.gif`);
     assert.match(a.details, /demo/);
-    assert.equal(a.buttons.length, 1);
+    assert.equal(a.buttons, undefined);
   }
   assert.equal(buildActivity({}, {}, { enabled: false }), null);
   assert.match(buildActivity({ source: "chatgpt" }, {}, {}).details, /ChatGPT/);

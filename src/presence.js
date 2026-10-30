@@ -1,3 +1,4 @@
+import { safeFilePath } from "./paths.js";
 import { getChatStats } from "./chat.js";
 import { conversationName } from "./threads.js";
 // Compact, Claude-RPC-style card text. No network access or raw prompt storage.
@@ -82,6 +83,19 @@ export function statusBadgeKind(state = {}) {
   }
   return state.status === "thinking" ? "thinking" : "idle";
 }
+export function getVisualState(state = {}, settings = {}, now = Date.now()) {
+  if (state.status === "idle") return "idle";
+  if (state.waitingReason === "error" || state.visualState === "error") return "error";
+  if (state.visualState === "done" || (state.status === "waiting" && state.waitingReason === "done")) {
+    const ended = state.eventTime || state.updatedAt;
+    return !ended || now - ended < (settings.timing?.successMs || 15000) ? "done" : "idle";
+  }
+  if (["thinking", "writing", "patching"].includes(state.visualState)) return state.visualState;
+  if (state.status === "thinking") return "thinking";
+  if (state.status === "working") return state.operationKind === "editing" || /patch|edit|write_file/i.test(state.effectiveTool || state.tool || "") ? "patching" : "writing";
+  return "waiting";
+}
+const clockLabel = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
 export function buildActivity(state = {}, aggregate = {}, c = {}, chat = getChatStats(state, c), now = Date.now()) {
   if (c.enabled === false) return null;
   const status = ["working", "thinking", "waiting", "idle"].includes(
@@ -92,12 +106,13 @@ export function buildActivity(state = {}, aggregate = {}, c = {}, chat = getChat
   const options = {
     type: 3,
     showTask: true,
-    stats: "chat",
+    stats: "telemetry",
+    timer: "operation",
     showChurn: true,
     ...c.presence,
   };
   const privateMode = c.privacy !== "public",
-    project = privateMode ? "a private project" : state.project || "Codex";
+    project = state.source === "chatgpt" && !state.project ? "ChatGPT App" : privateMode ? "a private project" : state.project || "Codex";
   const actions = {
     working: "Working in",
     thinking: "Thinking in",
@@ -153,7 +168,7 @@ export function buildActivity(state = {}, aggregate = {}, c = {}, chat = getChat
   const model = state.model || chat.model || "Codex";
   const promptsLabel = chat.prompts == null ? "" : `${compact(chat.prompts)} ${chat.prompts === 1 ? "prompt" : "prompts"}`;
   const tokensLabel = tokens == null ? "" : `${compact(tokens)} output tokens`;
-  const tool = String(state.tool || chat.activeTools?.at(-1)?.name || "");
+  const tool = String(state.effectiveTool || state.tool || chat.activeTools?.at(-1)?.name || "");
   const toolName = ({shell: "Bash", bash: "Bash", exec_command: "Bash", apply_patch: "Edit", write_file: "Write", read_file: "Read", update_plan: "Plan"})[tool] || tool.replace(/^mcp__/, "").replaceAll("__", ":");
   const activeTool = chat.activeTools?.find((t) => t.name === tool) || (chat.lastTool?.endedAt == null ? chat.lastTool : null);
   const toolMs = activeTool?.startedAt ? Math.max(0, now - activeTool.startedAt) : 0;
@@ -185,12 +200,41 @@ export function buildActivity(state = {}, aggregate = {}, c = {}, chat = getChat
     (today.linesAdded || 0) + (today.linesRemoved || 0)
   )
     parts.push(`+${today.linesAdded || 0} −${today.linesRemoved || 0}`);
+  const visual = getVisualState({ ...state, status }, c, now);
+  let telemetryDetails, telemetryState;
+  const operationAt = status === "thinking" ? state.thinkingStartedAt || state.operationStartedAt : state.operationStartedAt || activeTool?.startedAt;
+  const operationMs = operationAt ? Math.max(0, now - operationAt) : 0;
+  if (options.stats === "telemetry") {
+    const files = !privateMode && Array.isArray(state.currentFiles) ? state.currentFiles.filter(safeFilePath) : [];
+    const filename = !privateMode && safeFilePath(state.file) || files[0];
+    const additions = Number.isFinite(state.linesAdded) ? Math.max(0, state.linesAdded) : null;
+    const removals = Number.isFinite(state.linesRemoved) ? Math.max(0, state.linesRemoved) : null;
+    const churn = options.showChurn && additions != null && removals != null ? ` (+${additions} / -${removals})` : "";
+    const count = state.currentFileCount || files.length || (filename ? 1 : 0);
+    const command = !privateMode && typeof state.commandSummary === "string" ? state.commandSummary.slice(0, 64) : "";
+    const branch = !privateMode && typeof state.branch === "string" ? ` (${state.branch.slice(0, 80)})` : "";
+    const coding = visual === "patching" || state.operationKind === "editing" || !!filename || /edit|write|patch/.test(tool) || (state.visualState === "writing" && !tool);
+    telemetryDetails = visual === "error" ? `Blocked in ${target}`
+      : visual === "done" ? `Finished in ${target}`
+      : status === "thinking" ? `Pondering solution... (Elapsed: ${clockLabel(operationMs)})`
+      : status === "working" && coding ? count ? `Writing code across ${count} ${count === 1 ? "file" : "files"}` : "Writing code"
+      : status === "working" ? `Working in ${target}`
+      : status === "idle" || visual === "idle" ? `Idle in ${project}${branch}` : `Waiting on you · ${target}`;
+    const liveAction = status === "working" && coding ? `Editing ${filename || "files"}${churn}`
+      : status === "working" && /bash|shell|exec_command/.test(tool) ? `Running: ${command || "shell command"}`
+      : status === "working" ? (toolName ? `Using ${toolName}` : "Working")
+      : visual === "error" ? "Needs attention" : "";
+    telemetryState = [liveAction, model, tokensLabel, !privateMode && options.showTask && status === "thinking" ? namedTitle : null].filter(Boolean).join(" · ");
+  }
+  const visualAsset = c.assets?.[visual];
+  const legacyWorking = c.assets?.working;
+  const chosenAsset = ["writing", "patching"].includes(visual) && legacyWorking && !legacyWorking.startsWith(ASSET_BASE) && (!visualAsset || visualAsset.startsWith(ASSET_BASE)) ? legacyWorking : visualAsset;
   const activity = {
     type: options.type,
-    details: (options.stats === "chat" ? statusDetails[status] : details || `${actions[status]} ${project}`).slice(0, 128),
-    state: parts.join(" · ").slice(0, 128),
+    details: (telemetryDetails || (options.stats === "chat" ? statusDetails[status] : details || `${actions[status]} ${project}`)).slice(0, 128),
+    state: (telemetryState || parts.join(" · ")).slice(0, 128),
     assets: {
-      large_image: c.assets?.[status] || `${ASSET_BASE}/codex-pet-${status}.gif?v=calm-1`,
+      large_image: chosenAsset || c.assets?.[status] || `${ASSET_BASE}/codex-pet-${visual}.gif?v=motion-2`,
       large_text: (options.stats === "chat"
         ? status === "working" ? `Working with ${toolName || "Codex"}`
           : status === "thinking" ? `Reasoning with ${model}`
@@ -203,8 +247,8 @@ export function buildActivity(state = {}, aggregate = {}, c = {}, chat = getChat
       small_text: (options.stats === "chat" ? status === "working" && toolName ? `Using ${toolName}` : action : `${action} · ${aggregate.streak?.current || 0} day streak · ${(totals.activeHours || 0).toFixed(1)} all-time hours`).slice(0, 128),
     },
   };
-  if (state.startedAt)
-    activity.timestamps = { start: Math.floor(state.startedAt / 1000) };
-  if (c.buttons?.length) activity.buttons = c.buttons.slice(0, 2);
+  const timerStart = options.timer === "operation" && ["working", "thinking"].includes(status) ? operationAt || state.startedAt : state.startedAt;
+  if (timerStart) activity.timestamps = { start: Math.floor(timerStart / 1000) };
+  // This card deliberately has no external buttons.
   return activity;
 }

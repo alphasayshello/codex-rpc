@@ -37,10 +37,9 @@ test("named conversation wins over latest message and refreshes after rename", (
       updated_at: "2026-10-29T13:00:00Z",
     }) + "\n",
   );
-  assert.equal(
-    buildActivity(readJSON("state.json"), {}, config()).details,
-    "Thinking in Discord presence suite",
-  );
+  const activity = buildActivity(readJSON("state.json"), {}, config());
+  assert.match(activity.state, /Discord presence suite/);
+  assert.ok(!JSON.stringify(activity).includes("a completely different message"));
 });
 test("metadata tolerates partial rows and stale records without replacing the newest name", (t) => {
   const { codex } = sandbox(t);

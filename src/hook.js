@@ -1,11 +1,22 @@
-import { safeFilePath } from "./paths.js";
+import { toolTelemetry } from "./watcher.js";
+import { workspaceBranch } from "./workspace.js";
 import path from "node:path";
 import { taskTitle } from "./presence.js";
 import { conversationName } from "./threads.js";
 import { isMain, readJSON, writeJSON, config } from "./store.js";
 import { liveSessionFile, readLiveSession, normalizeUsage } from "./live.js";
+import { recapCounters, recordTurnEvent } from "./recaps.js";
 const states = {
   working: "working",
+  writing: "working",
+  coding: "working",
+  patching: "working",
+  diff_applying: "working",
+  planning: "thinking",
+  sleeping: "idle",
+  stuck: "waiting",
+  done: "waiting",
+  success: "waiting",
   thinking: "thinking",
   waiting: "waiting",
   idle: "idle",
@@ -13,6 +24,7 @@ const states = {
   "turn-start": "thinking",
   task_started: "thinking",
   user_message: "thinking",
+  token_count: "thinking",
   "tool-start": "working",
   function_call: "working",
   custom_tool_call: "working",
@@ -53,8 +65,9 @@ export function toolOutcome(input) {
 }
 export function normalizeEvent(input) {
   const p = input.payload || input;
-  const type = p.type || input.type;
-  let status = states[type];
+  const rawType = p.type || input.type;
+  const type = typeof rawType === "string" ? rawType.toLowerCase() : "";
+  let status = Object.hasOwn(states, type) ? states[type] : undefined;
   if (
     type === "reasoning" ||
     (p.role === "assistant" && p.content?.some?.((x) => x.type === "reasoning"))
@@ -62,15 +75,23 @@ export function normalizeEvent(input) {
     status = "thinking";
   if (p.role === "user") status = "thinking";
   if (!status) return null;
-  let args = p.arguments || p.tool_input || {};
-  if (typeof args === "string") {
-    try { args = JSON.parse(args); } catch { args = {}; }
-  }
-  const filename = safeFilePath(input.file || args?.file_path || args?.path || p.file_path);
+  const telemetry = toolTelemetry(input);
+  const visuals = { writing: "writing", coding: "writing", patching: "patching", diff_applying: "patching", planning: "thinking", sleeping: "idle", stuck: "error", error: "error", done: "done", success: "done" };
+  const cwd = input.cwd || p.cwd;
   return {
     status,
     type,
-    tokenOnly: input.tokenOnly === true,
+    ...telemetry,
+    visualState: Object.hasOwn(visuals, type) ? visuals[type] : undefined,
+    branch: cwd ? workspaceBranch(cwd) || undefined : undefined,
+    workspaceObserved: !!cwd,
+    tokenOnly: input.tokenOnly === true || type === "token_count",
+    turnId: typeof (input.turnId || input.turn_id || p.turn_id || p.turn?.id) === "string" ? (input.turnId || input.turn_id || p.turn_id || p.turn?.id).slice(0, 256) : undefined,
+    recapUsage: recapCounters(input.usage || p.thread_token_usage || p.info?.total_token_usage),
+    recapChanges: {
+      linesAdded: Number.isSafeInteger(input.linesAdded ?? p.lines_added) && (input.linesAdded ?? p.lines_added) >= 0 ? input.linesAdded ?? p.lines_added : null,
+      linesRemoved: Number.isSafeInteger(input.linesRemoved ?? p.lines_removed) && (input.linesRemoved ?? p.lines_removed) >= 0 ? input.linesRemoved ?? p.lines_removed : null,
+    },
     callId: p.call_id || input.callId || input.call_id || p.id,
     usage: normalizeUsage(input.usage || p.thread_token_usage || p.info?.total_token_usage),
     lastUsage: normalizeUsage(input.lastUsage || p.info?.last_token_usage),
@@ -81,18 +102,17 @@ export function normalizeEvent(input) {
       input.project ||
       (input.cwd || p.cwd ? path.basename(input.cwd || p.cwd) : undefined),
     task: taskTitle(input.threadName || input.task || p.thread_name),
-    waitingReason: ["error", "task_failed"].includes(type)
+    waitingReason: ["error", "task_failed", "stuck"].includes(type)
       ? "error"
       : type === "approval-request"
         ? "approval"
         : ["done", "approval", "error", "ready"].includes(input.waitingReason)
           ? input.waitingReason
-          : ["agent-turn-complete", "task_complete", "waiting"].includes(type)
+          : ["agent-turn-complete", "task_complete", "waiting", "done", "success"].includes(type)
             ? "done"
             : undefined,
     model: input.model || p.model,
     tool: input.tool || p.name,
-    file: filename || undefined,
     tokens: input.tokens ?? p.info?.total_token_usage?.total_tokens,
     timestamp: input.timestamp,
     outcome: ["tool-end", "function_call_output", "custom_tool_call_output"].includes(type) ? toolOutcome(input) : undefined,
@@ -118,23 +138,25 @@ export function applyEvent(input) {
       e.taskSource = "thread";
     } else if (e.task) e.taskSource = "explicit";
   }
-  const time = Date.now(),
-    eventTime = Date.parse(e.timestamp) || time;
+  const time = Date.now();
+  const parsedTime = typeof e.timestamp === "number" ? e.timestamp : Date.parse(e.timestamp);
+  const eventTime = Number.isFinite(parsedTime) && parsedTime >= 0 ? parsedTime : time;
   if (prior.eventTime > eventTime) return prior;
   const next = {
     ...prior,
-    status: e.status,
+    status: e.tokenOnly && e.type !== "token_count" ? prior.status || e.status : e.status,
     source,
     updatedAt: time,
     eventTime,
     startedAt:
-      !prior.startedAt || (e.sessionId && e.sessionId !== prior.sessionId)
+      prior.startedAt == null || (e.sessionId && e.sessionId !== prior.sessionId)
         ? eventTime
         : prior.startedAt,
   };
   for (const k of [
     "sessionId",
     "project",
+    "branch",
     "task",
     "taskSource",
     "waitingReason",
@@ -151,6 +173,7 @@ export function applyEvent(input) {
     delete next.taskSource;
   }
   if (!e.task && !prior.taskSource) delete next.task;
+  if (e.workspaceObserved && !e.branch) delete next.branch;
   if (e.usage) {
     next.usage = e.usage;
     next.tokens = e.usage.total;
@@ -158,6 +181,10 @@ export function applyEvent(input) {
     next.tokens = Math.max(0, Number(e.tokens) || 0);
     if (next.usage) next.usage = { ...next.usage, total: next.tokens };
   }
+  const metadata = {};
+  for (const field of ["file", "safeFiles", "linesAdded", "linesRemoved", "commandSummary", "operationKind", "effectiveTool"])
+    if (e[field] !== undefined && (c.privacy === "public" || ["linesAdded", "linesRemoved", "operationKind", "effectiveTool"].includes(field))) metadata[field] = e[field];
+  if (e.safeFiles?.length) metadata.fileCount = e.safeFiles.length;
   const starts = ["tool-start", "function_call", "custom_tool_call"].includes(e.type);
   const ends = ["tool-end", "function_call_output", "custom_tool_call_output"].includes(e.type);
   let active = [...(prior.activeTools || [])];
@@ -167,11 +194,17 @@ export function applyEvent(input) {
     const callId = String(e.callId || `${e.tool || "tool"}:${eventTime}`);
     if (!seen.includes(callId)) {
       seen.push(callId);
-      const tool = { name: String(e.tool || "tool").slice(0, 128), callId, status: "running", startedAt: eventTime, ...(c.privacy === "public" && e.file ? { file: e.file } : {}) };
+      const tool = { name: String(e.tool || "tool").slice(0, 128), callId, status: "running", startedAt: eventTime, ...metadata };
       active.push(tool);
       recent = [...recent.filter((t) => t.callId !== callId), tool].slice(-50);
       next.lastTool = tool;
-    } else if (!active.some((t) => t.callId === callId)) {
+    } else if (active.some((t) => t.callId === callId)) {
+      // Repeated notifications report cumulative metadata for this invocation;
+      // replace its observation rather than counting the same diff twice.
+      active = active.map((tool) => tool.callId === callId ? { ...tool, ...metadata } : tool);
+      recent = recent.map((tool) => tool.callId === callId ? { ...tool, ...metadata } : tool);
+      next.lastTool = active.find((tool) => tool.callId === callId);
+    } else {
       // Replayed completed calls cannot revive an old working state.
       next.status = prior.status || "thinking";
       next.tool = prior.tool;
@@ -180,7 +213,7 @@ export function applyEvent(input) {
     const target = e.callId ? String(e.callId) : active.at(-1)?.callId;
     const tool = active.find((t) => t.callId === target);
     if (tool) {
-      const completed = { ...tool, ...e.outcome, endedAt: eventTime, durationMs: Math.max(0, eventTime - tool.startedAt) };
+      const completed = { ...tool, ...metadata, ...e.outcome, endedAt: eventTime, durationMs: Math.max(0, eventTime - tool.startedAt) };
       recent = [...recent.filter((t) => t.callId !== target), completed].slice(-50);
       next.lastTool = completed;
       active = active.filter((t) => t.callId !== target);
@@ -198,24 +231,57 @@ export function applyEvent(input) {
   if (active.length && (starts || ends || e.tokenOnly)) {
     next.status = "working";
     next.tool = active.at(-1).name;
-    if (active.at(-1).file) next.file = active.at(-1).file;
-    else delete next.file;
   }
-  if (next.status !== "working") { delete next.tool; delete next.file; }
-  if (e.status !== "waiting") delete next.waitingReason;
+  // Current operation metadata comes from live calls, not completed/lifetime
+  // totals. Parallel calls retain independent files and cumulative diff counts.
+  for (const field of ["file", "currentFiles", "currentFileCount", "linesAdded", "linesRemoved", "commandSummary", "operationKind", "effectiveTool"]) delete next[field];
+  if (next.status === "working") {
+    const operation = e.tokenOnly ? { file: prior.file, safeFiles: prior.currentFiles, fileCount: prior.currentFileCount,
+      linesAdded: prior.linesAdded, linesRemoved: prior.linesRemoved, commandSummary: prior.commandSummary, operationKind: prior.operationKind, effectiveTool: prior.effectiveTool } : metadata;
+    const operations = active.length ? active : !ends ? [operation] : [];
+    const files = [...new Set([...operations].reverse().flatMap((tool) => tool.safeFiles || (tool.file ? [tool.file] : [])))];
+    if (files.length) { next.currentFiles = files; next.currentFileCount = files.length; next.file = files[0]; }
+    else {
+      const fileOperations = operations.filter((tool) => tool.fileCount > 0);
+      if (fileOperations.length === 1) next.currentFileCount = fileOperations[0].fileCount;
+      else if (fileOperations.length > 1) next.currentFileCount = null;
+    }
+    for (const field of ["linesAdded", "linesRemoved"]) {
+      const values = operations.map((tool) => tool[field]).filter((value) => typeof value === "number");
+      if (values.length) next[field] = values.reduce((sum, value) => sum + value, 0);
+    }
+    for (const field of ["operationKind", "effectiveTool"])
+      if (operations.at(-1)?.[field]) next[field] = operations.at(-1)[field];
+    const command = operations.at(-1)?.commandSummary;
+    if (command) next.commandSummary = command;
+  } else delete next.tool;
+  const previousCall = prior.activeTools?.at(-1)?.callId;
+  const currentCall = active.at(-1)?.callId;
+  if (!Number.isFinite(prior.operationStartedAt) || prior.status !== next.status || (!e.tokenOnly && previousCall !== currentCall))
+    next.operationStartedAt = active.at(-1)?.startedAt ?? eventTime;
+  if (next.status === "thinking") {
+    if (!Number.isFinite(prior.thinkingStartedAt) || prior.status !== "thinking") next.thinkingStartedAt = eventTime;
+  } else delete next.thinkingStartedAt;
+  if (!e.tokenOnly) {
+    if (e.visualState) next.visualState = e.visualState;
+    else delete next.visualState;
+  }
+  if (ends && e.outcome?.status === "failed") next.visualState = "error";
+  if (!e.tokenOnly && next.status !== "waiting") delete next.waitingReason;
   if (c.privacy === "private" || !c.presence.showTask) delete next.task;
   if (c.privacy === "private") {
     delete next.project;
+    delete next.branch;
     delete next.file;
+    delete next.currentFiles;
+    delete next.commandSummary;
     delete next.task;
-    // A privacy change must also redact metadata collected while public.
-    next.activeTools = next.activeTools.map(({ file, ...tool }) => tool);
-    next.recentTools = next.recentTools.map(({ file, ...tool }) => tool);
-    if (next.lastTool) {
-      const { file, ...tool } = next.lastTool;
-      next.lastTool = tool;
-    }
+    const privateTool = ({ file, safeFiles, commandSummary, ...tool }) => tool;
+    next.activeTools = next.activeTools.map(privateTool);
+    next.recentTools = next.recentTools.map(privateTool);
+    if (next.lastTool) next.lastTool = privateTool(next.lastTool);
   }
+  recordTurnEvent(e, prior, next, eventTime, c);
   if (sessionId) writeJSON(liveSessionFile(sessionId, source), next);
   // Old log records may refresh their own conversation, but must never switch
   // the visible conversation back from a newer event in another chat.

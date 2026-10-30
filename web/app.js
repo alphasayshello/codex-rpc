@@ -18,6 +18,16 @@ function setTheme(theme) {
 }
 setTheme(storage.get("codex-rpc-theme") || "dark");
 $("#theme-toggle").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"));
+const motionPreference = matchMedia("(prefers-reduced-motion: reduce)");
+function setMotion(reduced, persist = true) {
+  document.documentElement.dataset.motion = reduced ? "reduced" : "full";
+  $("#motion-toggle").setAttribute("aria-pressed", String(reduced));
+  $("#motion-label").textContent = reduced ? "Animate effects" : "Reduce motion";
+  if (persist) storage.set("codex-rpc-motion", reduced ? "reduced" : "full");
+}
+setMotion(storage.get("codex-rpc-motion") ? storage.get("codex-rpc-motion") === "reduced" : motionPreference.matches, false);
+$("#motion-toggle").addEventListener("click", () => { setMotion(document.documentElement.dataset.motion !== "reduced"); refresh(); });
+motionPreference.addEventListener("change", () => { if (!storage.get("codex-rpc-motion")) { setMotion(motionPreference.matches, false); refresh(); } });
 const mobileNavigation = matchMedia("(max-width: 760px)");
 let collapsedSidebar = storage.get("codex-rpc-sidebar-collapsed") === "true", drawerOpen = false;
 function updateSidebar() {
@@ -361,11 +371,36 @@ $("#unpin-chat").addEventListener("click", () => changePin({ id: null }));
 setInterval(() => {
   if (timelineData.rows?.some((row) => row.status === "running")) renderTimeline(timelineData);
 }, 1000);
+function renderRecaps(data = {}) {
+  const target = $("#turn-recaps");
+  const rows = data.rows || [];
+  const signature = JSON.stringify([data.sessionId, rows]);
+  if (target.dataset.signature === signature) return;
+  target.dataset.signature = signature;
+  target.replaceChildren();
+  if (!rows.length) {
+    const empty = document.createElement("li"); empty.className = "timeline-empty";
+    empty.textContent = "Finish a turn to see its recap. Earlier turns may not have recorded baselines.";
+    target.append(empty); return;
+  }
+  for (const row of rows.slice(0, 20)) {
+    const item = document.createElement("li"); item.className = "recap-row";
+    const title = document.createElement("strong");
+    title.textContent = row.outputTokens == null ? "Output not reported" : `${format(row.outputTokens)} output tokens`;
+    const details = document.createElement("span");
+    details.textContent = [row.toolCalls == null ? null : `${row.toolCalls} ${row.toolCalls === 1 ? "tool" : "tools"}`, row.elapsedMs == null ? null : `${(row.elapsedMs / 1000).toFixed(1)}s`, row.model].filter(Boolean).join(" · ");
+    const outcome = document.createElement("span"); outcome.className = `timeline-status ${row.outcome === "failed" ? "failed" : "completed"}`;
+    outcome.textContent = row.outcome || "unknown";
+    const time = document.createElement("time");
+    if (Number.isFinite(row.endedAt)) { time.dateTime = new Date(row.endedAt).toISOString(); time.textContent = new Date(row.endedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
+    item.append(title, details, outcome, time); target.append(item);
+  }
+}
 async function refresh() {
   if (refreshing) { refreshPending = true; return; }
   refreshing = true;
   try {
-    const [s, a, year, activity, chat, chats, timeline] = await Promise.all([
+    const [s, a, year, activity, chat, chats, timeline, recaps] = await Promise.all([
       api("/api/state"),
       api("/api/aggregate?range=" + $("#range").value),
       api("/api/aggregate?range=1y"),
@@ -373,14 +408,18 @@ async function refresh() {
       api("/api/chat"),
       api("/api/chats"),
       api("/api/timeline"),
+      api("/api/recaps"),
     ]);
     renderChat(chat);
     renderChats(chats);
     renderTimeline(timeline);
+    renderRecaps(recaps);
     const t = a.totals || {},
       state = ["working", "thinking", "waiting", "idle"].includes(s.status)
         ? s.status
         : "idle";
+    const visual = ["idle", "thinking", "writing", "patching", "error", "done", "waiting", "working"].includes(s.visualState) ? s.visualState : state;
+    $(".live").dataset.state = visual;
     const bundled =
       "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/";
     const configuredPet = activity?.assets?.large_image;
@@ -388,20 +427,20 @@ async function refresh() {
       configuredPet?.startsWith("https://") &&
       !configuredPet.startsWith(bundled)
         ? configuredPet
-        : `/assets/pet/codex-pet-${state}.gif`;
+        : `/assets/pet/codex-pet-${visual}.${document.documentElement.dataset.motion === "reduced" ? "svg" : "gif"}`;
     if ($("#pet").getAttribute("src") !== petURL) $("#pet").src = petURL;
     const configuredBadge = activity?.assets?.small_image;
     const badgeURL =
       configuredBadge?.startsWith("https://") &&
       !configuredBadge.startsWith(bundled)
         ? configuredBadge
-        : `/assets/pet/codex-status-${s.badgeKind || state}.png`;
+        : `/assets/pet/codex-status-${s.badgeKind || state}.${document.documentElement.dataset.motion === "reduced" ? "png" : "gif"}`;
     if ($("#status-badge").getAttribute("src") !== badgeURL)
       $("#status-badge").src = badgeURL;
     $("#activity-type").textContent =
       ((activity?.type ?? cfg.presence.type) === 3 ? "WATCHING" : "PLAYING") +
       " CODEX RPC";
-    $("#pet").alt = `Codex Pet ${state}`;
+    $("#pet").alt = `Codex Pet ${visual}`;
     $("#live-status").textContent = s.enabled ? state : "paused";
     $("#live-action").textContent = activity?.details || "Presence paused";
     $("#live-model").textContent =
@@ -474,16 +513,17 @@ function field(label, key, type = "text", hint = "") {
   let input;
   if (type === "textarea") {
     input = document.createElement("textarea");
-  } else if (type === "activityType" || type === "statsStyle") {
+  } else if (type === "activityType" || type === "statsStyle" || type === "timerStyle") {
     input = document.createElement("select");
     const choices =
-      type === "activityType"
+      type === "timerStyle" ? [["operation", "Current operation"], ["session", "Whole session"]] : type === "activityType"
         ? [
             [3, "Watching"],
             [0, "Playing"],
           ]
         : [
-            ["chat", "Claude-style · chat output tokens (default)"],
+            ["telemetry", "Live files, diffs and operation timers (default)"],
+            ["chat", "Claude-style · chat output tokens"],
             ["cost", "Today / all-time cost"],
             ["tokens", "Model / output tokens"],
           ];
@@ -593,6 +633,7 @@ function settings() {
       ["Presence enabled", "enabled", "checkbox"],
       ["Activity type", "presence.type", "activityType"],
       ["Stats line", "presence.stats", "statsStyle"],
+      ["Elapsed timer", "presence.timer", "timerStyle"],
       [
         "Show conversation name",
         "presence.showTask",
@@ -600,16 +641,15 @@ function settings() {
         "Conversation names are shared only in public privacy mode.",
       ],
       ["Show lines added / removed", "presence.showChurn", "checkbox"],
-      [
-        "Buttons (up to two)",
-        "buttons",
-        "textarea",
-        '[{"label":"View GitHub","url":"https://github.com/you/repo"}]',
-      ],
+
     ],
     Discord: [["Application ID", "clientId", "text"]],
     "Codex Pet Assets": [
-      ["Working GIF URL / key", "assets.working"],
+      ["Writing GIF URL / key", "assets.writing"],
+      ["Patching GIF URL / key", "assets.patching"],
+      ["Error GIF URL / key", "assets.error"],
+      ["Success GIF URL / key", "assets.done"],
+      ["Legacy working GIF URL / key", "assets.working"],
       ["Thinking GIF URL / key", "assets.thinking"],
       ["Waiting GIF URL / key", "assets.waiting"],
       ["Idle GIF URL / key", "assets.idle"],
@@ -654,6 +694,11 @@ function settings() {
       "Ten pixel status badges: command, thinking, done, idle, approval, editing, reading, review, ready, error";
     gallery.className = "badge-gallery";
     content.append(gallery);
+    const preview = document.createElement("a");
+    preview.href = "/assets/pet/animation-gallery.html";
+    preview.target = "_blank"; preview.rel = "noopener";
+    preview.className = "text-button"; preview.textContent = "Preview animated pets and pixel badges ↗";
+    content.append(preview);
   }
   if (tab === "Stats") {
     const link = document.createElement("a");

@@ -14,6 +14,7 @@ import {
 } from "./store.js";
 import { LogWatcher } from "./log-watcher.js";
 import { pollChatGPT } from "./chatgpt-detector.js";
+import { PresenceScheduler } from "./presence-scheduler.js";
 export function rotateLog(message) {
   fs.mkdirSync(home(), { recursive: true, mode: 0o700 });
   try {
@@ -41,6 +42,10 @@ export function chatScanTrigger(previous = {}, state = {}) {
   return previous.sessionId !== state.sessionId || previous.source !== state.source ||
     (["working", "thinking"].includes(previous.status) && state.status === "waiting");
 }
+export function startScanner(run = fork) {
+  return run(fileURLToPath(new URL("./scanner.js", import.meta.url)), ["--live"],
+    { stdio: "ignore", windowsHide: true });
+}
 export async function runDaemon() {
   fs.mkdirSync(home(), { recursive: true, mode: 0o700 });
   const prior = readJSON("daemon.json");
@@ -63,17 +68,16 @@ export async function runDaemon() {
     connecting = false,
     attempt = 0,
     nextConnect = 0,
-    lastSend = 0,
     lastScan = 0,
     lastDetect = 0,
     observedChat = {},
     pendingChatScan = false,
     scanner = null,
     stopped = false,
-    lastPayload = "",
     lastClientId = "",
     tickBusy = false;
   const startedAt = Date.now();
+  const presence = new PresenceScheduler();
   writeJSON("daemon.json", {
     pid: process.pid,
     startedAt,
@@ -97,9 +101,10 @@ export async function runDaemon() {
         client = null;
         lastClientId = c.clientId;
         nextConnect = 0;
+        presence.reset();
       }
       if (!c.enabled) {
-        if (client?.ready) await client.setActivity(null).catch(() => {});
+        if (client?.ready) await presence.clear((payload) => client.setActivity(payload)).catch(() => {});
         client?.close();
         client = null;
         writeJSON("daemon.json", {
@@ -128,11 +133,7 @@ export async function runDaemon() {
         (now - lastScan >= c.timing.scanMs || (pendingChatScan && now - lastScan >= 10000))) {
         pendingChatScan = false;
         lastScan = now;
-        scanner = fork(
-          fileURLToPath(new URL("./scanner.js", import.meta.url)),
-          ["--live"],
-          { stdio: "ignore" },
-        );
+        scanner = startScanner();
         scanner.on("error", (e) => rotateLog(e.message));
         scanner.on("exit", () => {
           scanner = null;
@@ -146,7 +147,7 @@ export async function runDaemon() {
         try {
           await client.connect();
           attempt = 0;
-          lastPayload = "";
+          presence.reset();
           rotateLog("Discord connected");
         } catch (e) {
           nextConnect = Date.now() + backoff(attempt++);
@@ -158,17 +159,10 @@ export async function runDaemon() {
       if (stopped) return;
       const s = selectedState(c);
       if (now - (s.updatedAt || 0) > c.timing.idleMs) s.status = "idle";
-      const payload = buildActivity(s, readJSON("aggregate.json"), c),
-        encoded = JSON.stringify(payload);
-      if (
-        client?.ready &&
-        encoded !== lastPayload &&
-        now - lastSend >= Math.max(15000, c.timing.presenceMs)
-      ) {
-        lastSend = now;
-        await client.setActivity(payload);
-        lastPayload = encoded;
-      }
+      const payload = buildActivity(s, readJSON("aggregate.json"), c);
+      presence.setPolicy({ intervalMs: Math.max(15000, c.timing.presenceMs) });
+      presence.update(payload, JSON.stringify([s.source, s.sessionId, s.status, s.tool || null, payload?.assets?.large_image]));
+      if (client?.ready) await presence.flush((activity) => client.setActivity(activity));
       if (stopped) return;
       writeJSON("daemon.json", {
         ...readJSON("daemon.json"),
@@ -206,7 +200,7 @@ export async function runDaemon() {
     clearInterval(timer);
     watcher.close();
     scanner?.kill();
-    if (client?.ready) await client.setActivity(null).catch(() => {});
+    if (client?.ready) await presence.clear((payload) => client.setActivity(payload)).catch(() => {});
     client?.close();
     writeJSON("daemon.json", {
       pid: null,

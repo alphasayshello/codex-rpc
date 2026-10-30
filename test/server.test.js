@@ -44,7 +44,7 @@ test("dashboard serves APIs/assets, live SVG, settings CSRF protection and range
   assert.deepEqual(chat.files, {});
   assert.equal(chat.title, "Private conversation");
   const chatCard = await (await fetch(url + "/api/presence")).json();
-  assert.match(chatCard.state, /^Edit · 200 output tokens$/);
+  assert.match(chatCard.state, /^Editing files · o3 · 200 output tokens$/);
   assert.equal((await fetch(url + "/api/aggregate?range=oops")).status, 400);
   assert.equal(
     await new Promise((resolve, reject) => {
@@ -119,6 +119,10 @@ test("dashboard serves APIs/assets, live SVG, settings CSRF protection and range
     "/cards/tokens.svg",
   ])
     assert.equal((await fetch(url + route)).status, 200, route);
+  assert.equal((await fetch(url + "/api/recaps")).status, 200);
+  assert.deepEqual((await (await fetch(url + "/api/recaps")).json()).rows, []);
+  assert.equal((await fetch(url + "/assets/pet/codex-status-thinking.gif")).headers.get("content-type"), "image/gif");
+  assert.equal((await fetch(url + "/assets/pet/animation-gallery.html")).status, 200);
   assert.equal((await fetch(url + "/not-a-route")).status, 404);
   const controller = new AbortController();
   t.after(() => controller.abort());

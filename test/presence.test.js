@@ -140,7 +140,7 @@ test("Claude-style status frames count only selected-chat output tokens", (t) =>
   const now = 1700000010000;
   const state = { sessionId: "frames", source: "codex", project: "codex-rpc", model: "o4-mini", tool: "exec_command", file: "/workspace/src/index.js", tokens: 9999999 };
   const chat = { tokens: 9999999, input: 9977199, output: 22800, prompts: 6, toolCalls: 18, activeTools: [{ name: "exec_command", startedAt: now - 65000 }] };
-  const c = { ...config(), privacy: "public" };
+  const c = { ...config(), privacy: "public", presence: { ...config().presence, stats: "chat" } };
   const a = { totals: { tokens: 1e12 }, days: { [new Date().toISOString().slice(0, 10)]: { activeSeconds: 5400 } } };
   const expected = {
     working: ["Working in codex-rpc", "Bash · index.js · 1.1min · 22.8k output tokens"],

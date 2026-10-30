@@ -27,6 +27,7 @@
       <div class="sidebar-note"><span class="dot"></span> Live on your device<small>Codex &amp; ChatGPT Desktop</small></div>
       <div class="aside-bottom">
         <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><span id="theme-label">Light mode</span></button>
+        <button id="motion-toggle" class="theme-toggle" type="button" aria-pressed="false"><span aria-hidden="true">▦</span><span id="motion-label">Reduce motion</span></button>
         <a class="sidebar-card-link" href="/cards/stats.svg" target="_blank" rel="noopener">Your stats card <span aria-hidden="true">↗</span></a>
         <small>Local data. No telemetry.<br />codex-rpc <span class="version">0.2.0</span></small>
       </div>
@@ -60,7 +61,7 @@
           <article class="live panel">
             <div class="panel-label">
               <span class="dot"></span>
-              <span id="activity-type">WATCHING CODEX RPC</span>
+              <span class="pixel-signal" aria-hidden="true"><i></i><i></i><i></i></span><span id="activity-type">WATCHING CODEX RPC</span>
               <span id="live-status" class="pill">idle</span>
             </div>
             <div class="pet-live">
@@ -154,6 +155,10 @@
           <div class="chat-tool-row"><span>RUNNING NOW</span><div id="chat-active-tools" class="tool-chips">No tools running</div></div>
           <div class="chat-tool-row"><span>RECENT TOOLS</span><div id="chat-recent-tools" class="tool-chips">No tool activity recorded</div></div>
           <p id="chat-note" class="chat-note">Usage appears when local session logs report it. Reasoning is included in output.</p>
+          <div class="turn-recaps">
+            <div class="section-head"><h3 id="recaps-heading">Turn recaps</h3><span class="muted">This conversation · output only</span></div>
+            <ol id="turn-recaps" aria-labelledby="recaps-heading"><li class="timeline-empty">Finish a turn to see its recap.</li></ol>
+          </div>
           <div class="tool-timeline">
             <div class="section-head"><h3 id="timeline-heading">Tool timeline</h3><span id="timeline-summary" class="muted">Current conversation</span></div>
             <ol id="tool-timeline" aria-labelledby="timeline-heading"><li class="timeline-empty">No tools recorded for this conversation yet.</li></ol>

@@ -23,6 +23,7 @@ app
   .then(async () => {
     const { writeJSON, readJSON, config } = await import("../src/store.js"),
       { liveSessionFile } = await import("../src/live.js"),
+      { recapFile } = await import("../src/recaps.js"),
       { emptyStats, mergeStats, streaks } = await import("../src/scanner.js");
     const days = {},
       totals = emptyStats();
@@ -61,6 +62,7 @@ app
     writeJSON("config.json", {
       ...config(),
       privacy: "public",
+      presence: { ...config().presence, stats: "chat" },
       chatgpt: { enabled: false },
     });
     writeJSON("aggregate.json", {
@@ -123,6 +125,15 @@ app
       ],
     };
     writeJSON(liveSessionFile(secondId, "codex"), pinnedState);
+    const recap = (id, values) => ({ id: `${id}:turn-one`, sessionId: id, turnId: "turn-one", source: "codex", model: "o4-mini", startedAt: now - 25000, endedAt: now - 12500, outcome: "completed", outputTokens: 4500, reasoningTokens: 1000, toolCalls: 8, activeDurationMs: 10000, elapsedMs: 12500, linesAdded: null, linesRemoved: null, filesTouched: 1, files: ["src/recap-private.js"], ...values });
+    const mainRecaps = { schemaVersion: 1, sessionId, source: "codex", turns: [recap(sessionId)] };
+    const pinRecaps = { schemaVersion: 1, sessionId: secondId, source: "codex", turns: [
+      recap(secondId, { outputTokens: 900, toolCalls: 3, model: '<img src=x onerror="window.RECAP_XSS=true">' }),
+      recap(secondId, { id: `${secondId}:turn-two`, turnId: "turn-two", outcome: "aborted", outputTokens: 250, toolCalls: 1, elapsedMs: 6000, model: "o3", endedAt: now - 30000 }),
+      recap(secondId, { id: `${secondId}:turn-three`, turnId: "turn-three", outcome: "failed", outputTokens: null, reasoningTokens: null, toolCalls: 0, elapsedMs: 2000, model: "o3", endedAt: now - 45000 }),
+    ] };
+    writeJSON(recapFile(sessionId), mainRecaps);
+    writeJSON(recapFile(secondId), pinRecaps);
     const { serve } = await import("../src/server.js");
     dashboard = await serve(0);
     const errors = [];
@@ -152,9 +163,9 @@ app
       await js("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
       fs.writeFileSync(path.join(output, name), (await window.webContents.capturePage()).toPNG());
     };
-    const reload = async () => {
+    const reload = async (stable = true) => {
       await window.loadURL(`http://127.0.0.1:${dashboard.address().port}`);
-      await window.webContents.insertCSS("* { transition: none !important; animation: none !important; scroll-behavior: auto !important; }");
+      if (stable) await window.webContents.insertCSS("* { transition: none !important; animation: none !important; scroll-behavior: auto !important; }");
       await until(() => js("document.querySelector('#connection').textContent==='Live on this device'"));
     };
     const key = async (keyCode, modifiers = []) => {
@@ -163,6 +174,32 @@ app
       await js(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key:${JSON.stringify(keyCode)},shiftKey:${modifiers.includes("shift")},bubbles:true,cancelable:true}))`);
       await wait(50);
     };
+    await until(() => js("document.querySelector('#connection').textContent==='Live on this device'"));
+    if (await js("document.documentElement.dataset.motion==='reduced'")) await js("document.querySelector('#motion-toggle').click()");
+    await js("document.querySelector('#motion-toggle').focus()");
+    assert.equal(await js("document.activeElement.tagName"), "BUTTON");
+    await js("document.activeElement.click()");
+    assert.equal(await js("document.documentElement.dataset.motion"), "reduced");
+    assert.equal(await js("localStorage.getItem('codex-rpc-motion')"), "reduced");
+    await until(() => js("document.querySelector('#pet').getAttribute('src').endsWith('.svg') && document.querySelector('#status-badge').getAttribute('src').endsWith('.png')"));
+    assert.equal(await js("getComputedStyle(document.querySelector('.pixel-signal i')).animationName"), "none");
+    assert.equal(await js("getComputedStyle(document.querySelector('#settings-content')).animationName"), "none");
+    assert.equal(await js("document.querySelector('.pixel-signal').getAttribute('aria-hidden')"), "true");
+    await reload(false);
+    assert.equal(await js("document.documentElement.dataset.motion"), "reduced");
+    assert.equal(await js("document.querySelector('#motion-toggle').getAttribute('aria-pressed')"), "true");
+    await js("document.querySelector('#motion-toggle').click()");
+    await until(() => js("document.querySelector('#pet').getAttribute('src').endsWith('.gif') && document.querySelector('#status-badge').getAttribute('src').endsWith('.gif')"));
+    await reload(false);
+    assert.equal(await js("document.documentElement.dataset.motion"), "full");
+    assert.equal(await js("localStorage.getItem('codex-rpc-motion')"), "full");
+    await js("window.petSourceChanges=0;window.petObserver=new MutationObserver(records=>{window.petSourceChanges+=records.filter(r=>r.attributeName==='src').length});window.petObserver.observe(document.querySelector('#pet'),{attributes:true})");
+    writeJSON("daemon.json", { connected: true, updatedAt: Date.now() });
+    await until(() => js("document.querySelector('#daemon').textContent.includes('Discord connected')"));
+    writeJSON("daemon.json", { connected: false, updatedAt: Date.now() });
+    await until(() => js("document.querySelector('#daemon').textContent.includes('Discord offline')"));
+    assert.equal(await js("window.petSourceChanges"), 0);
+    await js("window.petObserver.disconnect()");
     // Hidden compositor animation clocks are not reliable; verify stable end
     // states while leaving native GIF animation untouched.
     await window.webContents.insertCSS("* { transition: none !important; animation: none !important; scroll-behavior: auto !important; }");
@@ -185,6 +222,8 @@ app
     assert.match(await js("document.querySelector('#chat-context-label').textContent"), /12\.0%/);
     assert.match(await js("document.querySelector('#chat-active-tools').textContent"), /exec_command/);
     assert.match(await js("document.querySelector('#chat-recent-tools').textContent"), /apply_patch.*read_file/);
+    assert.match(await js("document.querySelector('#turn-recaps').textContent"), /4\.5K output tokens.*8 tools.*12\.5s.*completed/);
+    assert.ok(!(await js("document.querySelector('#turn-recaps').textContent")).includes("120K"));
     // Choosing a conversation is a draft. Only the explicit button changes
     // shared Discord selection, and a newer event must not steal that pin.
     const secondKey = JSON.stringify(["codex", secondId]);
@@ -197,6 +236,23 @@ app
     await until(() => readJSON("selection.json").sessionId === secondId);
     await until(() => js("document.querySelector('#chat-tokens').textContent==='8.8K'"));
     assert.equal(await js("document.querySelector('#chat-heading').textContent"), pinnedState.task);
+    await until(() => js("document.querySelector('#turn-recaps').textContent.includes('900 output tokens')"));
+    assert.ok(!(await js("document.querySelector('#turn-recaps').textContent")).includes("4.5K"));
+    assert.match(await js("document.querySelector('#turn-recaps').textContent"), /Output not reported/);
+    assert.equal(await js("document.querySelector('#turn-recaps img')===null && !window.RECAP_XSS"), true);
+    assert.match(await js("document.querySelector('#turn-recaps').textContent"), /<img src=x/);
+    pinRecaps.turns[0].model = "o3";
+    writeJSON(recapFile(secondId), pinRecaps);
+    writeJSON("state.json", { ...state, updatedAt: Date.now() });
+    await until(() => js("!document.querySelector('#turn-recaps').textContent.includes('<img')"));
+    writeJSON(recapFile(secondId), { ...pinRecaps, turns: [] });
+    writeJSON("state.json", { ...state, updatedAt: Date.now() });
+    await until(() => js("document.querySelector('#turn-recaps').textContent.includes('Finish a turn')"));
+    fs.rmSync(path.join(process.env.CODEX_RPC_HOME, recapFile(secondId)));
+    assert.equal(await js("fetch('/api/recaps').then(r=>r.json()).then(data=>data.rows.length)"), 0);
+    writeJSON(recapFile(secondId), pinRecaps);
+    writeJSON("state.json", { ...state, updatedAt: Date.now() });
+    await until(() => js("document.querySelectorAll('#turn-recaps .recap-row').length===3"));
     assert.ok((await js("fetch('/api/presence').then(r=>r.json()).then(a=>a.details)")).includes(pinnedState.task));
     await until(() => js("document.querySelectorAll('#tool-timeline .timeline-row').length===3"));
     assert.match(await js("document.querySelector('#tool-timeline').textContent"), /Completed.*exit 0/);
@@ -214,16 +270,22 @@ app
     assert.equal(await js("document.querySelector('#chat-tokens').textContent"), "8.8K");
     await js("document.querySelector('.tool-timeline').scrollIntoView({block:'center'})");
     await capture("timeline.png");
+    await js("document.querySelector('.turn-recaps').scrollIntoView({block:'center'})");
+    await capture("recaps.png");
     window.setSize(430, 1050);
     await wait(100);
     await js("document.querySelector('.tool-timeline').scrollIntoView({block:'center'})");
     assert.equal(await js("document.documentElement.scrollWidth <= innerWidth"), true);
     await capture("timeline-mobile.png");
+    await js("document.querySelector('.turn-recaps').scrollIntoView({block:'center'})");
+    assert.equal(await js("document.documentElement.scrollWidth <= innerWidth"), true);
+    await capture("recaps-mobile.png");
     window.setSize(1440, 1100);
     writeJSON("config.json", { ...config(), privacy: "private" });
     await until(() => js("document.querySelector('#chat-heading').textContent==='Private conversation'"));
     await until(() => js("!document.querySelector('#tool-timeline').textContent.includes('src/completed.js')"));
     assert.equal(await js("fetch('/api/timeline').then(r=>r.json()).then(t=>t.rows.every(row=>!('file' in row)&&!('arguments' in row)&&!('output' in row)))"), true);
+    assert.equal(await js("fetch('/api/recaps').then(r=>r.json()).then(t=>t.rows.every(row=>row.files===null))"), true);
     writeJSON("config.json", { ...config(), privacy: "public" });
     await until(() => js("document.querySelector('#chat-heading').textContent==='Verify pinned conversation'"));
     await js("document.querySelector('#unpin-chat').click()");
@@ -384,9 +446,89 @@ app
     await wait(100);
     assert.equal(await js("document.documentElement.scrollWidth <= innerWidth"), true);
     await capture("chat-mobile.png");
+    // Exercise the new default through real hooks in the disposable home;
+    // earlier assertions deliberately retain the legacy chat-card fixture.
+    const { applyEvent } = await import("../src/hook.js");
+    const workspace = path.join(temp, "telemetry-workspace");
+    fs.mkdirSync(workspace);
+    require("node:child_process").execFileSync("git", ["init", "-q", "-b", "feature/telemetry-private"], { cwd: workspace });
+    const telemetryId = "render-telemetry-chat", telemetryEpoch = Date.now();
+    const emit = (type, extra = {}, ago = 0) => applyEvent({ type, sessionId: telemetryId, model: "o3", cwd: workspace, timestamp: telemetryEpoch - ago, ...extra });
+    writeJSON("config.json", { ...config(), enabled: true, privacy: "public", presence: { ...config().presence, stats: "telemetry", timer: "operation" }, buttons: [{ label: "Ignored button", url: "https://example.com" }] });
+    emit("turn-start", {}, 20000);
+    const thinkingBefore = readJSON("state.json").thinkingStartedAt;
+    emit("token_count", { payload: { type: "token_count", info: { total_token_usage: { input_tokens: 90000, output_tokens: 7200, reasoning_output_tokens: 1200 } } } }, 19000);
+    assert.equal(readJSON("state.json").thinkingStartedAt, thinkingBefore);
+    window.setSize(1440, 1100);
+    await reload();
+    await until(() => js("document.querySelector('#live-action').textContent.startsWith('Pondering solution...')"));
+    assert.equal(await js("fetch('/api/presence').then(r=>r.json()).then(a=>a.timestamps.start)"), Math.floor(thinkingBefore / 1000));
+    assert.equal(await js("fetch('/api/presence').then(r=>r.json()).then(a=>'buttons' in a)"), false);
+    assert.equal(await js("document.querySelector('[data-key=\"presence.stats\"]').value"), "telemetry");
+    assert.equal(await js("document.querySelector('[data-key=\"presence.timer\"]').value"), "operation");
+    const patch = "*** Begin Patch\n*** Update File: src/telemetry-client.js\n@@\n-TELEMETRY_SECRET_BODY\n+replacement\n+extra\n*** Add File: src/telemetry-helper.js\n+helper\n*** End Patch";
+    emit("function_call", { callId: "telemetry-patch", tool: "apply_patch", payload: { type: "function_call", name: "apply_patch", call_id: "telemetry-patch", arguments: JSON.stringify({ patch }) } }, 15000);
+    await until(() => js("document.querySelector('#live-model').textContent.includes('(+3 / -1)')"));
+    assert.match(await js("document.querySelector('#live-action').textContent"), /Writing code across 2 files/);
+    const stateAPI = await js("fetch('/api/state').then(r=>r.json())");
+    assert.equal(stateAPI.visualState, "patching");
+    assert.equal(stateAPI.currentFileCount, 2);
+    assert.equal(stateAPI.linesAdded, 3);
+    assert.equal(stateAPI.linesRemoved, 1);
+    assert.ok(!JSON.stringify(stateAPI).includes("TELEMETRY_SECRET_BODY"));
+    assert.equal(await js("document.querySelector('#pet').getAttribute('src')"), "/assets/pet/codex-pet-patching.gif");
+    for (const timer of ["session", "operation"]) {
+      await js(`(()=>{const field=document.querySelector('[data-key="presence.timer"]');field.value=${JSON.stringify(timer)};field.dispatchEvent(new Event('change'));document.querySelector('#settings-form').requestSubmit()})()`);
+      await until(() => config().presence.timer === timer);
+      const expected = timer === "session" ? readJSON("state.json").startedAt : readJSON("state.json").operationStartedAt;
+      assert.equal(await js("fetch('/api/presence').then(r=>r.json()).then(a=>a.timestamps.start)"), Math.floor(expected / 1000));
+    }
+    await js("document.querySelector('#settings-tab-2').click()");
+    await js("(()=>{const field=document.querySelector('[data-key=\"assets.patching\"]');field.value='anim_patch_large';field.dispatchEvent(new Event('change'));document.querySelector('#settings-form').requestSubmit()})()");
+    await until(() => config().assets.patching === "anim_patch_large");
+    assert.equal(await js("fetch('/api/presence').then(r=>r.json()).then(a=>a.assets.large_image)"), "anim_patch_large");
+    assert.equal(await js("document.querySelector('#pet').getAttribute('src')"), "/assets/pet/codex-pet-patching.gif");
+    await js("scrollTo({top:0,behavior:'instant'})");
+    await capture("telemetry.png");
+    window.setSize(430, 1050);
+    await js("scrollTo({top:0,behavior:'instant'})");
+    assert.equal(await js("document.documentElement.scrollWidth<=innerWidth"), true);
+    await capture("telemetry-mobile.png");
+    window.setSize(1440, 1100);
+    writeJSON("config.json", { ...config(), privacy: "private" });
+    await until(() => js("!document.querySelector('#live-model').textContent.includes('telemetry-client.js')"));
+    const privatePatch = await js("Promise.all(['/api/state','/api/chat','/api/presence','/api/timeline'].map(url=>fetch(url).then(r=>r.json())))");
+    assert.ok(!JSON.stringify(privatePatch).includes("telemetry-client.js"));
+    assert.ok(!JSON.stringify(privatePatch).includes("telemetry-helper.js"));
+    assert.ok(!JSON.stringify(privatePatch).includes("feature/telemetry-private"));
+    emit("function_call_output", { callId: "telemetry-patch", payload: { type: "function_call_output", call_id: "telemetry-patch", output: "SECRET PATCH OUTPUT" } }, 14000);
+    writeJSON("config.json", { ...config(), privacy: "public" });
+    emit("function_call", { callId: "telemetry-shell", tool: "exec_command", payload: { type: "function_call", name: "exec_command", call_id: "telemetry-shell", arguments: JSON.stringify({ cmd: "API_TOKEN=TELEMETRY_SECRET_TOKEN npm test --token=TELEMETRY_SECRET_TOKEN /private/operand" }) } }, 10000);
+    await until(() => js("document.querySelector('#live-model').textContent.includes('Running: npm test')"));
+    assert.equal(readJSON("state.json").commandSummary, "npm test");
+    assert.ok(!JSON.stringify(readJSON("state.json")).includes("TELEMETRY_SECRET_TOKEN"));
+    writeJSON("config.json", { ...config(), privacy: "private" });
+    await until(() => js("!document.querySelector('#live-model').textContent.includes('npm test')"));
+    assert.ok(!JSON.stringify(await js("Promise.all(['/api/state','/api/presence'].map(url=>fetch(url).then(r=>r.json())))")).includes("npm test"));
+    writeJSON("config.json", { ...config(), privacy: "public" });
+    const stages = [["idle", "idle"], ["thinking", "thinking"], ["writing", "writing"], ["patching", "patching"], ["error", "error"], ["success", "done"]];
+    for (const reduced of [false, true]) {
+      if (await js("document.documentElement.dataset.motion==='reduced'") !== reduced) await js("document.querySelector('#motion-toggle').click()");
+      for (let i = 0; i < stages.length; i++) {
+        const [type, visual] = stages[i];
+        emit(type, {}, 8000 - i * 500 - (reduced ? 3500 : 0));
+        const route = `/assets/pet/codex-pet-${visual}.${reduced ? "svg" : "gif"}`;
+        await until(() => js(`document.querySelector('#pet').getAttribute('src')===${JSON.stringify(route)}`));
+        assert.equal(await js("fetch('/api/state').then(r=>r.json()).then(s=>s.visualState)"), visual);
+        assert.equal(await js(`fetch(${JSON.stringify(route)}).then(r=>r.status)`), 200);
+      }
+    }
+    writeJSON("state.json", { ...readJSON("state.json"), eventTime: Date.now() - 20000, updatedAt: Date.now() });
+    await until(() => js("document.querySelector('#pet').getAttribute('src')==='/assets/pet/codex-pet-idle.svg'"));
+    assert.equal(await js("fetch('/api/state').then(r=>r.json()).then(s=>s.visualState)"), "idle");
     assert.deepEqual(errors, []);
     console.log(
-      "Verified explicit pin/unpin, pin persistence and isolation from newer chats, safe live tool timeline/status/exit codes/durations, timeline privacy, dark/light theme persistence, keyboard/mobile navigation, desktop sidebar persistence, responsive layout, per-chat metrics/tools/context, chat-mode persistence, 7 tabs, settings save, range isolation, heatmap, SSE, privacy and pause. Screenshots in docs/.",
+      "Verified actual-hook file/diff/command telemetry, stable thinking and operation/session timers, six GIF/SVG visual states, asset keys, privacy and button suppression; output-only recaps, motion persistence, stable mascot across SSE, pin isolation, safe timeline, themes, keyboard/mobile navigation, responsive layout, settings, heatmap and pause. Screenshots in docs/.",
     );
   })
   .catch((e) => {
