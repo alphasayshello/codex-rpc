@@ -128,7 +128,9 @@ test("Windows SEA startup selects installed executable and preserves script disp
   assert.deepEqual(argvWindows(psValue(script, "$start.Arguments")), [path.join(home(), "runtime/bin/codex-rpc.js"), "daemon"]);
 });
 
-test("native Windows detector options launch PowerShell without a visible console", { skip: process.platform !== "win32", timeout: 20000 }, async () => {
+test("native Windows detector options launch PowerShell without a visible console", { skip: process.platform !== "win32", timeout: 60000 }, async () => {
+  // Cold Add-Type compilation can exceed 15s on a busy hosted runner. This
+  // longer probe budget does not change production polling or visibility flags.
   const script = `Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -139,7 +141,7 @@ public static class CodexRpcConsoleProbe {
 '@
 $handle = [CodexRpcConsoleProbe]::GetConsoleWindow()
 [pscustomobject]@{ handle = $handle.ToInt64(); visible = [CodexRpcConsoleProbe]::IsWindowVisible($handle) } | ConvertTo-Json -Compress`;
-  const { stdout } = await promisify(execFile)("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], backgroundExecOptions(15000));
+  const { stdout } = await promisify(execFile)("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], backgroundExecOptions(45000));
   const probe = JSON.parse(stdout.trim());
   assert.equal(typeof probe.handle, "number");
   assert.equal(probe.visible, false);
