@@ -7,6 +7,7 @@ export const commands = [
   "setup",
   "start",
   "status",
+  "chat",
   "usage",
   "insights",
   "preview",
@@ -38,8 +39,31 @@ export function completion(shell) {
     return `Register-ArgumentCompleter -Native -CommandName codex-rpc -ScriptBlock { param($wordToComplete) '${words}'.Split(' ') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_,$_,'ParameterValue',$_) } }\n`;
   throw Error("Shell must be bash, zsh, fish, or powershell");
 }
+export function defaultShell(
+  platform = process.platform,
+  shell = process.env.SHELL,
+) {
+  if (!shell) return platform === "win32" ? "powershell" : "bash";
+  const name = (platform === "win32" ? path.win32 : path)
+    .basename(shell)
+    .replace(/\.exe$/i, "");
+  return name === "pwsh" ? "powershell" : name;
+}
+export function completionSource(shell, target, platform = process.platform) {
+  // Shells on Windows accept forward slashes; backslashes inside fish single
+  // quotes can otherwise change the path (notably a backslash before a quote).
+  if (platform === "win32" && shell !== "powershell")
+    target = target.replaceAll("\\", "/");
+  const quote =
+    shell === "powershell"
+      ? "'" + target.replaceAll("'", "''") + "'"
+      : shell === "fish"
+        ? "'" + target.replaceAll("'", "\\'") + "'"
+        : "'" + target.replaceAll("'", "'\\''") + "'";
+  return (shell === "powershell" ? ". " : "source ") + quote;
+}
 export function installCompletion(shell) {
-  shell ||= path.basename(process.env.SHELL || "bash");
+  shell ||= defaultShell();
   const text = completion(shell),
     dir = path.join(home(), "completions");
   fs.mkdirSync(dir, { recursive: true });
@@ -77,16 +101,10 @@ export function installCompletion(shell) {
           ? ".zshrc"
           : ".bashrc",
     );
-  const quote =
-    shell === "powershell"
-      ? "'" + target.replaceAll("'", "''") + "'"
-      : shell === "fish"
-        ? "'" + target.replaceAll("'", "\\'") + "'"
-        : "'" + target.replaceAll("'", "'\\''") + "'";
-  const line = (shell === "powershell" ? ". " : "source ") + quote;
+  const line = completionSource(shell, target);
   const old = fs.existsSync(profile) ? fs.readFileSync(profile, "utf8") : "";
   const clean = old.replace(
-    /\n?# codex-rpc completion begin\n[\s\S]*?# codex-rpc completion end\n?/g,
+    /\r?\n?# codex-rpc completion begin\r?\n[\s\S]*?# codex-rpc completion end\r?\n?/g,
     "",
   );
   fs.mkdirSync(path.dirname(profile), { recursive: true });
@@ -109,7 +127,7 @@ export function uninstallCompletions() {
         fs
           .readFileSync(profile, "utf8")
           .replace(
-            /\n?# codex-rpc completion begin\n[\s\S]*?# codex-rpc completion end\n?/g,
+            /\r?\n?# codex-rpc completion begin\r?\n[\s\S]*?# codex-rpc completion end\r?\n?/g,
             "",
           ),
       );

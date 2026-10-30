@@ -30,11 +30,13 @@ export async function doctor() {
       client.close();
     }
   }
-  let valid = true;
+  let valid = true,
+    configHint = "";
   try {
     validateConfig(c);
-  } catch {
+  } catch (error) {
     valid = false;
+    configHint = error.message;
   }
   return [
     [
@@ -61,8 +63,8 @@ export async function doctor() {
     ],
     [
       "Privacy/config",
-      valid && c.privacy === "private",
-      'Set privacy: "private" to redact project and file names',
+      valid,
+      configHint,
     ],
   ].map(([name, ok, hint]) => ({ name, ok, hint: ok ? "OK" : hint }));
 }

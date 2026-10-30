@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 import {
   home,
   defaults,
@@ -37,26 +38,29 @@ const runtimeExecutable = () =>
     : process.execPath;
 const cli = () => path.join(home(), "runtime/bin/codex-rpc.js");
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+const hookBlock = /^# codex-rpc notify begin\r?\n[\s\S]*?^# codex-rpc notify end\r?\n?/gm;
 export function registerHook() {
   fs.mkdirSync(codexHome(), { recursive: true, mode: 0o700 });
   const target = path.join(codexHome(), "config.toml");
   let text = fs.existsSync(target) ? fs.readFileSync(target, "utf8") : "";
   const line = `notify = ${JSON.stringify([runtimeExecutable(), cli(), "hook"])}`;
-  const top = text.split(/^\s*\[/m)[0];
-  if (/^\s*notify\s*=/m.test(top) && !top.includes("codex-rpc"))
+  const clean = text.replace(hookBlock, "");
+  const top = clean.split(/^\s*\[/m)[0];
+  if (/^\s*notify\s*=/m.test(top))
     throw Error(
       "Existing Codex notify is preserved. Chain codex-rpc hook yourself or use codex-rpc run -- <args>.",
     );
   if (!fs.existsSync(file("codex-config.backup.toml")))
     fs.writeFileSync(file("codex-config.backup.toml"), text, { mode: 0o600 });
-  text = text.replace(
-    /^# codex-rpc notify begin\n[\s\S]*?^# codex-rpc notify end\n?/m,
-    "",
-  );
+  text = clean;
   const block = `# codex-rpc notify begin\n${line}\n# codex-rpc notify end\n`;
-  const temp = target + ".codex-rpc.tmp";
-  fs.writeFileSync(temp, block + text, { mode: 0o600 });
-  replaceFile(temp, target);
+  const temp = target + `.codex-rpc.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(temp, block + text, { mode: 0o600 });
+    replaceFile(temp, target);
+  } finally {
+    fs.rmSync(temp, { force: true });
+  }
   return line;
 }
 export function unregisterHook() {
@@ -64,10 +68,7 @@ export function unregisterHook() {
   if (fs.existsSync(target)) {
     const text = fs
       .readFileSync(target, "utf8")
-      .replace(
-        /^# codex-rpc notify begin\n[\s\S]*?^# codex-rpc notify end\n?/m,
-        "",
-      );
+      .replace(hookBlock, "");
     fs.writeFileSync(target, text, { mode: 0o600 });
   }
 }
@@ -99,21 +100,34 @@ export function serviceDefinition(platform = process.platform) {
   }
   throw Error("Unsupported service platform");
 }
-export function installService() {
-  const d = serviceDefinition();
+export function installService({
+  platform = process.platform,
+  definition = serviceDefinition(platform),
+  run = execFileSync,
+  uid = process.getuid?.() ?? 0,
+} = {}) {
+  const d = definition;
   fs.mkdirSync(path.dirname(d.path), { recursive: true });
   fs.writeFileSync(d.path, d.content, { mode: 0o600 });
   let warning;
   try {
-    if (process.platform === "darwin")
-      execFileSync(
+    if (platform === "darwin") {
+      // Refresh an already loaded agent, whose cached arguments/environment
+      // otherwise survive a setup upgrade. Missing agents are harmless.
+      try {
+        run("launchctl", ["bootout", `gui/${uid}/dev.codex-rpc`], {
+          stdio: "pipe",
+        });
+      } catch {}
+      run(
         "launchctl",
-        ["bootstrap", `gui/${process.getuid()}`, d.path],
+        ["bootstrap", `gui/${uid}`, d.path],
         { stdio: "pipe" },
       );
-    if (process.platform === "linux") {
-      execFileSync("systemctl", ["--user", "daemon-reload"], { stdio: "pipe" });
-      execFileSync("systemctl", ["--user", "enable", "codex-rpc.service"], {
+    }
+    if (platform === "linux") {
+      run("systemctl", ["--user", "daemon-reload"], { stdio: "pipe" });
+      run("systemctl", ["--user", "enable", "codex-rpc.service"], {
         stdio: "pipe",
       });
     }
