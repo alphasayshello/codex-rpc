@@ -19,7 +19,7 @@ const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const npmCLI = process.env.npm_execpath;
 if (process.platform === "win32" && !npmCLI) throw Error("Run through npm run release:prepare on Windows");
 const packed = JSON.parse(execFileSync(npmCLI ? process.execPath : npm, [...(npmCLI ? [npmCLI] : []), "pack", "--json", "--pack-destination", directory], { encoding: "utf8" }))[0];
-for (const required of [...animationCatalog.flatMap(({ id }) => [`assets/pet/codex-pet-${id}.gif`, `assets/pet/codex-pet-${id}.svg`]), "assets/pet/animation-gallery.js", "assets/pet/animation-catalog.json", "src/selection.js", "src/timeline.js", "src/watcher.js", "src/config.js", "src/presence-scheduler.js", "src/recaps.js", "bin/codex-rpc.js", "assets/pet/codex-pet-writing.gif", "assets/pet/codex-pet-patching.gif", "assets/pet/codex-pet-error.gif", "assets/pet/codex-pet-done.gif"]) {
+for (const required of [...animationCatalog.flatMap(({ id }) => [`assets/pet/codex-pet-${id}.gif`, `assets/pet/codex-pet-${id}.svg`]), "assets/pet/animation-gallery.js", "assets/pet/animation-catalog.json", "src/hooks-config.js", "src/native-events.js", "src/event-queue.js", "docs/HOOKS.md", "src/selection.js", "src/timeline.js", "src/watcher.js", "src/config.js", "src/presence-scheduler.js", "src/recaps.js", "bin/codex-rpc.js", "assets/pet/codex-pet-writing.gif", "assets/pet/codex-pet-patching.gif", "assets/pet/codex-pet-error.gif", "assets/pet/codex-pet-done.gif"]) {
   if (!packed.files.some((entry) => entry.path === required)) throw Error(`Missing package file: ${required}`);
 }
 // Stable filename keeps GitHub /releases/latest/download links evergreen.

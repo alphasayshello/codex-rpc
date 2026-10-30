@@ -68,3 +68,11 @@ On 2026-10-30, the full suite passed on Node 18 and 26: 148 tests total, 147 pas
 
 
 Pet Studio's custom-character prompt is generated locally from an editable brief. Format tests compare the requested sheet geometry and seven sampled anchor cells with the actual generator and source PNG, and verify the fixed typing region. The prompt explicitly distinguishes a source sheet from the 19 runtime GIF scenes and explains manual rig validation. The downloadable layout reference is checked as a real 1536 × 1872 PNG. Browser checks cover brief editing, literal special characters, copy/reset, dimensions and responsive layout; no prompt is sent to a remote service by the studio.
+
+## Native hook release checks
+
+The 0.3.0 native-hook update passed the full local suite: 179 tests, 177 passing and two native-Windows-only checks skipped on macOS. The prior complete suite passed on Node 18; the final changed hook/queue/recap tests passed again on Node 18. Browser verification passed unchanged with zero JavaScript errors. Generated configuration was loaded by the installed Codex 0.166.0 CLI in a disposable home; it accepted the TOML, reported hooks stable/true, and preserved the custom notifier, existing inline hooks and external hooks.json. No model request or trust bypass was used for that check.
+
+Native fixtures cover all ten callbacks, exact Stop JSON, pretty JSON/JSONL and CLI argument/stdin handling, disabled collection, private inbox metadata, malformed/oversized input and fail-open observation errors. Three rounds of 32 concurrent timestamp-free native CLI callbacks retained all 32 invocations each. Queue tests cover contention, abandoned leases, malformed records and retryable state-write errors. Stale records cannot rewind the visible chat or timers; late tools from an older turn cannot inflate the next turn's recap. Parsed multi-file metadata and confirmed line changes deduplicate across native hooks and logs.
+
+The platform matrix also executes a real Windows encoded-PowerShell-to-Node stdin probe and the existing hidden-console probe. Native release builds test their own executable version on macOS, Linux and Windows. See the verify and release-build runs for tag v0.3.0 for the remote platform evidence; macOS-only checks do not certify fresh Windows login behavior.

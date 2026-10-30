@@ -4,6 +4,11 @@ More expressive Discord presence, smoother pixel animation, and a Pet studio for
 
 ## New
 
+- **Native Codex lifecycle hooks.** Setup registers 10 observational callbacks for session/turn boundaries, tools, approvals, interruption and compaction while preserving existing notifiers and hooks. Review and trust them through `/hooks` in Codex. `codex-rpc hooks [--json]` reports registration and review guidance.
+- **Reliable concurrent events.** A local metadata inbox serializes hook and log updates. Call IDs deduplicate observations; late usage can refresh a chat without rewinding its activity.
+- **More accurate turn recaps.** Multiple files and parsed line changes are counted per invocation. Failed/unknown edits keep applied-line counts unknown; identified late usage can refine a completed recap.
+- **Installed hook fix.** The CLI correctly passes argument or stdin payloads to the hook handler, including pretty-printed native JSON and the required empty JSON response for Stop.
+
 - **19 distinct scenes.** The seven existing live scenes are joined by reading, searching, terminal, testing, building, installing, reviewing, debugging, connecting, focus, celebrating and cozy idle. The legacy working GIF remains a writing alias.
 - **20 fps loops.** Periodic movement replaces abrupt position changes. Each scene keeps one consistent original expression, with crisp pixel props and transparent backgrounds. Every GIF stays under 1 MB.
 - **Real typing paws.** Alternating presses have intermediate positions at 50 ms intervals. The head, body, feet and laptop stay fixed.
@@ -24,7 +29,7 @@ codex-rpc setup
 codex-rpc serve
 ```
 
-Open **http://localhost:47474**, then **Pet studio**. Setup refreshes the installed runtime and owned asset URLs while preserving analytics, privacy preferences and custom hosts. Make sure the matching source assets have been pushed before activating the new defaults.
+After setup, open **`/hooks` in Codex** and review/trust the new codex-rpc handlers. Setup does not bypass hook trust. Open **http://localhost:47474**, then **Pet studio**. Setup refreshes the installed runtime and owned asset URLs while preserving analytics, privacy preferences and custom hosts. Make sure the matching source assets have been pushed before activating the new defaults.
 
 This is a GitHub-only release. The unscoped npm name belongs to another project; use the GitHub archive above.
 
