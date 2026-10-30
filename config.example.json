@@ -1,0 +1,25 @@
+{
+  "enabled": true,
+  "privacy": "private",
+  "clientId": "",
+  "buttons": [],
+  "assets": {
+    "working": "",
+    "thinking": "",
+    "waiting": "",
+    "idle": "",
+    "badge": ""
+  },
+  "timing": {
+    "idleMs": 300000,
+    "pollMs": 2000,
+    "scanMs": 60000,
+    "presenceMs": 15000
+  },
+  "chatgpt": {
+    "enabled": true
+  },
+  "stats": {
+    "enabled": true
+  }
+}

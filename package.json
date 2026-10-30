@@ -1,0 +1,39 @@
+{
+  "name": "codex-rpc",
+  "version": "0.1.0",
+  "description": "Local Discord presence and lifetime analytics for Codex and ChatGPT Desktop",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "codex-rpc": "bin/codex-rpc.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "web",
+    "assets",
+    "electron",
+    "scripts",
+    "README.md",
+    "SECURITY.md",
+    "VERSIONING.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "assets": "node src/assets/generate-pet-gifs.js",
+    "start": "node bin/codex-rpc.js serve",
+    "build:sea": "node scripts/build-sea.js",
+    "check": "node scripts/check.js"
+  },
+  "keywords": [
+    "codex",
+    "discord",
+    "rpc",
+    "analytics",
+    "chatgpt"
+  ]
+}
