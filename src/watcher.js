@@ -39,31 +39,98 @@ export function patchTelemetry(patch) {
     const safe = safeFilePath(value);
     if (safe && !safeFiles.includes(safe) && safeFiles.length < 32) safeFiles.push(safe);
   };
-  let recognized = false, section = false, mode = "", hunk = false, deletedUnknown = false, added = 0, removed = 0;
-  for (const line of patch.split(/\r?\n/)) {
-    const header = line.match(/^\*\*\* (Add File|Update File|Delete File|Move to): (.+)$/);
-    if (header) {
-      recognized = section = true;
-      mode = "apply";
-      addFile(header[2]);
-      if (header[1] === "Delete File") deletedUnknown = true;
-      continue;
+  const rawLines = patch.split(/\r?\n/);
+  let first = 0, last = rawLines.length;
+  while (first < last && rawLines[first] === "") first++;
+  while (last > first && rawLines[last - 1] === "") last--;
+  const lines = rawLines.slice(first, last);
+  let added = 0, removed = 0, valid = true, deletedUnknown = false;
+  const metadata = () => safeFiles.length ? { safeFiles } : {};
+  if (lines.some((line) => /^\*\*\* (?:Begin Patch|End Patch|Add File:|Update File:|Delete File:|Move to:)/.test(line))) {
+    // Recognizable paths survive partial input, but totals require a complete
+    // envelope and valid contents for every operation in the patch.
+    let section, sections = 0;
+    const finish = () => {
+      if (!section) return;
+      if (section.kind === "Update File" && !section.body && !(section.moved && !section.hunk)) valid = false;
+      if (section.kind === "Add File" && !section.body) valid = false;
+    };
+    if (lines[0] !== "*** Begin Patch" || lines.at(-1) !== "*** End Patch") valid = false;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i], header = /^\*\*\* (Add File|Update File|Delete File|Move to): (.+)$/.exec(line);
+      if (header) {
+        addFile(header[2]);
+        if (header[1] === "Move to") {
+          if (section?.kind !== "Update File" || section.moved || section.body || section.hunk) valid = false;
+          if (section) section.moved = true;
+        } else {
+          finish(); sections++;
+          section = { kind: header[1], body: false, hunk: false };
+          if (header[1] === "Delete File") deletedUnknown = true;
+        }
+        continue;
+      }
+      if (line === "*** Begin Patch") { if (i !== 0) valid = false; continue; }
+      if (line === "*** End Patch") { if (i !== lines.length - 1) valid = false; continue; }
+      if (!section) { valid = false; continue; }
+      if (/^@@(?: |$)/.test(line) && section.kind === "Update File") { section.hunk = true; continue; }
+      if (line === "*** End of File" && section.kind === "Update File" && section.body) continue;
+      if (section.kind === "Delete File") { valid = false; continue; }
+      if (line.startsWith("+")) { added++; section.body = true; }
+      else if (line.startsWith("-") && section.kind === "Update File") { removed++; section.body = true; }
+      else if (line.startsWith(" ") && section.kind === "Update File") section.body = true;
+      else valid = false;
     }
-    if (/^diff --git /.test(line)) { recognized = true; section = false; mode = "unified"; hunk = false; continue; }
-    const unified = line.match(/^(?:---|\+\+\+) (.+?)(?:\t.*)?$/);
-    if (unified && mode !== "apply" && !hunk) {
-      recognized = section = true;
-      mode = "unified";
-      if (unified[1] !== "/dev/null") addFile(unified[1].replace(/^[ab]\//, ""));
-      continue;
+    finish();
+    if (!sections || !valid) return metadata();
+  } else {
+    // Unified hunks declare old/new line counts. Verify both before exposing
+    // any counters, including zero: truncated and binary diffs stay unknown.
+    let oldHeader = false, newHeader = false, section = false, sectionHunks = 0, hunk, totalHunks = 0;
+    const complete = () => hunk && hunk.old === hunk.expectedOld && hunk.next === hunk.expectedNew;
+    const finishHunk = () => { if (hunk && !complete()) valid = false; hunk = null; };
+    const finishSection = () => {
+      finishHunk();
+      if (section && (!oldHeader || !newHeader || !sectionHunks)) valid = false;
+      oldHeader = newHeader = section = false; sectionHunks = 0;
+    };
+    for (const line of lines) {
+      const diff = /^diff --git a\/(.+) b\/(.+)$/.exec(line);
+      if (diff) { finishSection(); section = true; addFile(diff[1]); addFile(diff[2]); continue; }
+      if (/^(?:Binary files .* differ|GIT binary patch)/.test(line)) { valid = false; continue; }
+      const header = /^(---|\+\+\+) (.+?)(?:\t.*)?$/.exec(line);
+      if (header && (!hunk || complete())) {
+        finishHunk();
+        if (header[1] === "---") {
+          if (newHeader) finishSection();
+          if (oldHeader) valid = false;
+          oldHeader = true; section = true;
+        } else { if (!oldHeader || newHeader) valid = false; newHeader = true; section = true; }
+        if (header[2] !== "/dev/null") addFile(header[2].replace(/^[ab]\//, ""));
+        continue;
+      }
+      if (line.startsWith("@@")) {
+        finishHunk();
+        const match = /^@@ -([0-9]+)(?:,([0-9]+))? \+([0-9]+)(?:,([0-9]+))? @@(?:.*)$/.exec(line);
+        if (!match || !oldHeader || !newHeader) { valid = false; continue; }
+        const expectedOld = Number(match[2] ?? 1), expectedNew = Number(match[4] ?? 1);
+        if (!Number.isSafeInteger(expectedOld) || !Number.isSafeInteger(expectedNew) || expectedOld + expectedNew === 0) valid = false;
+        hunk = { expectedOld, expectedNew, old: 0, next: 0 }; sectionHunks++; totalHunks++;
+        continue;
+      }
+      if (hunk) {
+        if (line === "\\ No newline at end of file") continue;
+        if (line.startsWith("+")) { added++; hunk.next++; }
+        else if (line.startsWith("-")) { removed++; hunk.old++; }
+        else if (line.startsWith(" ")) { hunk.old++; hunk.next++; }
+        else valid = false;
+        if (hunk.old > hunk.expectedOld || hunk.next > hunk.expectedNew) valid = false;
+      } else if (line && !/^(?:index |(?:new|old|deleted) file mode |similarity index |rename (?:from|to) )/.test(line)) valid = false;
     }
-    if (line === "*** End Patch") { section = false; continue; }
-    if (mode === "unified" && /^@@/.test(line)) { hunk = true; continue; }
-    if (!section || (mode === "unified" && !hunk)) continue;
-    if (line.startsWith("+")) added++;
-    else if (line.startsWith("-")) removed++;
+    finishSection();
+    if (!valid || !totalHunks) return metadata();
   }
-  return recognized ? { safeFiles, linesAdded: added, ...(deletedUnknown ? {} : { linesRemoved: removed }) } : {};
+  return { ...metadata(), linesAdded: added, ...(deletedUnknown ? {} : { linesRemoved: removed }) };
 }
 function replacementLines(oldValue, newValue) {
   if (typeof oldValue !== "string" || typeof newValue !== "string") return {};

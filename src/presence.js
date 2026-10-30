@@ -66,6 +66,7 @@ const money = (n) => {
   );
 };
 export function statusBadgeKind(state = {}) {
+  if (state.status !== "idle" && state.visualState === "error") return "error";
   const tool = String(state.tool || "").toLowerCase();
   if (state.status === "waiting")
     return state.waitingReason === "approval"
@@ -219,16 +220,23 @@ export function buildActivity(state = {}, aggregate = {}, c = {}, chat = getChat
       : status === "thinking" ? `Pondering solution... (Elapsed: ${clockLabel(operationMs)})`
       : status === "working" && coding ? count ? `Writing code across ${count} ${count === 1 ? "file" : "files"}` : "Writing code"
       : status === "working" ? `Working in ${target}`
-      : status === "idle" || visual === "idle" ? `Idle in ${project}${branch}` : `Waiting on you · ${target}`;
-    const liveAction = status === "working" && coding ? `Editing ${filename || "files"}${churn}`
+      : status === "idle" || visual === "idle" ? namedTitle || (state.source === "chatgpt" ? "ChatGPT App" : "Session idle") : `Waiting on you · ${target}`;
+    const telemetryModel = model.slice(0, 40);
+    const actionBudget = Math.max(24, 128 - telemetryModel.length - tokensLabel.length - 6);
+    const fileBudget = Math.max(8, actionBudget - 8 - churn.length);
+    const shownFile = filename && filename.length > fileBudget ? `…${filename.slice(-(fileBudget - 1))}` : filename;
+    const idleBranch = branch.length > 24 ? branch.slice(0, 23) + "…" : branch;
+    const workspaceBudget = Math.max(8, actionBudget - 8 - idleBranch.length);
+    const idleProject = project.length > workspaceBudget ? project.slice(0, workspaceBudget - 1) + "…" : project;
+    const liveAction = status === "idle" || visual === "idle" ? `Idle in ${idleProject}${idleBranch}` : status === "working" && coding ? `Editing ${shownFile || "files"}${churn}`
       : status === "working" && /bash|shell|exec_command/.test(tool) ? `Running: ${command || "shell command"}`
       : status === "working" ? (toolName ? `Using ${toolName}` : "Working")
       : visual === "error" ? "Needs attention" : "";
-    telemetryState = [liveAction, model, tokensLabel, !privateMode && options.showTask && status === "thinking" ? namedTitle : null].filter(Boolean).join(" · ");
+    telemetryState = [liveAction, telemetryModel, tokensLabel, !privateMode && options.showTask && status === "thinking" ? namedTitle : null].filter(Boolean).join(" · ");
   }
   const visualAsset = c.assets?.[visual];
   const legacyWorking = c.assets?.working;
-  const chosenAsset = ["writing", "patching"].includes(visual) && legacyWorking && !legacyWorking.startsWith(ASSET_BASE) && (!visualAsset || visualAsset.startsWith(ASSET_BASE)) ? legacyWorking : visualAsset;
+  const chosenAsset = ["writing", "patching"].includes(visual) && legacyWorking && !legacyWorking.startsWith(ASSET_BASE) && (!visualAsset || visualAsset.split("?")[0] === `${ASSET_BASE}/codex-pet-${visual}.gif`) ? legacyWorking : visualAsset;
   const activity = {
     type: options.type,
     details: (telemetryDetails || (options.stats === "chat" ? statusDetails[status] : details || `${actions[status]} ${project}`)).slice(0, 128),

@@ -16,6 +16,9 @@ test('live editing uses operation diff metadata, output-only counters and no but
   assert.match(p.state,/Editing src\/client.js \(\+42 \/ -12\).*22.8k output tokens/);
   assert.match(p.assets.large_image,/codex-pet-patching/);
   assert.equal(p.timestamps.start,(now-32000)/1000); assert.equal(p.buttons,undefined);
+  const long = buildActivity({...state,file:'src/'+ 'long-folder/'.repeat(20)+'client.js'}, {}, c, chat, now);
+  assert.match(long.state, /client.js \(\+42 \/ -12\).*22.8k output tokens/);
+  assert.ok(long.state.length <= 128);
   const priv=buildActivity(state,{}, {...c,privacy:'private'},chat,now);
   assert.ok(!JSON.stringify(priv).includes('client.js')); assert.match(priv.state,/Editing files/);
 });
@@ -26,7 +29,8 @@ test('thinking timer, bash summary, idle branch and safe missing-metadata fallba
   p=buildActivity({status:'working',tool:'exec_command',commandSummary:'npm test'}, {}, c, chat,now);
   assert.match(p.state,/^Running: npm test/);
   p=buildActivity({status:'idle',project:'codex-rpc',branch:'feature/pets'}, {}, c, chat,now);
-  assert.equal(p.details,'Idle in codex-rpc (feature/pets)');
+  assert.equal(p.details,'Session idle');
+  assert.match(p.state,/^Idle in codex-rpc \(feature\/pets\)/);
   p=buildActivity({status:'working',tool:'read_file',project:'codex-rpc'}, {}, c, {...chat,output:null},now);
   assert.equal(p.details,'Working in codex-rpc');assert.ok(!p.state.includes('9000000'));
   const session=buildActivity({status:'thinking',thinkingStartedAt:now-10000,startedAt:now-100000}, {}, {...c,presence:{...c.presence,timer:'session'}},chat,now);

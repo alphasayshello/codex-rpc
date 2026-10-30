@@ -423,25 +423,27 @@ async function refresh() {
     const bundled =
       "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/";
     const configuredPet = activity?.assets?.large_image;
-    const petURL =
-      configuredPet?.startsWith("https://") &&
-      !configuredPet.startsWith(bundled)
-        ? configuredPet
-        : `/assets/pet/codex-pet-${visual}.${document.documentElement.dataset.motion === "reduced" ? "svg" : "gif"}`;
+    const reduced = document.documentElement.dataset.motion === "reduced";
+    const petName = configuredPet?.startsWith(bundled) ? configuredPet.slice(bundled.length).split(/[?#]/)[0] : "";
+    const localPet = /^codex-pet-(working|thinking|waiting|idle|writing|patching|error|done)\.gif$/.test(petName);
+    const petURL = localPet ? `/assets/pet/${petName.replace(/\.gif$/, reduced ? ".svg" : ".gif")}`
+      : configuredPet?.startsWith("https://") ? configuredPet
+      : `/assets/pet/codex-pet-${visual}.${reduced ? "svg" : "gif"}`;
     if ($("#pet").getAttribute("src") !== petURL) $("#pet").src = petURL;
     const configuredBadge = activity?.assets?.small_image;
-    const badgeURL =
-      configuredBadge?.startsWith("https://") &&
-      !configuredBadge.startsWith(bundled)
-        ? configuredBadge
-        : `/assets/pet/codex-status-${s.badgeKind || state}.${document.documentElement.dataset.motion === "reduced" ? "png" : "gif"}`;
+    const badgeName = configuredBadge?.startsWith(bundled) ? configuredBadge.slice(bundled.length).split(/[?#]/)[0] : "";
+    const localBadge = /^codex-status-(working|thinking|waiting|idle|approval|editing|reading|review|ready|error|done)\.(png|gif)$/.test(badgeName);
+    const badgeFile = reduced ? badgeName.replace(/\.(png|gif)$/, ".png").replace("codex-status-done.png", "codex-status-waiting.png") : cfg.assets.badge ? badgeName : badgeName.replace(/\.png$/, ".gif");
+    const badgeURL = localBadge ? `/assets/pet/${badgeFile}`
+      : configuredBadge?.startsWith("https://") ? configuredBadge
+      : `/assets/pet/codex-status-${s.badgeKind || state}.${reduced ? "png" : "gif"}`;
     if ($("#status-badge").getAttribute("src") !== badgeURL)
       $("#status-badge").src = badgeURL;
     $("#activity-type").textContent =
       ((activity?.type ?? cfg.presence.type) === 3 ? "WATCHING" : "PLAYING") +
       " CODEX RPC";
     $("#pet").alt = `Codex Pet ${visual}`;
-    $("#live-status").textContent = s.enabled ? state : "paused";
+    $("#live-status").textContent = s.enabled ? visual : "paused";
     $("#live-action").textContent = activity?.details || "Presence paused";
     $("#live-model").textContent =
       activity?.state || "Resume when you are ready.";

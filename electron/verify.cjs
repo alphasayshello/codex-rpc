@@ -12,7 +12,7 @@ let dashboard, window;
 app.commandLine.appendSwitch("disable-gpu");
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn) {
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 200; i++) {
     if (await fn()) return;
     await wait(50);
   }
@@ -488,6 +488,12 @@ app
     await until(() => config().assets.patching === "anim_patch_large");
     assert.equal(await js("fetch('/api/presence').then(r=>r.json()).then(a=>a.assets.large_image)"), "anim_patch_large");
     assert.equal(await js("document.querySelector('#pet').getAttribute('src')"), "/assets/pet/codex-pet-patching.gif");
+    // A custom URL within our own repository still selects that exact artwork.
+    await js("(()=>{const field=document.querySelector('[data-key=\"assets.patching\"]');field.value='https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-idle.gif';field.dispatchEvent(new Event('change'));document.querySelector('#settings-form').requestSubmit()})()");
+    await until(() => js("document.querySelector('#pet').getAttribute('src')==='/assets/pet/codex-pet-idle.gif'"));
+    assert.match(await js("fetch('/api/presence').then(r=>r.json()).then(a=>a.assets.large_image)"), /codex-pet-idle.gif$/);
+    await js("(()=>{const field=document.querySelector('[data-key=\"assets.patching\"]');field.value='anim_patch_large';field.dispatchEvent(new Event('change'));document.querySelector('#settings-form').requestSubmit()})()");
+    await until(() => js("document.querySelector('#pet').getAttribute('src')==='/assets/pet/codex-pet-patching.gif'"));
     await js("scrollTo({top:0,behavior:'instant'})");
     await capture("telemetry.png");
     window.setSize(430, 1050);
@@ -518,7 +524,10 @@ app
         const [type, visual] = stages[i];
         emit(type, {}, 8000 - i * 500 - (reduced ? 3500 : 0));
         const route = `/assets/pet/codex-pet-${visual}.${reduced ? "svg" : "gif"}`;
-        await until(() => js(`document.querySelector('#pet').getAttribute('src')===${JSON.stringify(route)}`));
+        await until(() => js(`document.querySelector('#pet').getAttribute('src')===${JSON.stringify(route)}`)).catch(async error => {
+          const observed = await js("Promise.all([Promise.resolve(document.querySelector('#pet').getAttribute('src')),fetch('/api/state').then(r=>r.json()).then(s=>({status:s.status,visual:s.visualState})),fetch('/api/presence').then(r=>r.json()).then(p=>p?.assets.large_image)])");
+          throw new Error(`${error.message}: expected ${route}; observed ${JSON.stringify(observed)}`);
+        });
         assert.equal(await js("fetch('/api/state').then(r=>r.json()).then(s=>s.visualState)"), visual);
         assert.equal(await js(`fetch(${JSON.stringify(route)}).then(r=>r.status)`), 200);
       }

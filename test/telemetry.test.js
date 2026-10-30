@@ -210,3 +210,45 @@ test("literal wrapper templates, escapes and separate patches aggregate safely",
   assert.equal(nestedContext.linesAdded, 2);
   assert.equal(nestedContext.linesRemoved, 1);
 });
+test("partial or malformed apply patches retain files without fabricating zero diffs", () => {
+  for (const value of [
+    "*** Update File: src/a.js\n@@\n-old\n+new\n*** End Patch",
+    "*** Begin Patch\n*** Update File: src/a.js\n*** End Patch",
+    "*** Begin Patch\n*** Update File: src/a.js\n@@\n*** End Patch",
+    "*** Begin Patch\n*** Update File: src/a.js\n@@\n-old\n+new",
+    "*** Begin Patch\n*** Add File: src/a.js\n+new",
+    "*** Begin Patch\n*** Add File: src/a.js\n*** End Patch",
+    "*** Begin Patch\n*** Update File: src/a.js\n*** Move to: src/b.js\n@@\n*** End Patch",
+    "*** Begin Patch\n*** Add File: src/a.js\n+new\n*** Update File: src/b.js\n*** End Patch",
+  ]) {
+    const result = patchTelemetry(value);
+    assert.ok(result.safeFiles.includes("src/a.js"), value);
+    assert.equal(result.linesAdded, undefined, value);
+    assert.equal(result.linesRemoved, undefined, value);
+  }
+});
+test("unified and binary diffs require complete declared hunks before exposing totals", () => {
+  for (const value of [
+    "--- a/src/a.js\n+++ b/src/a.js",
+    "diff --git a/src/a.js b/src/a.js\nindex 123..456 100644",
+    "diff --git a/src/a.js b/src/a.js\nBinary files a/src/a.js and b/src/a.js differ",
+    "diff --git a/src/a.js b/src/a.js\nGIT binary patch\nliteral 10\nencoded-body",
+    "--- a/src/a.js\n+++ b/src/a.js\n@@ -1,2 +1,2 @@\n-old\n+new",
+    "--- a/src/a.js\n+++ b/src/a.js\n@@ -1 +1 @\n-old\n+new",
+    "--- a/src/a.js\n+++ b/src/a.js\n@@ -0,0 +0,0 @@",
+    "--- a/src/a.js\n+++ b/src/a.js\n@@ -1 +1 @@\n-old\n+new\n+undeclared-extra",
+    "--- a/src/a.js\n+++ b/src/a.js\n@@ -1 +1 @@\n-old\n+new\n--- a/src/b.js\n+++ b/src/b.js",
+  ]) {
+    const result = patchTelemetry(value);
+    assert.ok(result.safeFiles.includes("src/a.js"), value);
+    assert.equal(result.linesAdded, undefined, value);
+    assert.equal(result.linesRemoved, undefined, value);
+  }
+});
+test("complete no-change contexts and pure moves have known zero while deletion size stays unknown", () => {
+  assert.deepEqual(patchTelemetry("*** Begin Patch\n*** Update File: src/a.js\n@@\n unchanged\n*** End Patch"), { safeFiles: ["src/a.js"], linesAdded: 0, linesRemoved: 0 });
+  assert.deepEqual(patchTelemetry("*** Begin Patch\n*** Update File: src/a.js\n*** Move to: src/b.js\n*** End Patch"), { safeFiles: ["src/a.js", "src/b.js"], linesAdded: 0, linesRemoved: 0 });
+  assert.deepEqual(patchTelemetry("--- a/src/a.js\n+++ b/src/a.js\n@@ -1 +1 @@\n unchanged\n"), { safeFiles: ["src/a.js"], linesAdded: 0, linesRemoved: 0 });
+  assert.deepEqual(patchTelemetry("*** Begin Patch\n*** Delete File: src/a.js\n*** End Patch"), { safeFiles: ["src/a.js"], linesAdded: 0 });
+  assert.deepEqual(patchTelemetry("--- /dev/null\n+++ b/src/a.js\n@@ -0,0 +1 @@\n+new\n\\ No newline at end of file\n"), { safeFiles: ["src/a.js"], linesAdded: 1, linesRemoved: 0 });
+});
