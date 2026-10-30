@@ -1,0 +1,39 @@
+# Security & privacy
+
+codex-rpc is a local utility. It does not collect telemetry, call OpenAI APIs, read API keys or OAuth tokens, install a bot, or publish your analytics. Runtime JavaScript has no third-party dependencies. Optional Electron and build tooling are separate from the normal CLI.
+
+## Data flow
+
+The hook reads a notify JSON argument or stdin events. The live watcher reads Codex JSONL session files; the scanner reads local Codex session/history logs. They persist summaries in `~/.codex-rpc/`. The daemon sends a small activity object to Discord Desktop through a local IPC socket. Discord then distributes that activity according to your Discord account's visibility settings. This is an intentional disclosure to Discord and anyone who can see your profile.
+
+Stored files include live state, per-source state, aggregate daily totals, per-file scanner summaries and normalized latest-event metadata, configuration, daemon PID/heartbeat, log, and locks. Raw prompt/assistant text and raw tool arguments are parsed in memory but are not copied into our cache. Source transcripts remain in Codex's own directory. The cache contains original file paths, hotspot names, command executable names, model names and timestamps; treat it as personal data. The setup backup of `config.toml` may contain your existing provider settings and belongs to you alone.
+
+The application never opens network connections to OpenAI, analytics collectors, GitHub or an asset CDN. The daemon connects only to local Discord IPC. The dashboard browser may fetch images from explicit HTTPS asset URLs if configured in a future/custom UI; Discord itself resolves configured image URLs. A host serving assets may learn the viewer/client IP and request metadata. Exported SVGs embed a local pet SVG and require no external image fetch.
+
+## Privacy modes and kill switch
+
+`privacy: "private"` is the default. The hook omits project/file names from new persisted live snapshots. The activity builder always rechecks privacy, so an old public state cannot disclose its project through the next Discord payload after privacy is changed. Aggregate outputs redact hotspot paths. Local scanner cache can still contain file paths and summaries; private mode is not an encrypted storage mode. Old backups and old public snapshots may still contain names until overwritten/deleted. Explicit button labels/URLs and asset URLs are not redacted: don't put secrets in them.
+
+Even in private mode Discord may receive model name, token counter, tool name (not command arguments), source, session start time, streak and all-time active hours. Public mode adds the project name. To share nothing, use `codex-rpc pause` or set `enabled: false`. The running daemon clears presence and closes IPC; hooks, live scanning and new history scans stop. Existing data stays on disk. `stop` terminates only the daemon; externally invoked hooks may continue to update local state. `uninstall` removes the managed notify block, autostart and installed runtime while retaining config/statistics. Delete `~/.codex-rpc/` separately to erase them, including cached executable runtimes.
+
+## Local filesystem and IPC
+
+JSON writes use unique sibling temporary files plus atomic rename. This prevents half-written JSON, not transactional multi-file snapshots. Per-source files reduce contention. Concurrent events can select the most recent completed write; this is presence, not an ordered event ledger. The scanner cache is protected by an exclusive PID lock. Locks from exited workers are recovered immediately; incomplete legacy locks expire after ten minutes. One daemon holds a PID lock. Files are 0600 and the state directory is created 0700 on POSIX; on Windows, effective privacy follows the user's inherited ACLs. Existing parent permissions are not rewritten.
+
+The IPC client searches Discord's conventional local sockets 0–9 and user runtime directories; Windows uses named pipes. There is no TCP listener for Discord RPC. `CODEX_RPC_IPC` is an explicit trusted socket override for WSL/bridges. A malicious process under your OS account can replace state, sockets, config or code and can inspect your Codex logs regardless of this application. Protect your account and do not bridge the socket onto an untrusted network. The client limits inbound frames to 1 MiB, times out handshake/command ACKs, and reconnects with jitter. Discord protocol errors are logged without raw transcript payloads.
+
+## Dashboard
+
+The HTTP server binds only `127.0.0.1` and validates Host against localhost/127.0.0.1 plus its bound port to resist DNS rebinding. It does not enable CORS. Mutations require a random per-process request token delivered by a same-origin API; provided Origin headers must match the local server. Requests have bounded bodies; routes do not accept arbitrary filesystem paths or shell commands. Static resources have a Content Security Policy, no-sniff, no-referrer and anti-framing restrictions. Stats text uses DOM textContent; SVG text is escaped. SSE connections are local and read-only.
+
+This is not a multi-user service. Any process on your computer able to access loopback can read statistics or obtain a request token. No authentication/TLS is provided for other local users. Do not expose or reverse-proxy this dashboard to a network. Public cards must be deliberately exported/hosted separately. Electron disables Node integration, enables context isolation and renderer sandboxing, and restricts navigation/popups to the local dashboard/card routes.
+
+## Installation scope
+
+Setup changes only the user's RPC directory, a managed top-level notify block in the user's Codex config, and one per-user login entry. Existing notify integrations are never overwritten. Configuration backup is created once; uninstall removes only our marked block so later unrelated edits survive. Stable runtime copies allow temporary npx checkouts to disappear. Setup is idempotent and can skip service/start operations.
+
+macOS uses a LaunchAgent; Linux uses `systemd --user`; Windows uses a Startup command task. No `sudo`, privileged daemon, kernel hook or global registry modification. OS process/window detection runs fixed executable argument arrays without a shell. macOS may ask for Automation access to System Events; denial is reported by doctor. ChatGPT detection reads process identity/foreground status, never conversation contents or Accessibility screen text.
+
+## Reporting
+
+Please report vulnerabilities privately to the maintainer through the repository's private vulnerability reporting mechanism when available. Do not include transcripts, config backups, local paths or tokens in public issues. Until a repository is published with private reporting enabled, contact the distributor privately rather than opening a public exploit report. There is no invented security email address. Supported security fixes target the latest released version; see VERSIONING.md.
