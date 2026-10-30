@@ -1,6 +1,6 @@
 # Versioning
 
-codex-rpc follows Semantic Versioning. The current release candidate is 0.3.0; the initial source version was 0.1.0.
+codex-rpc follows Semantic Versioning. The current release is 0.3.0; the initial source version was 0.1.0.
 
 - Patch: compatible bug fixes, parser coverage, asset corrections, docs.
 - Minor: additive commands/settings/metrics and integrations. Before 1.0, breaking changes may appear in a minor with migration notes.
