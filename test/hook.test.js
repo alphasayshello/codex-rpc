@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -93,7 +94,7 @@ test("detector parses macOS and Windows process responses without reading chat",
 });
 test("hook accepts argument and stdin; concurrent writes remain valid JSON", async (t) => {
   sandbox(t);
-  const script = new URL("../src/hook.js", import.meta.url).pathname;
+  const script = fileURLToPath(new URL("../src/hook.js", import.meta.url));
   await Promise.all(
     Array.from({ length: 12 }, (_, i) =>
       exec(process.execPath, [

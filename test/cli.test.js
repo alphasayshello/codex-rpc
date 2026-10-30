@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -13,7 +14,7 @@ import {
 import { config, writeJSON, readJSON, alive } from "../src/store.js";
 import { completion, commands } from "../src/completion.js";
 const exec = promisify(execFile),
-  cli = new URL("../bin/codex-rpc.js", import.meta.url).pathname;
+  cli = fileURLToPath(new URL("../bin/codex-rpc.js", import.meta.url));
 test("all read-only commands exit cleanly and produce useful output", async (t) => {
   const { temp, env } = sandbox(t);
   writeJSON("config.json", { ...config(), chatgpt: { enabled: false } });
@@ -85,6 +86,7 @@ test("daemon CLI start/status/pause/resume/restart/stop stays within sandbox", a
   const { env } = sandbox(t);
   writeJSON("config.json", {
     ...config(),
+    clientId: "",
     chatgpt: { enabled: false },
     stats: { enabled: false },
   });
@@ -136,4 +138,14 @@ test("completion install writes and idempotently registers all shell scripts in 
   assert.match(stdout, /Register-ArgumentCompleter/);
 });
 
-test('Codex wrapper forwards arguments and records session end',async t=>{const {env}=sandbox(t);env.CODEX_RPC_CODEX_BIN=process.execPath;const {stdout}=await exec(process.execPath,[cli,'run','--','--version'],{env});assert.match(stdout,/v\d+/);assert.equal(readJSON('state.json').status,'idle');});
+test("Codex wrapper forwards arguments and records session end", async (t) => {
+  const { env } = sandbox(t);
+  env.CODEX_RPC_CODEX_BIN = process.execPath;
+  const { stdout } = await exec(
+    process.execPath,
+    [cli, "run", "--", "--version"],
+    { env },
+  );
+  assert.match(stdout, /v\d+/);
+  assert.equal(readJSON("state.json").status, "idle");
+});

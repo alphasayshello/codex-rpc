@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
@@ -6,7 +7,7 @@ import { promisify } from "node:util";
 import { sandbox, mockDiscord, until, jsonl } from "./helpers.js";
 import { config, writeJSON, readJSON } from "../src/store.js";
 const exec = promisify(execFile),
-  cli = new URL("../bin/codex-rpc.js", import.meta.url).pathname;
+  cli = fileURLToPath(new URL("../bin/codex-rpc.js", import.meta.url));
 test("daemon consumes a real live log, connects, clears on pause and reconnects on resume", async (t) => {
   const { temp, env, codex } = sandbox(t);
   const socket =
@@ -69,7 +70,7 @@ test("daemon consumes a real live log, connects, clears on pause and reconnects 
   assert.ok(!JSON.stringify(activity).includes("echo private"));
   await exec(process.execPath, [cli, "pause"], { env });
   await until(() => mock.received.some((x) => x.args?.activity === null));
-  assert.equal(readJSON("daemon.json").connected, false);
+  await until(() => readJSON("daemon.json").connected === false);
   const first = mock.handshakes;
   await exec(process.execPath, [cli, "resume"], { env });
   await until(() => mock.handshakes > first);

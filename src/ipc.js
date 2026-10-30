@@ -12,11 +12,12 @@ export function frame(opcode, payload) {
   return Buffer.concat([header, data]);
 }
 export function socketPaths(platform = process.platform, env = process.env) {
+  if (env.CODEX_RPC_IPC) return [env.CODEX_RPC_IPC];
   if (platform === "win32")
-    return [
-      ...(env.CODEX_RPC_IPC ? [env.CODEX_RPC_IPC] : []),
-      ...Array.from({ length: 10 }, (_, i) => `\\\\?\\pipe\\discord-ipc-${i}`),
-    ];
+    return Array.from(
+      { length: 10 },
+      (_, i) => `\\\\?\\pipe\\discord-ipc-${i}`,
+    );
   const dirs = [
     env.XDG_RUNTIME_DIR,
     env.TMPDIR,
@@ -33,14 +34,6 @@ export function socketPaths(platform = process.platform, env = process.env) {
       path.join(d, "snap.discord"),
     ]),
   ];
-  // WSL supports a Windows named-pipe bridge exposed as a Unix socket via socat.
-  if (env.CODEX_RPC_IPC)
-    return [
-      env.CODEX_RPC_IPC,
-      ...[...new Set(all)].flatMap((d) =>
-        Array.from({ length: 10 }, (_, i) => path.join(d, `discord-ipc-${i}`)),
-      ),
-    ];
   return [...new Set(all)].flatMap((d) =>
     Array.from({ length: 10 }, (_, i) => path.join(d, `discord-ipc-${i}`)),
   );
@@ -55,9 +48,11 @@ export class DiscordIPC extends EventEmitter {
     this.pending = new Map();
   }
   async connect() {
+    this.cancelled = false;
     if (!/^\d{5,22}$/.test(this.clientId))
       throw Error("Set a Discord application clientId in config.json");
     for (const socketPath of this.paths) {
+      if (this.cancelled) throw Error("Discord connection cancelled");
       try {
         await this.open(socketPath);
         return this;
@@ -93,12 +88,13 @@ export class DiscordIPC extends EventEmitter {
       );
       s.on("close", () => {
         clearTimeout(timer);
-        this.ready = false;
-        for (const { reject, timer } of this.pending.values()) {
-          clearTimeout(timer);
-          reject(Error("Discord disconnected"));
-        }
-        this.pending.clear();
+        if (this.socket === s) this.ready = false;
+        if (this.socket === s)
+          for (const { reject, timer } of this.pending.values()) {
+            clearTimeout(timer);
+            reject(Error("Discord disconnected"));
+          }
+        if (this.socket === s) this.pending.clear();
         if (!settled) {
           settled = true;
           reject(Error("Discord closed before READY"));
@@ -106,6 +102,7 @@ export class DiscordIPC extends EventEmitter {
         this.emit("disconnect");
       });
       s.on("data", (chunk) => {
+        if (this.socket !== s || this.cancelled) return;
         this.buffer = Buffer.concat([this.buffer, chunk]);
         try {
           while (this.buffer.length >= 8) {
@@ -180,6 +177,7 @@ export class DiscordIPC extends EventEmitter {
     });
   }
   close() {
+    this.cancelled = true;
     this.ready = false;
     this.socket?.destroy();
   }

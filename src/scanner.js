@@ -9,6 +9,7 @@ import {
   home,
   config,
   isMain,
+  alive,
 } from "./store.js";
 import { estimateCost } from "./pricing.js";
 import { applyEvent, normalizeEvent } from "./hook.js";
@@ -312,10 +313,12 @@ export async function scan({ live = false } = {}) {
   let lock;
   try {
     lock = fs.openSync(file("scanner.lock"), "wx", 0o600);
+    fs.writeFileSync(lock, String(process.pid));
   } catch (e) {
     if (e.code !== "EEXIST") throw e;
     const age = Date.now() - fs.statSync(file("scanner.lock")).mtimeMs;
-    if (age < 600000)
+    const owner = Number(fs.readFileSync(file("scanner.lock"), "utf8"));
+    if (alive(owner) || (!owner && age < 600000))
       return readJSON("aggregate.json", { totals: emptyStats(), days: {} });
     fs.unlinkSync(file("scanner.lock"));
     return scan({ live });

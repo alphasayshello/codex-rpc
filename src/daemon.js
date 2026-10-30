@@ -135,6 +135,7 @@ export async function runDaemon() {
           connecting = false;
         }
       }
+      if (stopped) return;
       const s = readJSON("state.json", { status: "idle" });
       if (now - (s.updatedAt || 0) > c.timing.idleMs) s.status = "idle";
       const payload = buildActivity(s, readJSON("aggregate.json"), c),
@@ -148,6 +149,7 @@ export async function runDaemon() {
         await client.setActivity(payload);
         lastPayload = encoded;
       }
+      if (stopped) return;
       writeJSON("daemon.json", {
         ...readJSON("daemon.json"),
         pid: process.pid,

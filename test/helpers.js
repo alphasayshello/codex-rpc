@@ -12,7 +12,33 @@ export function sandbox(t) {
   process.env.CODEX_RPC_HOME = path.join(temp, "rpc");
   process.env.CODEX_HOME = path.join(temp, "codex");
   fs.mkdirSync(process.env.CODEX_HOME, { recursive: true });
-  t.after(() => {
+  t.after(async () => {
+    let pid;
+    try {
+      pid = JSON.parse(
+        fs.readFileSync(path.join(temp, "rpc/daemon.json"), "utf8"),
+      ).pid;
+    } catch {}
+    if (Number.isInteger(pid) && pid > 0) {
+      try {
+        process.kill(pid, "SIGTERM");
+      } catch {}
+      for (let i = 0; i < 100; i++) {
+        try {
+          process.kill(pid, 0);
+        } catch {
+          pid = null;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      if (pid) {
+        try {
+          process.kill(pid, "SIGKILL");
+        } catch {}
+      }
+    }
+
     for (const [k, v] of Object.entries(prior))
       if (v === undefined) delete process.env[k];
       else process.env[k] = v;
@@ -22,8 +48,12 @@ export function sandbox(t) {
     temp,
     rpc: process.env.CODEX_RPC_HOME,
     codex: process.env.CODEX_HOME,
-    env: { ...process.env, HOME: temp,
-      USERPROFILE:temp, APPDATA: path.join(temp, "AppData") },
+    env: {
+      ...process.env,
+      HOME: temp,
+      USERPROFILE: temp,
+      APPDATA: path.join(temp, "AppData"),
+    },
   };
 }
 export function jsonl(filename, rows) {

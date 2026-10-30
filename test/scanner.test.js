@@ -396,3 +396,13 @@ test("ChatGPT observations accumulate foreground hours and sessions without inve
   assert.equal(a.totals.sourceHours.chatgpt, 5 / 3600);
   assert.equal(a.streak.current, 1);
 });
+
+test("scanner immediately recovers a lock left by an exited worker", async (t) => {
+  const { codex, rpc } = sandbox(t);
+  fixture(codex);
+  fs.mkdirSync(rpc, { recursive: true });
+  fs.writeFileSync(path.join(rpc, "scanner.lock"), "2147483647");
+  const a = await scan();
+  assert.equal(a.totals.tokens, 1650);
+  assert.equal(fs.existsSync(path.join(rpc, "scanner.lock")), false);
+});
