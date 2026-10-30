@@ -18,7 +18,7 @@ const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const npmCLI = process.env.npm_execpath;
 if (process.platform === "win32" && !npmCLI) throw Error("Run through npm run release:prepare on Windows");
 const packed = JSON.parse(execFileSync(npmCLI ? process.execPath : npm, [...(npmCLI ? [npmCLI] : []), "pack", "--json", "--pack-destination", directory], { encoding: "utf8" }))[0];
-for (const required of ["src/selection.js", "src/timeline.js", "bin/codex-rpc.js", "assets/pet/codex-pet-working.gif"]) {
+for (const required of ["src/selection.js", "src/timeline.js", "src/watcher.js", "src/config.js", "src/presence-scheduler.js", "src/recaps.js", "bin/codex-rpc.js", "assets/pet/codex-pet-writing.gif", "assets/pet/codex-pet-patching.gif", "assets/pet/codex-pet-error.gif", "assets/pet/codex-pet-done.gif"]) {
   if (!packed.files.some((entry) => entry.path === required)) throw Error(`Missing package file: ${required}`);
 }
 const artifacts = [packed.filename];

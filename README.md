@@ -37,9 +37,9 @@ Native downloads and checksums are prepared by the release workflow. See [releas
 
 Setup refreshes running code and old bundled asset URLs while preserving custom URLs. It copies a stable runtime into `~/.codex-rpc/runtime/`, registers the user-level Codex `notify` command, enables lightweight ChatGPT detection, installs login autostart, and starts the daemon. Existing notifiers are preserved; setup explains how to use the wrapper instead. No administrator access required. `setup --no-service --no-start` writes only integration files.
 
-Open **http://localhost:47474**. The default application is `1565535814308470814` and the four GIFs plus badge are hosted directly in [this GitHub repository](https://github.com/alphasayshello/codex-rpc/tree/main/assets/pet). No asset upload is needed once these commits are pushed. Use **Settings → Discord / Codex Pet Assets** to supply your own application, HTTPS GIF URLs, or uploaded Discord asset keys.
+Open **http://localhost:47474**. The default application is `1565535814308470814` and the six state GIFs plus tool badges are hosted directly in [this GitHub repository](https://github.com/alphasayshello/codex-rpc/tree/main/assets/pet). No asset upload is needed once these commits are pushed. Use **Settings → Discord / Codex Pet Assets** to supply your own application, HTTPS GIF URLs, or uploaded Discord asset keys.
 
-Discord **Desktop** must be running. Browser-only Discord cannot expose its local IPC socket. Discord controls whether remote GIFs animate; uploaded application art may be static. All four actual animated GIFs ship in this repository.
+Discord **Desktop** must be running. Browser-only Discord cannot expose its local IPC socket. Discord controls whether remote GIFs animate; uploaded application art may be static. All six state GIFs ship in this repository.
 
 ## on Discord
 
@@ -50,15 +50,29 @@ Bash · 22.8k output tokens
 ▣ 0:58 elapsed
 ```
 
-The default card follows [claude-rpc’s status templates](https://github.com/rar-file/claude-rpc/blob/main/src/default-config.js): **working** shows tool, file and tool elapsed time when available, then this chat’s **output tokens**; **thinking** shows model, prompts and output tokens; **waiting** shows model and prompts; **idle** shows model and today’s active hours. Missing fields disappear cleanly. The headline uses the conversation name when public. Input and cached tokens are never added to the Discord token counter. Full usage breakdowns remain available locally in the dashboard and `chat --json`.
+The default **Live telemetry** card uses the selected chat’s output tokens, edited files, logged diff counts, safe command summary and operation timer. Example:
 
-The pet tooltip describes the live action; the pixel badge tooltip names the tool or status. Discord controls wrapping, fonts and application name; the bundled application is named **Codex RPC**. `Watching` is the default activity type.
+```text
+Watching Codex RPC
+Writing code across 2 files
+Editing src/client.js (+42 / -12) · o4-mini · 22.8k output tokens
+```
 
-For that named-chat layout, open `codex-rpc serve`, choose **Privacy → public**, and leave **Presence → Show conversation name** enabled. Private mode keeps task and project names out of the card. The default stats line is **This chat**. Presence also offers **Today / all-time cost**, **Model / tokens**, and a **Playing / Watching** header. `codex-rpc preview` prints the exact text and asset URLs for all four states before you share anything.
+Thinking shows `Pondering solution... (Elapsed: 1:05)`; execution shows `Running: npm test`; idle shows the workspace and Git branch when available. Unknown diffs fall back to directory/model status. Reasoning is a subset of output and input/cache are never added to the card’s token counter. There are **no Discord card buttons**.
 
-The blue pet uses selected original poses with deliberate holds, not a rapid expression slideshow: work keeps its neutral terminal face, with one brief blink in a 5.22-second loop. Other states move slowly or give an occasional wave. Dashboard SSE updates preserve an animation already in progress. Ten pixel badges cover commands, thinking, completion, idle, approval, editing, reading, review, ready and errors. They are drawn on a crisp 24-pixel grid and enlarged without antialiasing; the card selects a badge from the live tool/state. A custom badge URL overrides them.
+**Presence → Elapsed timer** chooses current operation or whole session. Legacy **Claude-style**, **Today / all-time cost**, and **Model / output tokens** layouts remain available. Public privacy mode enables names and command summaries; private mode hides them. `codex-rpc preview` prints six scenes plus approval waiting.
+
+Six distinct **10 fps** loops retain the original blue Codex Pet: sleeping/breathing, pacing/planning, energetic laptop typing, patch stamping, smoke/panic and a smiling celebration. Motion changes body position and surrounding pixel effects rather than cycling unrelated faces. Success settles to idle after 15 seconds by default; approval keeps its own waiting pose. Main GIFs remain below 1 MB each; all movement uses integer pixel positions, nearest-neighbor rendering, and uncropped original sprite pixels.
+
+Open `/assets/pet/animation-gallery.html` while the dashboard is running, or use **Codex Pet Assets → Preview animated pets**. Animated status badge GIFs ship alongside static PNGs. **Reduce motion** in the sidebar freezes bundled artwork and stops stepped UI effects; OS reduced motion is respected. Unrelated SSE updates preserve mascot playback.
 
 <img src="assets/pet/status-badges.svg" width="800" alt="Ten pixel-art status badges" />
+
+## Discord image configuration
+
+Use the bundled application ID, or create an application in the [Discord Developer Portal](https://discord.com/developers/applications). In **Codex Pet Assets**, set each of `idle`, `thinking`, `writing`, `patching`, `error`, and `done` to either a Discord uploaded asset key such as `anim_typing_large`, or a direct public HTTPS GIF URL. `waiting` controls approval; legacy `working` overrides still work. A custom badge URL/key overrides automatic tool badges. Never paste a bot token or client secret; the application ID is sufficient.
+
+GitHub raw links serve bundled GIFs after these files are pushed. Asset keys depend on the selected Discord application, and uploaded application art may be static. Discord controls external image proxying, caching and animation playback. Bump a URL query version when replacing hosted GIF bytes to avoid an old cached animation. The local gallery always renders the files in your checkout.
 
 ## three small pieces
 
@@ -76,7 +90,7 @@ ChatGPT process/window ──┘                       ↑
 
 **01. hook** — a short-lived JSON reader. Accepts stdin or the notify JSON argument, normalizes lifecycle events, atomically replaces state, exits. No network work in the hook. “Zero blocking delay” means no artificial sleeps or network waits on the normal hook path; reading/writing local files still takes time. Windows transient file-handle conflicts receive a bounded retry (up to 71 ms total) to preserve atomic writes; normal writes do not wait.
 
-**02. daemon** — a small, long-lived Node process. Tails modified session logs, polls ChatGPT process/window state, watches JSON files, and sends raw Discord IPC frames. Fragmented frames, READY handshakes, ACKs, ping/pong, reconnect backoff with jitter, and 5 MiB log rotation are handled locally. Updates are coalesced with a minimum 15-second interval to avoid Discord throttling. Disabled presence clears immediately.
+**02. daemon** — a small, long-lived Node process. Tails modified session logs, polls ChatGPT process/window state, watches JSON files, and sends raw Discord IPC frames. Fragmented frames, READY handshakes, ACKs, ping/pong, reconnect backoff with jitter, and 5 MiB log rotation are handled locally. Counter updates are coalesced at a steady interval of at least 15 seconds. A bounded two-slot reserve allows major transitions promptly when budget is available; repeated transitions cannot bypass the budget. Failed sends are retried without marking them acknowledged. Disabled presence clears immediately.
 
 **03. scanner** — a short-lived child. Recursively discovers JSONL session logs and only parses files whose size or modification time changed. A modified file is re-read in full so cumulative token counters, rewrites, and truncated tails remain correct. Deleted files leave both the aggregate and per-chat index. `sessions.json` keeps each conversation’s own usage, tools and costs, keyed by its actual session ID. `history.jsonl` is a prompt-only fallback when session logs are absent, so overlapping history never doubles totals.
 
@@ -84,15 +98,21 @@ ChatGPT process/window ──┘                       ↑
 
 | state | preview | when |
 | --- | --- | --- |
-| working | <img src="assets/pet/codex-pet-working.gif" width="96" alt="Original blue Codex Pet working at a laptop" /> | tool execution, shell, editing, active goal work |
-| thinking | <img src="assets/pet/codex-pet-thinking.gif" width="96" alt="Original blue Codex Pet pondering" /> | task start, user prompt, reasoning |
-| waiting | <img src="assets/pet/codex-pet-waiting.gif" width="96" alt="Original blue Codex Pet waving for attention" /> | turn complete, approval event, foreground ChatGPT |
-| idle | <img src="assets/pet/codex-pet-idle.gif" width="96" alt="Original blue Codex Pet calmly blinking" /> | session end, timeout, backgrounded/closed ChatGPT |
+| writing | <img src="assets/pet/codex-pet-writing.gif" width="96" alt="Blue Codex Pet typing" /> | writing/generation, bash and tool execution |
+| thinking | <img src="assets/pet/codex-pet-thinking.gif" width="96" alt="Blue Codex Pet planning" /> | reasoning and planning |
+| patching | <img src="assets/pet/codex-pet-patching.gif" width="96" alt="Blue Codex Pet applying patches" /> | file edits and diff application |
+| error | <img src="assets/pet/codex-pet-error.gif" width="96" alt="Blue Codex Pet stuck with smoke" /> | failed tools, error/stuck events |
+| done | <img src="assets/pet/codex-pet-done.gif" width="96" alt="Blue Codex Pet celebrating" /> | brief success loop before idle |
+| idle | <img src="assets/pet/codex-pet-idle.gif" width="96" alt="Blue Codex Pet sleeping" /> | inactivity, session end, background app |
+| waiting | <img src="assets/pet/codex-pet-waiting.gif" width="96" alt="Blue Codex Pet awaiting approval" /> | approval/foreground app with no telemetry |
 
-The **actual blue Codex companion**, reused from OpenAI’s official [Codex pet sprite sheet](https://cdn.openai.com/c6d7b0d0-3abf-40b5-9d0c-ecd2b9364692/codex-spritesheet-v4.webp), not a newly drawn mascot. `npm run assets` extracts existing animation rows using Node built-ins: laptop work → working, pondering → thinking, waving → waiting, calm blink → idle. No new typing sparks, question bubbles, or sleep effects are invented. Frame selection and holds avoid rapid face changes. The looping GIFs use the original 192×208 frame geometry; PNG and embedded-PNG SVG previews retain the original RGBA pixels. Source hashes and row mappings are in [manifest.json](assets/pet/manifest.json); attribution is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The **actual blue Codex companion** comes from OpenAI’s official [sprite sheet](https://cdn.openai.com/c6d7b0d0-3abf-40b5-9d0c-ecd2b9364692/codex-spritesheet-v4.webp). The Node-only pipeline composites original poses with integer motion and original code-generated pixel effects. Source PNG/SVG previews retain original RGBA; the GIF encoder quantizes colors. `working` remains a compatibility alias for `writing`. Source hashes, frame mappings, motion and effect provenance are in [manifest.json](assets/pet/manifest.json); artwork attribution is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 
 ## what is observable
+
+The pure `src/watcher.js` parser extracts safe file paths, multi-file patches and exact logged +/- line counts without retaining code. It recognizes direct tools and bounded static literals inside `functions.exec` wrappers; dynamic expressions are not evaluated. Public command summaries retain only allowlisted executable/subcommand names (`npm test`, `git diff`), never flags, secrets or operands. Git branch lookup reads `.git/HEAD` and worktree pointers locally without spawning `git`. No changes or unparsable/binary/deleted unknown diffs remain unknown, not fabricated zeros.
+
 
 Codex's documented [`notify`](https://learn.chatgpt.com/docs/config-file/config-advanced#notifications) fires `agent-turn-complete` with a JSON **argument**. It is not a full lifecycle hook stream. We map it to waiting, use the wrapper for session boundaries, and tail local Codex logs for task starts, reasoning, tool calls, and completion. Unknown schemas are ignored safely. Approval/waiting is exact only when the producer actually emits an approval event; no screen scraping or invented approvals.
 
@@ -134,6 +154,8 @@ No subscription quota requests or credential reads. `usage` means recorded local
 ## on your machine
 
 Choose a conversation in **Conversation on Discord**, then press **Pin to Discord**. Pinning persists across restarts and applies to the card, current-chat dashboard, timeline and CLI status. Other chats keep collecting data. **Follow latest** returns to automatic selection; an idle pinned chat stays idle rather than switching to another conversation.
+
+**Turn recaps** summarize each newly observed turn: output tokens generated, reasoning as a subset, observed tool calls, elapsed time and outcome. Recaps are metadata only, capped at 20 per chat; missing baselines stay unknown rather than counting input tokens. Older turns are not retroactively invented.
 
 The **Tool timeline** shows up to 50 recent observed calls with live durations, completed/failed/unknown outcomes, and numeric exit codes when available. It never displays arguments, stdout or raw error bodies. Older history may have fewer events or unknown outcomes.
 
@@ -204,7 +226,7 @@ Input, output, cached-input and reasoning tokens are separate. Total tokens are 
 
 Chat totals combine matching session-ID history and live observations without adding the same cumulative counters twice. Lifetime aggregates never fill missing chat metrics. Prompts, tools, line changes and active time need compatible local logs; live tool counts cover observed calls. ChatGPT process detection alone cannot reveal a conversation ID, title, model or token usage, so unavailable chat data stays unknown.
 
-Prices are **USD API-equivalent estimates**, not a ChatGPT/Codex subscription bill. Rates are snapshots, not fetched at runtime. Unknown models accumulate `unknownCostTokens` and contribute no invented cost. Historical models are retained for old sessions. Source rates checked 2026-10-29: [o3](https://developers.openai.com/api/docs/models/o3), [o4-mini](https://developers.openai.com/api/docs/models/o4-mini), [GPT-5](https://developers.openai.com/api/docs/models/gpt-5), [codex-mini-latest](https://developers.openai.com/api/docs/models/codex-mini-latest), [current pricing](https://developers.openai.com/api/docs/pricing). Update the inspectable table in `src/pricing.js` when prices change.
+Prices are **USD API-equivalent estimates**, not a ChatGPT/Codex subscription bill. Rates are snapshots, not fetched at runtime. The extended model table includes owner-supplied, unverified estimates (including Daybreak and additional model tiers); these must not be treated as official quotes. Scanner caches include a pricing fingerprint so table changes recalculate historical estimates even when logs are unchanged. A missing cached-input rate uses the full input rate rather than treating tokens as free. Unknown models accumulate `unknownCostTokens` and contribute no invented cost. Historical models are retained for old sessions. Source rates checked 2026-10-29: [o3](https://developers.openai.com/api/docs/models/o3), [o4-mini](https://developers.openai.com/api/docs/models/o4-mini), [GPT-5](https://developers.openai.com/api/docs/models/gpt-5), [codex-mini-latest](https://developers.openai.com/api/docs/models/codex-mini-latest), [current pricing](https://developers.openai.com/api/docs/pricing). Update the inspectable table in `src/pricing.js` when prices change.
 
 ## build & verify
 
@@ -249,3 +271,11 @@ scripts/              syntax / SEA builds
 ```
 
 Modeled on [rar-file/claude-rpc](https://github.com/rar-file/claude-rpc), inspected at `fa3798d0e18830106fc923f0a4c4d10dd400e0b4`. Same three-piece JSON glue, command conventions and compact developer-first presentation; independent implementation adapted to Codex. No upstream telemetry, community publishing, authentication or Claude-specific integrations. Unaffiliated with OpenAI or Discord.
+
+## Windows console flashes
+
+If blank terminals were opening and closing every few seconds, update this checkout and run `node bin/codex-rpc.js setup` once. That refreshes the installed runtime and restarts the daemon. Detector polling, scans and background launches now use hidden windows; setup replaces recognizable old Startup `.cmd` files with a hidden `.vbs` launcher. Custom launcher files are preserved with a warning.
+
+Login autostart requires Windows Script Host/VBScript. Setup checks availability and reports a fix hint if your Windows installation disables it; it does not change execution policies. Manual `codex-rpc start` still supports background operation without login autostart. Microsoft is [deprecating VBScript](https://techcommunity.microsoft.com/blog/windows-itpro-blog/vbscript-deprecation-timelines-and-next-steps/4148301), so this dependency is documented rather than silently assumed.
+
+For validation, leave the updated daemon running for at least 15 seconds, allowing several detector checks, and then test a fresh sign-in. Native Windows CI includes a console-visibility probe. macOS-only tests cannot certify your Windows desktop behavior.

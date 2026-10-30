@@ -1,6 +1,6 @@
 # codex-rpc 0.2.0 — release candidate
 
-Chat selection and pinning, live tool timeline, output-only chat presence, and a quieter dark/light dashboard.
+Six full-body animated states, live file/diff telemetry, operation timers, turn recaps, Windows hidden launches, chat pinning and a dark/light dashboard.
 
 This is a GitHub-only release. The unscoped npm name `codex-rpc` belongs to an unrelated project. Do not use `npx codex-rpc@latest` or `npm publish` for this repository. The package is marked private to prevent accidental registry publication; the tarball still installs normally.
 
@@ -44,3 +44,5 @@ For a native binary, run `npm run release:prepare -- --sea` with an official SEA
 ## Privacy and limits
 
 Pinning stays in local `selection.json`; it never changes a Codex conversation. A pinned inactive or removed chat stays idle rather than leaking another conversation. Private mode redacts names and files. Tool outcomes are best-effort metadata from logs, not a security audit; interrupted calls can have unknown results. Desktop process observation cannot invent chat tokens. Costs are API-equivalent estimates, not subscription bills. No telemetry or automatic analytics publishing.
+
+Before publication, check six hosted asset URLs from config.example.json against committed hashes and confirm the visual scenes in Discord. For Windows, verify at least 15 seconds of detector polling without console flashes, scanner startup, and fresh-login autostart. The native console-visibility probe must pass in the Windows CI jobs. The local macOS build cannot certify those Windows-specific behaviors.
