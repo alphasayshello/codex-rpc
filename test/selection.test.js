@@ -82,9 +82,10 @@ test("chat lists expose safe titles and output, respect privacy/showTask and ret
   assert.doesNotThrow(() => pinChat("ancient"));
 });
 test("selection APIs share selected state and protect pin mutations with CSRF token", async (t) => {
+  let server;
+  t.after(async () => { await server?.closeDashboard(); });
   sandbox(t); fixture();
-  const server = await serve(0);
-  t.after(() => new Promise((resolve) => { server.closeDashboard(); server.on("close", resolve); }));
+  server = await serve(0);
   const base = `http://127.0.0.1:${server.address().port}`;
   let response = await fetch(base + "/api/pin", { method: "POST", body: JSON.stringify({ id: "a" }) });
   assert.equal(response.status, 403);
@@ -107,6 +108,8 @@ test("selection APIs share selected state and protect pin mutations with CSRF to
   assert.equal((await (await fetch(base + "/api/state")).json()).sessionId, "b");
 });
 test("selected state and API sanitize nested tools from old public snapshots", async (t) => {
+  let server;
+  t.after(async () => { await server?.closeDashboard(); });
   sandbox(t);
   const tool = { name: "bash", callId: "call-1", startedAt: Date.now(), durationMs: 10, status: "failed", exitCode: 1,
     file: "private/company.js", arguments: { secret: "secret-argument" }, output: "secret-output", command: "secret-command", error: "secret-error" };
@@ -121,8 +124,7 @@ test("selected state and API sanitize nested tools from old public snapshots", a
   const visible = selectedState(settings());
   assert.equal(visible.lastTool.file, "private/company.js");
   assert.equal(visible.lastTool.output, undefined);
-  const server = await serve(0);
-  t.after(() => new Promise((resolve) => { server.closeDashboard(); server.on("close", resolve); }));
+  server = await serve(0);
   const response = await fetch(`http://127.0.0.1:${server.address().port}/api/state`);
   assert.equal(response.status, 200);
   const text = await response.text();

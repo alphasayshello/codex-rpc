@@ -1,4 +1,5 @@
 import { selectedState } from "./selection.js";
+import { watchDirectory } from "./directory-watch.js";
 import fs from "node:fs";
 import { fork } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -187,7 +188,7 @@ export async function runDaemon() {
       request.startedAt === startedAt
     );
   }
-  const watcher = fs.watch(home(), (_, name) => {
+  const watcher = watchDirectory(home(), ["control.json", "state.json", "config.json", "aggregate.json", "sessions.json", "selection.json"], (name) => {
     if (name === "control.json" && stopRequested()) {
       stop().catch((e) => rotateLog(e.message));
       return;

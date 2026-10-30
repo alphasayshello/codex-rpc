@@ -14,9 +14,10 @@ import {
 } from "../src/statcards.js";
 import { rangeAggregate, insights, heatmap } from "../src/tui.js";
 test("dashboard serves APIs/assets, live SVG, settings CSRF protection and ranges", async (t) => {
+  let server, controller;
+  t.after(async () => { controller?.abort(); await server?.closeDashboard(); });
   sandbox(t);
-  const server = await serve(0);
-  t.after(() => server.closeDashboard());
+  server = await serve(0);
   const url = `http://127.0.0.1:${server.address().port}`;
   writeJSON("state.json", { status: "working", source: "codex" });
   writeJSON("aggregate.json", {
@@ -124,8 +125,7 @@ test("dashboard serves APIs/assets, live SVG, settings CSRF protection and range
   assert.equal((await fetch(url + "/assets/pet/codex-status-thinking.gif")).headers.get("content-type"), "image/gif");
   assert.equal((await fetch(url + "/assets/pet/animation-gallery.html")).status, 200);
   assert.equal((await fetch(url + "/not-a-route")).status, 404);
-  const controller = new AbortController();
-  t.after(() => controller.abort());
+  controller = new AbortController();
   const response = await fetch(url + "/events", { signal: controller.signal });
   assert.match(response.headers.get("content-type"), /event-stream/);
   const reader = response.body.getReader();

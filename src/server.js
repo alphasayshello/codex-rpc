@@ -11,12 +11,14 @@ import { rangeAggregate } from "./tui.js";
 import { emptyStats } from "./scanner.js";
 import { statsSVG, heatmapSVG, badgeSVG } from "./statcards.js";
 import { startDaemon, stopDaemon } from "./service.js";
+import { watchDirectory } from "./directory-watch.js";
 export function createServer() {
   const token = randomBytes(24).toString("hex"),
     clients = new Set();
-  let watcher, interval;
+  let watcher, interval, closing;
   const server = http.createServer(async (req, res) => {
     const address = server.address();
+    if (!address) { res.writeHead(503).end("Dashboard is closing"); return; }
     const expected = `localhost:${address.port}`,
       alternate = `127.0.0.1:${address.port}`;
     if (![expected, alternate].includes(req.headers.host)) {
@@ -254,12 +256,8 @@ export function createServer() {
   });
   server.on("listening", () => {
     fs.mkdirSync(home(), { recursive: true, mode: 0o700 });
-    watcher = fs.watch(home(), (_, name) => {
-      if (
-        ["state.json", "aggregate.json", "sessions.json", "selection.json", "config.json", "daemon.json"].includes(
-          name,
-        )
-      )
+    watcher = watchDirectory(home(),
+      ["state.json", "aggregate.json", "sessions.json", "selection.json", "config.json", "daemon.json"], () => {
         for (const c of clients)
           if (c.writableLength < 65536) c.write("event: update\ndata: {}\n\n");
     });
@@ -274,9 +272,21 @@ export function createServer() {
     for (const c of clients) c.end();
     clients.clear();
   });
-  server.closeDashboard = () => {
+  server.closeDashboard = (callback) => {
+    // Release native watchers before waiting for HTTP/SSE connections, so
+    // callers may remove the data directory as soon as shutdown begins.
+    watcher?.close();
+    clearInterval(interval);
     for (const c of clients) c.end();
-    server.close();
+    clients.clear();
+    closing ||= new Promise((resolve, reject) => {
+      server.close((error) => error && error.code !== "ERR_SERVER_NOT_RUNNING" ? reject(error) : resolve());
+      // Node 18 does not automatically dispose of idle keep-alive sockets.
+      server.closeIdleConnections?.();
+      server.closeAllConnections?.();
+    });
+    if (callback) closing.then(() => callback(), callback);
+    return closing;
   };
   return server;
 }
