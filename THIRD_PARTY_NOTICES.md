@@ -9,6 +9,6 @@ The blue Codex companion is existing OpenAI artwork, not original codex-rpc artw
 - Original WebP bytes and a losslessly decoded RGBA PNG are retained in `assets/pet/source/`.
 - `assets/pet/manifest.json` records SHA-256 hashes, exact source rows, frame counts and GIF timings.
 
-Generated GIFs quantize the original frames to a shared 256-color GIF palette. PNG/SVG previews preserve source RGBA pixels, except hidden RGB under fully transparent pixels is cleared. Badges resize an original idle frame. Banner, dashboard and stat-card images embed these source-derived previews. No replacement character or new character pose is drawn.
+Generated GIFs quantize the original frames to a shared 256-color GIF palette. PNG/SVG previews preserve source RGBA pixels, except hidden RGB under fully transparent pixels is cleared. Badges resize an original idle frame. Banner, dashboard and stat-card images embed these source-derived previews. Selected original frames are held longer and repeated to keep expressions calm; no replacement character or new character pose is drawn. The separate colored status-circle/check/terminal icons are original code-rendered UI glyphs covered by MIT, not third-party mascot artwork.
 
 These images remain third-party artwork. The repository's MIT grant covers the original code and does not purport to relicense OpenAI's artwork or trademarks. The download service did not provide a separate artwork license. This independent utility is not an OpenAI product or an endorsement.

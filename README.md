@@ -26,11 +26,28 @@ codex-rpc setup
 codex-rpc serve
 ```
 
-Setup copies a stable runtime into `~/.codex-rpc/runtime/`, registers the user-level Codex `notify` command, enables lightweight ChatGPT detection, installs login autostart, and starts the daemon. Existing notifiers are preserved; setup explains how to use the wrapper instead. No administrator access required. `setup --no-service --no-start` writes only integration files.
+Setup refreshes running code and old bundled asset URLs while preserving custom URLs. It copies a stable runtime into `~/.codex-rpc/runtime/`, registers the user-level Codex `notify` command, enables lightweight ChatGPT detection, installs login autostart, and starts the daemon. Existing notifiers are preserved; setup explains how to use the wrapper instead. No administrator access required. `setup --no-service --no-start` writes only integration files.
 
 Open **http://localhost:47474**. The default application is `1565535814308470814` and the four GIFs plus badge are hosted directly in [this GitHub repository](https://github.com/alphasayshello/codex-rpc/tree/main/assets/pet). No asset upload is needed once these commits are pushed. Use **Settings → Discord / Codex Pet Assets** to supply your own application, HTTPS GIF URLs, or uploaded Discord asset keys.
 
 Discord **Desktop** must be running. Browser-only Discord cannot expose its local IPC socket. Discord controls whether remote GIFs animate; uploaded application art may be static. All four actual animated GIFs ship in this repository.
+
+## on Discord
+
+```text
+Watching Codex RPC
+Build a complete Discord presence suite
+$1.04k today · $24.3k all-time · Done · your move · +1055 −21
+▣ 0:58 elapsed
+```
+
+The card follows the same compact layout as claude-rpc: current task on top, daily/lifetime API-equivalent cost plus live status below, a state badge, and the session timer. The numbers above are an illustration, not collected usage. Discord controls wrapping, font and application name; the bundled application is named **Codex RPC**. `Watching` is the default activity type.
+
+For that task-title layout, open `codex-rpc serve`, choose **Privacy → public**, and leave **Presence → Show current task** enabled. Private mode keeps task and project names out of the card. Presence also offers the original **Model / tokens** stats line and **Playing / Watching** header. `codex-rpc preview` prints the exact text and asset URLs for all four states before you share anything.
+
+The blue pet uses selected original poses with deliberate holds, not a rapid expression slideshow: work keeps its neutral terminal face, with one brief blink in a 5.22-second loop. Other states move slowly or give an occasional wave. Dashboard SSE updates preserve an animation already in progress. Ten pixel badges cover commands, thinking, completion, idle, approval, editing, reading, review, ready and errors. They are drawn on a crisp 24-pixel grid and enlarged without antialiasing; the card selects a badge from the live tool/state. A custom badge URL overrides them.
+
+<img src="assets/pet/status-badges.svg" width="800" alt="Ten pixel-art status badges" />
 
 ## three small pieces
 
@@ -60,7 +77,7 @@ ChatGPT process/window ──┘                       ↑
 | waiting | <img src="assets/pet/codex-pet-waiting.gif" width="96" alt="Original blue Codex Pet waving for attention" /> | turn complete, approval event, foreground ChatGPT |
 | idle | <img src="assets/pet/codex-pet-idle.gif" width="96" alt="Original blue Codex Pet calmly blinking" /> | session end, timeout, backgrounded/closed ChatGPT |
 
-The **actual blue Codex companion**, reused from OpenAI’s official [Codex pet sprite sheet](https://cdn.openai.com/c6d7b0d0-3abf-40b5-9d0c-ecd2b9364692/codex-spritesheet-v4.webp), not a newly drawn mascot. `npm run assets` extracts existing animation rows using Node built-ins: laptop work → working, pondering → thinking, waving → waiting, calm blink → idle. No new typing sparks, question bubbles, or sleep effects are invented. The looping GIFs use the original 192×208 frame geometry; PNG and embedded-PNG SVG previews retain the original RGBA pixels. Source hashes and row mappings are in [manifest.json](assets/pet/manifest.json); attribution is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The **actual blue Codex companion**, reused from OpenAI’s official [Codex pet sprite sheet](https://cdn.openai.com/c6d7b0d0-3abf-40b5-9d0c-ecd2b9364692/codex-spritesheet-v4.webp), not a newly drawn mascot. `npm run assets` extracts existing animation rows using Node built-ins: laptop work → working, pondering → thinking, waving → waiting, calm blink → idle. No new typing sparks, question bubbles, or sleep effects are invented. Frame selection and holds avoid rapid face changes. The looping GIFs use the original 192×208 frame geometry; PNG and embedded-PNG SVG previews retain the original RGBA pixels. Source hashes and row mappings are in [manifest.json](assets/pet/manifest.json); attribution is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 
 ## what is observable
@@ -86,6 +103,7 @@ ChatGPT detection is process-only on Windows; macOS uses System Events for foreg
 | `status [--watch]` | live state, ASCII pet, totals, heatmap and rankings |
 | `usage [--watch]` | heat-graded bars, 52-week heatmap, hour histogram, tools, languages, cost |
 | `insights` | trend, peak weekday, hotspot, cost/token pace, streak |
+| `preview` | exact current Discord text and asset URLs for all four states |
 | `serve [--port 47474]` | dark dashboard, SSE, range filters, interactive year heatmap |
 | `statcards [--output ./statcards]` | SVG card with embedded pet, 12-month heatmap, four badges, Markdown |
 | `doctor` | Node, notify, detector, daemon, real Discord handshake, aggregate age, privacy |
@@ -130,7 +148,7 @@ Electron runs the same loopback dashboard on a random port with Node integration
 
 ## settings & privacy
 
-`~/.codex-rpc/config.json` contains overrides. See [config.example.json](config.example.json). Default privacy is `private`: Discord receives “a private project”, not project/file names. Tokens, model, tool name, hours and streak can still be shared. Public buttons and URLs are explicit user configuration.
+`~/.codex-rpc/config.json` contains overrides. See [config.example.json](config.example.json). Default privacy is `private`: Discord receives “a private project”, not task titles or project/file names. Public mode can retain a short current-task title from the first line of the user prompt; full prompts are not stored. Tokens, model, tool name, hours and streak can still be shared. Public buttons and URLs are explicit user configuration.
 
 ```json
 {
@@ -182,6 +200,7 @@ src/hook.js           01. event hook
 src/daemon.js         02. Discord supervisor
 src/scanner.js        03. incremental history scanner
 src/ipc.js            raw Discord IPC client
+src/presence.js       card templates and compact usage text
 src/log-watcher.js    live JSONL tailer
 src/chatgpt-detector.js
 src/pricing.js        token cost snapshots
