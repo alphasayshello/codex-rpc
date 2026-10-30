@@ -86,7 +86,8 @@ document.addEventListener("keydown", (event) => {
 let cfg,
   token,
   tab = "Presence",
-  refreshing = false;
+  refreshing = false,
+  refreshPending = false;
 const categories = [
   "Presence",
   "Discord",
@@ -245,18 +246,137 @@ function renderChat(chat = {}) {
     chat.unknownCostTokens ? `${format(chat.unknownCostTokens)} tokens have no known model price.` : "",
   ].filter(Boolean).join(" ");
 }
+let chatChoices = [], pinnedChat = null, draftChat = null, pinBusy = false;
+let timelineData = { rows: [] };
+const chatKey = (chat) => chat?.id ? JSON.stringify([chat.source || "codex", chat.id]) : "";
+function updatePinControls() {
+  const value = $("#chat-picker").value;
+  $("#pin-chat").disabled = pinBusy || !value || value === chatKey(pinnedChat);
+  $("#unpin-chat").disabled = pinBusy || !pinnedChat;
+  $("#chat-picker").disabled = pinBusy;
+}
+function renderChats(data = {}) {
+  chatChoices = data.chats || [];
+  pinnedChat = data.pinned || null;
+  const picker = $("#chat-picker");
+  const selection = draftChat ?? chatKey(pinnedChat);
+  picker.replaceChildren();
+  const automatic = document.createElement("option");
+  automatic.value = "";
+  automatic.textContent = "Automatic · follow latest conversation";
+  picker.append(automatic);
+  for (const chat of chatChoices) {
+    const option = document.createElement("option");
+    option.value = chatKey(chat);
+    option.textContent = [chat.title || "Untitled conversation", chat.source === "chatgpt" ? "ChatGPT" : "Codex", chat.status || "idle", chat.current ? "current" : ""].filter(Boolean).join(" · ");
+    picker.append(option);
+  }
+  // Keep an unsaved choice through SSE refreshes; selecting alone never pins.
+  picker.value = selection;
+  if (picker.selectedIndex < 0) { picker.value = ""; draftChat = null; }
+  const pinTitle = chatChoices.find((chat) => chatKey(chat) === chatKey(pinnedChat))?.title || "Selected conversation";
+  $("#chat-pin-status").textContent = pinnedChat
+    ? `Pinned to Discord: ${pinTitle}. Follow latest to return to automatic selection.`
+    : "Following the latest conversation automatically. Choose a conversation and click Pin to Discord to keep it selected.";
+  if (draftChat != null && draftChat !== chatKey(pinnedChat))
+    $("#chat-pin-status").textContent += draftChat ? " New choice is not pinned yet." : " Click Follow latest to clear the pin.";
+  updatePinControls();
+}
+function renderTimeline(data = {}) {
+  timelineData = data;
+  const target = $("#tool-timeline");
+  target.replaceChildren();
+  const rows = Array.isArray(data.rows) ? data.rows : [];
+  const running = rows.filter((row) => row.status === "running").length;
+  $("#timeline-summary").textContent = running ? `${running} running · ${rows.length} recorded` : `${rows.length} recorded`;
+  if (!rows.length) {
+    const empty = document.createElement("li");
+    empty.className = "timeline-empty";
+    empty.textContent = data.sessionId ? "No tools recorded for this conversation yet." : "Start or pin a conversation to see its tools here.";
+    target.append(empty);
+    return;
+  }
+  for (const row of rows.slice().reverse()) {
+    const item = document.createElement("li");
+    item.className = "timeline-row";
+    const details = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = row.name || "Tool";
+    details.append(name);
+    if (row.file) {
+      const file = document.createElement("span");
+      file.className = "timeline-file";
+      file.textContent = row.file;
+      details.append(file);
+    }
+    const metadata = document.createElement("div");
+    metadata.className = "timeline-metadata";
+    const status = document.createElement("span");
+    const kind = ["running", "completed", "failed"].includes(row.status) ? row.status : "unknown";
+    status.className = `timeline-status ${kind}`;
+    status.textContent = kind === "unknown" ? "Status unknown" : kind[0].toUpperCase() + kind.slice(1);
+    metadata.append(status);
+    const ms = kind === "running" && Number.isFinite(row.startedAt) && row.startedAt > 0
+      ? Math.max(0, Date.now() - row.startedAt) : row.durationMs;
+    const duration = document.createElement("span");
+    duration.className = "timeline-duration";
+    duration.textContent = typeof ms === "number" && Number.isFinite(ms)
+      ? ms < 1000 ? `${Math.round(ms)} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.floor(ms / 60000)}m ${Math.floor(ms / 1000) % 60}s`
+      : "Duration unavailable";
+    metadata.append(duration);
+    if (Number.isInteger(row.exitCode)) {
+      const exit = document.createElement("span");
+      exit.className = "timeline-exit";
+      exit.textContent = `exit ${row.exitCode}`;
+      metadata.append(exit);
+    }
+    item.append(details, metadata);
+    target.append(item);
+  }
+}
+$("#chat-picker").addEventListener("change", () => {
+  draftChat = $("#chat-picker").value;
+  renderChats({ chats: chatChoices, pinned: pinnedChat });
+});
+async function changePin(selection) {
+  if (pinBusy) return;
+  pinBusy = true;
+  updatePinControls();
+  try {
+    await api("/api/pin", selection);
+    draftChat = null;
+    await refresh();
+  } catch (error) {
+    $("#chat-pin-status").textContent = `Could not change Discord selection: ${error.message}`;
+  } finally {
+    pinBusy = false;
+    updatePinControls();
+  }
+}
+$("#pin-chat").addEventListener("click", () => {
+  const chat = chatChoices.find((choice) => chatKey(choice) === $("#chat-picker").value);
+  if (chat) changePin({ id: chat.id, source: chat.source });
+});
+$("#unpin-chat").addEventListener("click", () => changePin({ id: null }));
+setInterval(() => {
+  if (timelineData.rows?.some((row) => row.status === "running")) renderTimeline(timelineData);
+}, 1000);
 async function refresh() {
-  if (refreshing) return;
+  if (refreshing) { refreshPending = true; return; }
   refreshing = true;
   try {
-    const [s, a, year, activity, chat] = await Promise.all([
+    const [s, a, year, activity, chat, chats, timeline] = await Promise.all([
       api("/api/state"),
       api("/api/aggregate?range=" + $("#range").value),
       api("/api/aggregate?range=1y"),
       api("/api/presence"),
       api("/api/chat"),
+      api("/api/chats"),
+      api("/api/timeline"),
     ]);
     renderChat(chat);
+    renderChats(chats);
+    renderTimeline(timeline);
     const t = a.totals || {},
       state = ["working", "thinking", "waiting", "idle"].includes(s.status)
         ? s.status
@@ -335,6 +455,10 @@ async function refresh() {
     $("#connection").textContent = e.message;
   } finally {
     refreshing = false;
+    if (refreshPending) {
+      refreshPending = false;
+      queueMicrotask(refresh);
+    }
   }
 }
 function field(label, key, type = "text", hint = "") {

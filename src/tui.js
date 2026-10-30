@@ -1,3 +1,4 @@
+import { selectedState } from "./selection.js";
 import { config, readJSON, alive } from "./store.js";
 import { emptyStats, streaks, mergeStats } from "./scanner.js";
 import { getChatStats } from "./chat.js";
@@ -70,7 +71,7 @@ export function rangeAggregate(a, range = "all", now = new Date()) {
 }
 const known = (value, format = compact) =>
   value === null || value === undefined ? "unavailable" : format(value);
-export function renderChat(chat = getChatStats(), settings = config()) {
+export function renderChat(chat = getChatStats(selectedState()), settings = config()) {
   if (!chat?.id) return "Current chat\nNo identified chat yet. Open a Codex session to collect chat-specific activity.";
   const toolNames = (tools) =>
     [...new Set((tools || []).map((tool) => typeof tool === "string" ? tool : tool.name).filter(Boolean))].join(", ");
@@ -88,7 +89,7 @@ export function renderChat(chat = getChatStats(), settings = config()) {
   ].join("\n");
 }
 export function renderStatus({ usage = false, currentChat = true } = {}) {
-  const s = readJSON("state.json", { status: "idle" }),
+  const s = selectedState(),
     a = readJSON("aggregate.json", {
       totals: emptyStats(),
       days: {},

@@ -30,6 +30,27 @@ const states = {
   "app-closed": "idle",
   "app-active": "waiting",
 };
+// Keep outcome metadata, never the output it came from. Terminal wrappers have
+// stable exit markers; arbitrary occurrences of "error" in stdout prove nothing.
+export function toolOutcome(input) {
+  const p = input.payload || input;
+  let output = p.output ?? input.output;
+  if (typeof output === "string") {
+    const prefix = output.slice(0, 4096);
+    try {
+      output = output.length <= 65536 ? JSON.parse(output) : null;
+    } catch { output = null; }
+    if (!output || typeof output !== "object") {
+      const match = prefix.match(/^(?:Process exited with code\s+|Exit code:\s*|Command failed with exit code\s+)(-?\d+)\s*$/m);
+      output = match ? { exit_code: Number(match[1]) } : {};
+    }
+  }
+  const objects = [input, p, output, output?.metadata].filter((v) => v && typeof v === "object");
+  const codes = objects.flatMap((v) => [v.exitCode, v.exit_code]).filter((v) => typeof v === "number" && Number.isSafeInteger(v));
+  const exitCode = codes.find((code) => code !== 0) ?? codes[0];
+  const failed = objects.some((v) => v.is_error === true || v.isError === true || ["failed", "error", "cancelled", "canceled"].includes(v.status)) || (exitCode != null && exitCode !== 0);
+  return { status: failed ? "failed" : "completed", ...(exitCode != null ? { exitCode } : {}) };
+}
 export function normalizeEvent(input) {
   const p = input.payload || input;
   const type = p.type || input.type;
@@ -74,6 +95,7 @@ export function normalizeEvent(input) {
     file: filename || undefined,
     tokens: input.tokens ?? p.info?.total_token_usage?.total_tokens,
     timestamp: input.timestamp,
+    outcome: ["tool-end", "function_call_output", "custom_tool_call_output"].includes(type) ? toolOutcome(input) : undefined,
   };
 }
 export function applyEvent(input) {
@@ -145,9 +167,9 @@ export function applyEvent(input) {
     const callId = String(e.callId || `${e.tool || "tool"}:${eventTime}`);
     if (!seen.includes(callId)) {
       seen.push(callId);
-      const tool = { name: String(e.tool || "tool").slice(0, 128), callId, startedAt: eventTime, ...(c.privacy === "public" && e.file ? { file: e.file } : {}) };
+      const tool = { name: String(e.tool || "tool").slice(0, 128), callId, status: "running", startedAt: eventTime, ...(c.privacy === "public" && e.file ? { file: e.file } : {}) };
       active.push(tool);
-      recent = [...recent.filter((t) => t.callId !== callId), tool].slice(-8);
+      recent = [...recent.filter((t) => t.callId !== callId), tool].slice(-50);
       next.lastTool = tool;
     } else if (!active.some((t) => t.callId === callId)) {
       // Replayed completed calls cannot revive an old working state.
@@ -158,14 +180,14 @@ export function applyEvent(input) {
     const target = e.callId ? String(e.callId) : active.at(-1)?.callId;
     const tool = active.find((t) => t.callId === target);
     if (tool) {
-      const completed = { ...tool, endedAt: eventTime, durationMs: Math.max(0, eventTime - tool.startedAt) };
-      recent = [...recent.filter((t) => t.callId !== target), completed].slice(-8);
+      const completed = { ...tool, ...e.outcome, endedAt: eventTime, durationMs: Math.max(0, eventTime - tool.startedAt) };
+      recent = [...recent.filter((t) => t.callId !== target), completed].slice(-50);
       next.lastTool = completed;
       active = active.filter((t) => t.callId !== target);
     }
   } else if (["waiting", "idle"].includes(e.status) && !e.tokenOnly) {
     recent = recent.map((t) => active.some((a) => a.callId === t.callId)
-      ? { ...t, endedAt: eventTime, durationMs: Math.max(0, eventTime - t.startedAt) } : t);
+      ? { ...t, status: "unknown", endedAt: eventTime, durationMs: Math.max(0, eventTime - t.startedAt) } : t);
     if (active.length) next.lastTool = recent.at(-1);
     active = [];
   }
@@ -186,6 +208,13 @@ export function applyEvent(input) {
     delete next.project;
     delete next.file;
     delete next.task;
+    // A privacy change must also redact metadata collected while public.
+    next.activeTools = next.activeTools.map(({ file, ...tool }) => tool);
+    next.recentTools = next.recentTools.map(({ file, ...tool }) => tool);
+    if (next.lastTool) {
+      const { file, ...tool } = next.lastTool;
+      next.lastTool = tool;
+    }
   }
   if (sessionId) writeJSON(liveSessionFile(sessionId, source), next);
   // Old log records may refresh their own conversation, but must never switch

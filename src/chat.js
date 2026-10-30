@@ -21,7 +21,7 @@ export function getChatStats(state = readJSON("state.json"), settings = config()
   const index = history(), candidate = id ? index.sessions?.[id] : null;
   const record = candidate && (!candidate.source || candidate.source === source) ? candidate : {};
   const snapshot = readLiveSession(id, source);
-  const live = snapshot.sessionId === id && (snapshot.updatedAt || 0) > (state.updatedAt || 0) ? snapshot : state;
+  const live = snapshot.sessionId === id && (!snapshot.source || snapshot.source === source) && (snapshot.updatedAt || 0) > (state.updatedAt || 0) ? snapshot : state;
   const totals = record.totals || {}, usage = live.usage || {};
   const known = !!record.usageKnown;
   const count = (key, liveValue) => {
@@ -40,7 +40,15 @@ export function getChatStats(state = readJSON("state.json"), settings = config()
   const cost = tokens == null ? null : (known ? (number(totals.cost) || 0) : 0) + (extra || 0);
   const recent = [...(record.recentTools || []), ...(live.recentTools || [])];
   const dedup = new Map(recent.map((t) => [t.callId || `${t.name}:${t.startedAt}`, t]));
-  const privateMode = settings.privacy !== "public";
+  const privateMode = settings.privacy !== "public" || settings.presence?.showTask === false;
+  const safeTool = (tool) => {
+    if (typeof tool === "string") return tool.slice(0, 128);
+    const clean = {};
+    for (const field of ["name", "callId", "startedAt", "endedAt", "durationMs", "status", "exitCode"])
+      if (tool?.[field] !== undefined) clean[field] = tool[field];
+    if (!privateMode && safeFilePath(tool?.file)) clean.file = tool.file;
+    return clean;
+  };
   const contextWindow = number(live.contextWindow), lastRequestTokens = number(live.lastUsage?.total);
   return {
     id, source, title: privateMode ? "Private conversation" : conversationName(id) || (live.taskSource ? live.task : null) || live.project || "Current chat",
@@ -57,8 +65,8 @@ export function getChatStats(state = readJSON("state.json"), settings = config()
     linesAdded: record.id ? number(totals.linesAdded) : null, linesRemoved: record.id ? number(totals.linesRemoved) : null,
     activeSeconds: record.id ? number(totals.activeSeconds) : null,
     activeHours: record.id ? (totals.activeSeconds || 0) / 3600 : null,
-    activeTools: live.activeTools || [], recentTools: [...dedup.values()].sort((a,b) => (a.startedAt || 0)-(b.startedAt || 0)).slice(-8),
-    lastTool: live.lastTool || null, contextWindow, lastRequestTokens,
+    activeTools: (live.activeTools || []).map(safeTool), recentTools: [...dedup.values()].sort((a,b) => (a.startedAt || 0)-(b.startedAt || 0)).slice(-8).map(safeTool),
+    lastTool: live.lastTool ? safeTool(live.lastTool) : null, contextWindow, lastRequestTokens,
     contextPercent: contextWindow && lastRequestTokens != null ? Math.min(100,lastRequestTokens/contextWindow*100) : null,
   };
 }

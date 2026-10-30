@@ -1,3 +1,4 @@
+import { selectedState } from "./selection.js";
 import fs from "node:fs";
 import { fork } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -155,7 +156,7 @@ export async function runDaemon() {
         }
       }
       if (stopped) return;
-      const s = readJSON("state.json", { status: "idle" });
+      const s = selectedState(c);
       if (now - (s.updatedAt || 0) > c.timing.idleMs) s.status = "idle";
       const payload = buildActivity(s, readJSON("aggregate.json"), c),
         encoded = JSON.stringify(payload);
@@ -197,7 +198,7 @@ export async function runDaemon() {
       stop().catch((e) => rotateLog(e.message));
       return;
     }
-    if (["state.json", "config.json", "aggregate.json", "sessions.json"].includes(name)) tick();
+    if (["state.json", "config.json", "aggregate.json", "sessions.json", "selection.json"].includes(name)) tick();
   });
   async function stop() {
     if (stopped) return;

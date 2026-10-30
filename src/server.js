@@ -1,3 +1,5 @@
+import { getToolTimeline } from "./timeline.js";
+import { selectedState, listChats, pinChat, unpinChat } from "./selection.js";
 import { getChatStats } from "./chat.js";
 import http from "node:http";
 import fs from "node:fs";
@@ -69,6 +71,12 @@ export function createServer() {
             return;
           }
         }
+        if (url.pathname === "/api/pin") {
+          const { id, source = "codex" } = JSON.parse(text);
+          const pinned = id === null ? unpinChat() : pinChat(id, source);
+          json(200, { ok: true, pinned, state: selectedState() });
+          return;
+        }
         if (url.pathname === "/api/config") {
           const next = validateConfig(JSON.parse(text));
           writeJSON("config.json", next);
@@ -102,7 +110,7 @@ export function createServer() {
         return;
       }
       if (url.pathname === "/api/state") {
-        const state = readJSON("state.json", { status: "idle" });
+        const state = selectedState();
         if (config().privacy !== "public" || !config().presence.showTask)
           delete state.task;
         if (config().privacy === "private") {
@@ -124,7 +132,7 @@ export function createServer() {
         return;
       }
       if (url.pathname === "/api/presence") {
-        const state = readJSON("state.json", { status: "idle" });
+        const state = selectedState();
         if (
           state.updatedAt &&
           Date.now() - state.updatedAt > config().timing.idleMs
@@ -134,7 +142,17 @@ export function createServer() {
         return;
       }
       if (url.pathname === "/api/chat") {
-        json(200, getChatStats());
+        json(200, getChatStats(selectedState()));
+        return;
+      }
+      if (url.pathname === "/api/chats") {
+        const saved = readJSON("selection.json");
+        json(200, { chats: listChats(), pinned: saved.sessionId ? { id: saved.sessionId, source: saved.source } : null });
+        return;
+      }
+      if (url.pathname === "/api/timeline") {
+        const state = selectedState();
+        json(200, { sessionId: state.sessionId || null, source: state.source || "codex", rows: getToolTimeline(state, config()) });
         return;
       }
       if (url.pathname === "/api/aggregate") {
@@ -211,7 +229,7 @@ export function createServer() {
       res.end(fs.readFileSync(new URL(route[0], import.meta.url)));
     } catch (e) {
       json(
-        e instanceof SyntaxError ||
+        e.statusCode === 400 || e instanceof SyntaxError ||
           /Invalid range|setting|must|Invalid enabled|Assets|Timing|Use up/.test(
             e.message,
           )
@@ -225,7 +243,7 @@ export function createServer() {
     fs.mkdirSync(home(), { recursive: true, mode: 0o700 });
     watcher = fs.watch(home(), (_, name) => {
       if (
-        ["state.json", "aggregate.json", "sessions.json", "config.json", "daemon.json"].includes(
+        ["state.json", "aggregate.json", "sessions.json", "selection.json", "config.json", "daemon.json"].includes(
           name,
         )
       )

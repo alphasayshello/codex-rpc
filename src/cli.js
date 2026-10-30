@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import { selectedState } from "./selection.js";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { buildActivity } from "./presence.js";
@@ -54,7 +56,7 @@ export async function main(args = process.argv.slice(2)) {
       break;
     case "version":
     case "--version":
-      console.log("0.1.0");
+      console.log(JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version);
       break;
     case "hook":
       await hook();
@@ -109,7 +111,7 @@ export async function main(args = process.argv.slice(2)) {
       const render = () => console.log(
         cmd === "chat"
           ? rest.includes("--json")
-            ? JSON.stringify(getChatStats(), null, 2)
+            ? JSON.stringify(getChatStats(selectedState()), null, 2)
             : renderChat()
           : renderStatus({ usage: cmd === "usage", currentChat: cmd === "status" }),
       );

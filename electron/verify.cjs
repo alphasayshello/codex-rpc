@@ -21,7 +21,8 @@ async function until(fn) {
 app
   .whenReady()
   .then(async () => {
-    const { writeJSON, config } = await import("../src/store.js"),
+    const { writeJSON, readJSON, config } = await import("../src/store.js"),
+      { liveSessionFile } = await import("../src/live.js"),
       { emptyStats, mergeStats, streaks } = await import("../src/scanner.js");
     const days = {},
       totals = emptyStats();
@@ -69,7 +70,7 @@ app
       days,
       streak: streaks(days),
     });
-    const now = Date.now(), sessionId = "render-demo-chat";
+    const now = Date.now(), sessionId = "render-demo-chat", secondId = "render-pinned-chat";
     const chatTotals = {
       ...emptyStats(), tokens: 142800, input: 120000, output: 22800,
       reasoning: 8000, cached: 75000, prompts: 14, toolCalls: 32,
@@ -82,6 +83,12 @@ app
           id: sessionId, source: "codex", model: "o4-mini", usageKnown: true,
           startedAt: now - 1800000, totals: chatTotals,
           recentTools: [{ name: "apply_patch", callId: "finished-patch", startedAt: now - 15000, endedAt: now - 12000, durationMs: 3000 }],
+        },
+        [secondId]: {
+          id: secondId, source: "codex", model: "o3", usageKnown: true,
+          startedAt: now - 600000, lastActivityAt: now - 1000,
+          totals: { ...emptyStats(), tokens: 50800, input: 42000, output: 8800, prompts: 3, toolCalls: 3, cost: 0.14 },
+          recentTools: [],
         },
       },
     });
@@ -104,6 +111,18 @@ app
       updatedAt: now,
     };
     writeJSON("state.json", state);
+    writeJSON(liveSessionFile(sessionId, "codex"), state);
+    const pinnedState = {
+      ...state, sessionId: secondId, model: "o3", task: "Verify pinned conversation", tokens: 50800,
+      usage: { total: 50800, input: 42000, output: 8800, reasoning: 1200, cached: 20000 },
+      updatedAt: now - 1000,
+      activeTools: [{ name: "read_file", callId: "pin-running", startedAt: now - 2000, file: "src/current.js", arguments: "DO_NOT_RENDER_RAW" }],
+      recentTools: [
+        { name: "build_project", callId: "pin-done", status: "completed", startedAt: now - 15000, endedAt: now - 12500, durationMs: 2500, exitCode: 0, file: "src/completed.js", output: "DO_NOT_RENDER_RAW" },
+        { name: "run_tests", callId: "pin-failed", status: "failed", startedAt: now - 9000, endedAt: now - 8000, durationMs: 1000, exitCode: 2, file: "test/failed.js", arguments: "DO_NOT_RENDER_RAW", output: "DO_NOT_RENDER_RAW" },
+      ],
+    };
+    writeJSON(liveSessionFile(secondId, "codex"), pinnedState);
     const { serve } = await import("../src/server.js");
     dashboard = await serve(0);
     const errors = [];
@@ -166,6 +185,54 @@ app
     assert.match(await js("document.querySelector('#chat-context-label').textContent"), /12\.0%/);
     assert.match(await js("document.querySelector('#chat-active-tools').textContent"), /exec_command/);
     assert.match(await js("document.querySelector('#chat-recent-tools').textContent"), /apply_patch.*read_file/);
+    // Choosing a conversation is a draft. Only the explicit button changes
+    // shared Discord selection, and a newer event must not steal that pin.
+    const secondKey = JSON.stringify(["codex", secondId]);
+    await js(`document.querySelector('#chat-picker').value=${JSON.stringify(secondKey)};document.querySelector('#chat-picker').dispatchEvent(new Event('change'))`);
+    assert.equal(readJSON("selection.json").sessionId, undefined);
+    assert.equal(await js("document.querySelector('#chat-tokens').textContent"), "22.8K");
+    assert.match(await js("document.querySelector('#chat-pin-status').textContent"), /not pinned yet/);
+    assert.equal(await js("document.querySelector('#pin-chat').disabled"), false);
+    await js("document.querySelector('#pin-chat').click()");
+    await until(() => readJSON("selection.json").sessionId === secondId);
+    await until(() => js("document.querySelector('#chat-tokens').textContent==='8.8K'"));
+    assert.equal(await js("document.querySelector('#chat-heading').textContent"), pinnedState.task);
+    assert.ok((await js("fetch('/api/presence').then(r=>r.json()).then(a=>a.details)")).includes(pinnedState.task));
+    await until(() => js("document.querySelectorAll('#tool-timeline .timeline-row').length===3"));
+    assert.match(await js("document.querySelector('#tool-timeline').textContent"), /Completed.*exit 0/);
+    assert.match(await js("document.querySelector('#tool-timeline').textContent"), /Failed.*exit 2/);
+    assert.match(await js("document.querySelector('#tool-timeline').textContent"), /src\/completed\.js/);
+    assert.equal(await js("document.querySelector('#tool-timeline').textContent.includes('DO_NOT_RENDER_RAW')"), false);
+    const runningBefore = await js("[...document.querySelectorAll('.timeline-row')].find(r=>r.querySelector('.running')).querySelector('.timeline-duration').textContent");
+    await until(async () => (await js("[...document.querySelectorAll('.timeline-row')].find(r=>r.querySelector('.running')).querySelector('.timeline-duration').textContent")) !== runningBefore);
+    writeJSON("state.json", { ...state, updatedAt: Date.now() });
+    await wait(150);
+    assert.equal(await js("document.querySelector('#chat-tokens').textContent"), "8.8K");
+    assert.equal(await js("fetch('/api/chat').then(r=>r.json()).then(c=>c.id)"), secondId);
+    await reload();
+    assert.equal(await js("document.querySelector('#chat-picker').value"), secondKey);
+    assert.equal(await js("document.querySelector('#chat-tokens').textContent"), "8.8K");
+    await js("document.querySelector('.tool-timeline').scrollIntoView({block:'center'})");
+    await capture("timeline.png");
+    window.setSize(430, 1050);
+    await wait(100);
+    await js("document.querySelector('.tool-timeline').scrollIntoView({block:'center'})");
+    assert.equal(await js("document.documentElement.scrollWidth <= innerWidth"), true);
+    await capture("timeline-mobile.png");
+    window.setSize(1440, 1100);
+    writeJSON("config.json", { ...config(), privacy: "private" });
+    await until(() => js("document.querySelector('#chat-heading').textContent==='Private conversation'"));
+    await until(() => js("!document.querySelector('#tool-timeline').textContent.includes('src/completed.js')"));
+    assert.equal(await js("fetch('/api/timeline').then(r=>r.json()).then(t=>t.rows.every(row=>!('file' in row)&&!('arguments' in row)&&!('output' in row)))"), true);
+    writeJSON("config.json", { ...config(), privacy: "public" });
+    await until(() => js("document.querySelector('#chat-heading').textContent==='Verify pinned conversation'"));
+    await js("document.querySelector('#unpin-chat').click()");
+    await until(() => !readJSON("selection.json").sessionId);
+    await until(() => js("document.querySelector('#chat-tokens').textContent==='22.8K'"));
+    assert.equal(await js("document.querySelector('#chat-heading').textContent"), state.task);
+    assert.equal(await js("document.querySelector('#chat-picker').value"), "");
+    assert.ok((await js("fetch('/api/presence').then(r=>r.json()).then(a=>a.details)")).includes(state.task));
+    await js("scrollTo({top:0,behavior:'instant'})");
     assert.equal(
       await js("document.documentElement.scrollWidth <= innerWidth"),
       true,
@@ -319,7 +386,7 @@ app
     await capture("chat-mobile.png");
     assert.deepEqual(errors, []);
     console.log(
-      "Verified dark/light theme persistence, keyboard/mobile navigation, desktop sidebar persistence, responsive layout, per-chat metrics/tools/context, chat-mode persistence, 7 tabs, settings save, range isolation, heatmap, SSE, privacy and pause. Screenshots in docs/.",
+      "Verified explicit pin/unpin, pin persistence and isolation from newer chats, safe live tool timeline/status/exit codes/durations, timeline privacy, dark/light theme persistence, keyboard/mobile navigation, desktop sidebar persistence, responsive layout, per-chat metrics/tools/context, chat-mode persistence, 7 tabs, settings save, range isolation, heatmap, SSE, privacy and pause. Screenshots in docs/.",
     );
   })
   .catch((e) => {
