@@ -21,7 +21,10 @@ const packed = JSON.parse(execFileSync(npmCLI ? process.execPath : npm, [...(npm
 for (const required of ["src/selection.js", "src/timeline.js", "src/watcher.js", "src/config.js", "src/presence-scheduler.js", "src/recaps.js", "bin/codex-rpc.js", "assets/pet/codex-pet-writing.gif", "assets/pet/codex-pet-patching.gif", "assets/pet/codex-pet-error.gif", "assets/pet/codex-pet-done.gif"]) {
   if (!packed.files.some((entry) => entry.path === required)) throw Error(`Missing package file: ${required}`);
 }
-const artifacts = [packed.filename];
+// Stable filename keeps GitHub /releases/latest/download links evergreen.
+const latestName = "codex-rpc.tgz";
+fs.copyFileSync(path.join(directory, packed.filename), path.join(directory, latestName));
+const artifacts = [packed.filename, latestName];
 if (process.argv.includes("--sea")) {
   execFileSync(process.execPath, ["scripts/build-sea.js"], { stdio: "inherit" });
   const exe = process.platform === "win32" ? ".exe" : "";
@@ -34,6 +37,7 @@ if (process.argv.includes("--sea")) {
   artifacts.push(name);
 }
 fs.copyFileSync("docs/RELEASE.md", path.join(directory, "RELEASE.md"));
+fs.copyFileSync(`docs/RELEASE-NOTES-v${pkg.version}.md`, path.join(directory, "RELEASE-NOTES.md"));
 fs.writeFileSync(path.join(directory, "SHA256SUMS"), artifacts.map((name) => `${createHash("sha256").update(fs.readFileSync(path.join(directory, name))).digest("hex")}  ${name}`).join("\n") + "\n");
 console.log(`Release ${pkg.version}: ${directory}`);
 console.log("Archives prepared locally. Nothing was uploaded or published.");
