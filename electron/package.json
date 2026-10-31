@@ -1,12 +1,13 @@
 {
   "name": "codex-rpc-desktop",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
     "verify": "electron verify.cjs",
-    "verify:pets": "electron verify-pets.cjs"
+    "verify:pets": "electron verify-pets.cjs",
+    "benchmark": "electron benchmark.cjs"
   },
   "devDependencies": {
     "electron": "^45.1.0"

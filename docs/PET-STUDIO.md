@@ -53,3 +53,8 @@ The supplied built-in pets already have their GitHub URL mapping and do not requ
 The reference preview and optional direction stay in the page. Copying puts the prompt on your clipboard; attaching an image and submitting it to ChatGPT are your actions. Pet Studio never calls ChatGPT, uploads a character to an image service, or publishes files to GitHub automatically. Import and live-selection requests use the dashboard's localhost Host, Origin and per-process request-token protections.
 
 The generated gallery also supports browsing the bundled collection without the local server. Imports, exports and live controls then show a `codex-rpc serve` hint instead of pretending the local API exists. Custom pet artwork stays local until you deliberately host or export it. Only import artwork you have permission to use and share.
+
+
+## Workspace preview (0.5.0 source)
+
+Open **Pet studio** in the sidebar to use Studio inside the dashboard. It loads when first opened, follows the workspace light/dark and motion preferences, and preserves your staged files, prompt and import name when you switch pages. Offscreen previews pause automatically. Selecting a different Discord pet in Settings updates Studio's selected-pet indicator on return without discarding your preview or import draft. **Open separately** retains the standalone/offline gallery.

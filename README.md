@@ -16,6 +16,8 @@ Node 18+ · zero runtime dependencies · no accounts · no telemetry
 
 **Latest: 0.4.0** — Codex Bloom, a pet library, reference-image prompts and drag-and-drop imports. [What changed](https://github.com/alphasayshello/codex-rpc/releases/tag/v0.4.0).
 
+**Source preview: 0.5.0** — a calmer ChatGPT-style workspace, searchable conversations, embedded Pet Studio, and fewer live-update requests. [Preview notes](docs/RELEASE-NOTES-v0.5.0.md). The published npm/GitHub version above remains 0.4.0.
+
 ## install
 
 Keep **Discord Desktop** running. Browser-only Discord does not expose the local IPC connection.
@@ -121,14 +123,15 @@ Artwork provenance and composition details: [asset manifest](https://github.com/
 
 <img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/docs/telemetry.png" width="1000" alt="Dark local dashboard with live file telemetry, original Codex Pet and per-chat output usage; synthetic sample data" />
 
+- **Browse without broadcasting.** Search up to 100 recent conversations in the sidebar and open their output usage, tools and recaps. Inspecting a chat never changes the Discord pin.
 - **Pin a chat to Discord.** Choose a conversation and press **Pin to Discord**. Other chats cannot steal the card; **Follow latest** restores automatic selection.
 - **Inspect tool activity.** A live timeline shows running durations, completed calls, failures and exit codes—without raw arguments or output.
 - **Review each turn.** Recaps show output-token deltas, observed tool calls, elapsed time and outcomes. Missing baselines stay unknown.
 - **Explore lifetime usage.** Tokens, sessions, active hours, streaks, languages, tools, hotspots, hourly patterns and estimated cost.
 - **Choose a range.** 7d, 30d, 90d, 1y or all time. The current-chat panel stays independent of the history range.
-- **Make it yours.** Dark/light themes, mobile navigation, keyboard-accessible settings and seven settings tabs. A visual picker offers 19 pet scenes, with pixel badges and a dedicated preview studio.
+- **Make it yours.** A ChatGPT-inspired sidebar, light/dark themes, mobile navigation and a seven-tab settings dialog. Pet Studio opens inside the workspace and keeps your import draft when you switch pages.
 
-The dashboard binds to loopback only and updates over SSE. Optional Electron wraps the same dashboard with Node integration disabled:
+The dashboard binds to loopback only and updates over SSE. Source 0.5.0 uses one snapshot request per live refresh, caches historical ranges and keeps unchanged charts in place. Hidden tabs stop requesting snapshots; offscreen animated previews use still frames. No UI framework or runtime dependency is added. Optional Electron wraps the same dashboard with Node integration disabled:
 
 ```sh
 cd electron
@@ -240,6 +243,6 @@ npm run release:prepare -- --sea
 
 Normal runtime supports Node 18+. Some Homebrew Node builds disable SEA; standalone builds need an official SEA-enabled build. Output goes to `dist/release/<platform>-<arch>/`, with versioned archives, the stable `codex-rpc.tgz` alias, release notes and checksums. Native executables must be built on each target platform.
 
-[Release checklist](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE.md) · [Paste-ready v0.3.1 notes](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE-NOTES-v0.4.0.md) · [Verification](https://github.com/alphasayshello/codex-rpc/blob/main/docs/VERIFICATION.md) · [Versioning](https://github.com/alphasayshello/codex-rpc/blob/main/VERSIONING.md)
+[Release checklist](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE.md) · [Paste-ready v0.4.0 notes](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE-NOTES-v0.4.0.md) · [Verification](https://github.com/alphasayshello/codex-rpc/blob/main/docs/VERIFICATION.md) · [Versioning](https://github.com/alphasayshello/codex-rpc/blob/main/VERSIONING.md)
 
 Inspired by [rar-file/claude-rpc](https://github.com/rar-file/claude-rpc): three small Node pieces joined by JSON, adapted independently for Codex. Unaffiliated with OpenAI or Discord. Original project code is MIT; bundled OpenAI artwork has separate provenance.

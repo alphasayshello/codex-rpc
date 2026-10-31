@@ -29,6 +29,14 @@ try {
   });
   const get = async (route) => { const r = await fetch(url + route, { signal: AbortSignal.timeout(30000) }); assert.equal(r.status, 200, route); return r; };
   const { token } = await (await get("/api/session")).json();
+  const snapshotResponse = await get("/api/dashboard?range=30d");
+  const snapshot = await snapshotResponse.json();
+  assert.equal(snapshot.state.version, version);
+  assert.equal(snapshot.chat.output, null);
+  assert.ok(snapshot.versions.year && snapshot.versions.chat);
+  assert.match(snapshotResponse.headers.get("content-security-policy"), /frame-ancestors 'self'/);
+  assert.match(await (await get("/assets/ui/tokens.css")).text(), /--ui-sidebar/);
+  assert.match(await (await get("/")).text(), /id="studio-frame"/);
   const post = (route, value) => fetch(url + route, { method: "POST", headers: { "Content-Type": "application/json", "x-codex-rpc-token": token }, body: JSON.stringify(value), signal: AbortSignal.timeout(35000) });
   const width = 256, height = 224, rgba = Buffer.alloc(width * height * 4);
   for (let row = 0; row < 7; row++) for (let column = 0; column < 8; column++)
@@ -47,7 +55,7 @@ try {
   assert.equal((await post("/api/pets/select", { id: "codex-bloom" })).status, 200);
   const activity = await (await get("/api/presence")).json();
   assert.match(activity.assets.large_image, /\/pets\/codex-bloom\/sleeping.gif$/);
-  console.log("Standalone pet import, worker, GIF/ZIP routes and builtin selection passed.");
+  console.log("Standalone dashboard snapshot, shared theme, embedded Studio, pet import worker, GIF/ZIP routes and builtin selection passed.");
 } finally {
   child.kill("SIGTERM");
   const deadline = Date.now() + 3000;

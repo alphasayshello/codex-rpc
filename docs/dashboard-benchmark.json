@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-31",
+  "environment": "macOS ARM64, Electron 45.1.0, isolated synthetic fixtures; main process also hosts local HTTP server",
+  "baselineCommit": "04cf4aa18d335253aa66482d808b4bf5586388db",
+  "before": {
+    "version": "0.4.0",
+    "fixture": {
+      "days": 365,
+      "sessions": 200,
+      "updates": 12
+    },
+    "requests": 234,
+    "requestsPerUpdate": 19.5,
+    "endpoints": [
+      "/api/state",
+      "/api/aggregate",
+      "/api/chats",
+      "/api/presence",
+      "/api/chat",
+      "/api/recaps",
+      "/api/pets",
+      "/api/timeline"
+    ],
+    "removedHeatmapCells": 9646,
+    "retainedFirstHeatmapCell": false,
+    "updateMeanMs": 58,
+    "updateP95Ms": 61,
+    "mainCpuMs": 664,
+    "idleMainCpuMsOver3s": 51,
+    "mainRssMiB": 182,
+    "rendererWorkingSetMiB": 294
+  },
+  "after": {
+    "version": "0.5.0",
+    "fixture": {
+      "days": 365,
+      "sessions": 200,
+      "updates": 12
+    },
+    "requests": 13,
+    "requestsPerUpdate": 1.0833333333333333,
+    "endpoints": [
+      "/api/dashboard"
+    ],
+    "removedHeatmapCells": 0,
+    "retainedFirstHeatmapCell": true,
+    "updateMeanMs": 128,
+    "updateP95Ms": 136,
+    "mainCpuMs": 238,
+    "idleMainCpuMsOver3s": 44,
+    "mainRssMiB": 179,
+    "rendererWorkingSetMiB": 223
+  }
+}

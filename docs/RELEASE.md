@@ -1,6 +1,8 @@
-# codex-rpc 0.4.0 — release procedure
+# codex-rpc — release procedure
 
-Two base pets, reference-image prompts, local PNG/GIF imports, a pet library and portable/hosting exports, alongside live telemetry and analytics.
+Published: **0.4.0**. Current source/local preview: **0.5.0**, with a ChatGPT-inspired workspace, searchable conversations, embedded Pet Studio and lighter live updates. See [preview notes](RELEASE-NOTES-v0.5.0.md).
+
+The commands below use 0.4.0 as a historical example. Substitute the version being published; never recreate a published tag.
 
 Published release: [v0.4.0](https://github.com/alphasayshello/codex-rpc/releases/tag/v0.4.0). For a future release, update all package versions and release notes first, and substitute that new version in the steps below. Published tags are retained.
 

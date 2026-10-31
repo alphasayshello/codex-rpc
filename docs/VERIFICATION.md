@@ -117,4 +117,17 @@ Verified on macOS ARM64, 2026-10-31:
 - The main Electron suite passed, including whole-pet draft/save selection, resetting state overrides, local Bloom rendering and reduced-motion PNG fallback. The dedicated pet suite passed local reference privacy, PNG upload through the file input, seven previews, explicit selection, HTTPS hosting, JSON roundtrip, ZIP export, malformed/XSS input, offline browsing and 430px mobile layout with no JavaScript errors. Screenshots use synthetic sample data.
 - Built the macOS ARM64 standalone executable with official Node 26.10.0. `scripts/verify-sea-pets.js` launched that executable in disposable homes and verified worker-based PNG import, eight-frame GIF output, ZIP download, custom-host enforcement and built-in pet selection. Release builds now run this integration probe on every native platform.
 
-This is a source/local preview. The published npm/GitHub release remains 0.3.1 until a separate 0.4.0 publication.
+This section records the original local preview. Version 0.4.0 was subsequently published to both GitHub Releases and npm; its source tag is `04cf4aa`.
+
+
+## 0.5.0 workspace source/local preview
+
+On 2026-10-31, `npm test -- --test-concurrency=4` completed 214 tests: 212 passed, no failures, two Windows-only checks skipped on macOS. New coverage verifies cached historical ranges (file/settings/UTC-day invalidation), stable section signatures, read-only per-chat viewing, source isolation, immediate privacy redaction of old public scans, safe legacy filename labels, literal prototype-like metadata keys, SSE burst/shutdown handling and same-origin Studio appearance/draft behavior.
+
+`npm run verify:desktop` passed the real renderer flow: sidebar search and chat inspection without pin mutation, unchanged heatmap identity, hidden-tab request suppression/catch-up, modal cancel/focus, delayed config responses preserving active input drafts, all settings tabs, lifecycle telemetry, privacy, recaps/timelines, desktop/light/mobile layouts and embedded Studio lazy loading, theme/motion, draft retention and modal pausing. Screenshots in `docs/` contain synthetic data.
+
+The optional Pet Studio Electron integration verifies the built-in library, PNG import/portable-pack roundtrip, GIF/ZIP output, public-host validation, local-only reference preview and mobile/offline behavior. The native macOS ARM64 build also passed `scripts/verify-sea-pets.js`, including the new snapshot endpoint, shared theme asset, embedded Studio markup and media-decoding worker. Windows/Linux native build and installer claims require their target-platform checks; publication remains a separate action.
+
+The isolated synthetic comparison in [PERFORMANCE.md](PERFORMANCE.md) records fewer requests and chart mutations, memory observations, and the batching latency tradeoff. Baseline is the published 0.4.0 source commit. Neither the benchmark nor renderer fixtures use personal chat history.
+
+The published npm/GitHub release remains **0.4.0**. Version **0.5.0** is a source/local preview, with [draft release notes](RELEASE-NOTES-v0.5.0.md).
