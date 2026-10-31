@@ -39,6 +39,7 @@ test("Discord handshake, fragmented frames, activity ack, ping/pong, and disconn
   await client.setActivity(activity);
   const sent = mock.received[0];
   assert.equal(sent.cmd, "SET_ACTIVITY");
+  assert.equal(sent.args.activity.name, "Codex");
   assert.equal(
     sent.args.activity.assets.large_image,
     "https://example.com/pet.gif",

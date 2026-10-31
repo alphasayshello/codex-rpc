@@ -470,6 +470,9 @@ app
     emit("function_call", { callId: "telemetry-patch", tool: "apply_patch", payload: { type: "function_call", name: "apply_patch", call_id: "telemetry-patch", arguments: JSON.stringify({ patch }) } }, 15000);
     await until(() => js("document.querySelector('#live-model').textContent.includes('(+3 / -1)')"));
     assert.match(await js("document.querySelector('#live-action').textContent"), /Writing code across 2 files/);
+    assert.equal(await js("document.querySelector('#activity-type').textContent"), "WATCHING Codex");
+    assert.equal(await js("document.querySelector('.version').textContent"), require('../package.json').version);
+    assert.ok((await js("document.querySelector('#live-model').textContent")).includes("telemetry-workspace/src/telemetry-client.js"));
     const stateAPI = await js("fetch('/api/state').then(r=>r.json())");
     assert.equal(stateAPI.visualState, "patching");
     assert.equal(stateAPI.currentFileCount, 2);

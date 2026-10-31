@@ -419,6 +419,7 @@ async function refresh() {
     renderChats(chats);
     renderTimeline(timeline);
     renderRecaps(recaps);
+    $(".version").textContent = s.version || "";
     const t = a.totals || {},
       state = ["working", "thinking", "waiting", "idle"].includes(s.status)
         ? s.status
@@ -446,7 +447,7 @@ async function refresh() {
       $("#status-badge").src = badgeURL;
     $("#activity-type").textContent =
       ((activity?.type ?? cfg.presence.type) === 3 ? "WATCHING" : "PLAYING") +
-      " CODEX RPC";
+      ` ${activity?.name || "Codex"}`;
     $("#pet").alt = `Codex Pet ${visual}`;
     $("#live-status").textContent = s.enabled ? visual : "paused";
     $("#live-action").textContent = activity?.details || "Presence paused";

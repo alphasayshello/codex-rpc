@@ -14,6 +14,7 @@ import { startDaemon, stopDaemon } from "./service.js";
 import { watchDirectory } from "./directory-watch.js";
 import { animationCatalog } from "./assets/generate-pet-gifs.js";
 const animationIds = new Set(animationCatalog.map(({ id }) => id));
+const appVersion = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 export function createServer() {
   const token = randomBytes(24).toString("hex"),
     clients = new Set();
@@ -138,6 +139,7 @@ export function createServer() {
           visualState: getVisualState(state, config()),
           daemon: readJSON("daemon.json"),
           enabled: config().enabled,
+          version: appVersion,
         });
         return;
       }

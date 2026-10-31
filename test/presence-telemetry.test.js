@@ -13,7 +13,7 @@ test('live editing uses operation diff metadata, output-only counters and no but
   const state={status:'working',tool:'apply_patch',project:'codex-rpc',file:'src/client.js',currentFiles:['src/client.js','test/client.js'],currentFileCount:2,linesAdded:42,linesRemoved:12,operationStartedAt:now-32000,startedAt:now-900000};
   const p=buildActivity(state,{},c,chat,now);
   assert.equal(p.details,'Writing code across 2 files');
-  assert.match(p.state,/Editing src\/client.js \(\+42 \/ -12\).*22.8k output tokens/);
+  assert.match(p.state,/Editing codex-rpc\/src\/client.js \(\+42 \/ -12\).*22.8k output tokens/);
   assert.match(p.assets.large_image,/codex-pet-patching/);
   assert.equal(p.timestamps.start,(now-32000)/1000); assert.equal(p.buttons,undefined);
   const long = buildActivity({...state,file:'src/'+ 'long-folder/'.repeat(20)+'client.js'}, {}, c, chat, now);

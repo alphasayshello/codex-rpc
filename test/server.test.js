@@ -26,6 +26,9 @@ test("dashboard serves APIs/assets, live SVG, settings CSRF protection and range
     streak: { current: 0 },
   });
   assert.equal((await (await fetch(url + "/api/presence")).json()).type, 3);
+  assert.equal((await (await fetch(url + "/api/presence")).json()).name, "Codex");
+  assert.equal((await (await fetch(url + "/api/state")).json()).version,
+    JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version);
   assert.equal(
     (await (await fetch(url + "/api/state")).json()).status,
     "working",

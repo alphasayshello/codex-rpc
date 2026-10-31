@@ -1,6 +1,6 @@
 import { animationStates } from "./store.js";
 import { summarizeCommand } from "./watcher.js";
-import { safeFilePath } from "./paths.js";
+import { presenceFilePath } from "./paths.js";
 import { getChatStats } from "./chat.js";
 import { conversationName } from "./threads.js";
 // Compact, Claude-RPC-style card text. No network access or raw prompt storage.
@@ -202,8 +202,7 @@ export function buildActivity(state = {}, aggregate = {}, c = {}, chat = getChat
     idle: `Idle in ${target}`,
   };
   if (options.stats === "chat") {
-    const currentFile = !privateMode && typeof state.file === "string"
-      ? state.file.split(/[\\/]/).pop() : "";
+    const currentFile = !privateMode ? presenceFilePath(state.file, state.project) : "";
     const frames = {
       working: [toolName, currentFile, elapsed, tokensLabel],
       thinking: [model, promptsLabel, tokensLabel],
@@ -223,13 +222,14 @@ export function buildActivity(state = {}, aggregate = {}, c = {}, chat = getChat
   const operationAt = status === "thinking" ? state.thinkingStartedAt || state.operationStartedAt : state.operationStartedAt || activeTool?.startedAt;
   const operationMs = operationAt ? Math.max(0, now - operationAt) : 0;
   if (options.stats === "telemetry") {
-    const files = !privateMode && Array.isArray(state.currentFiles) ? state.currentFiles.filter(safeFilePath) : [];
-    const filename = !privateMode && safeFilePath(state.file) || files[0];
+    const files = !privateMode && Array.isArray(state.currentFiles)
+      ? state.currentFiles.map((file) => presenceFilePath(file, state.project)).filter(Boolean) : [];
+    const filename = !privateMode && presenceFilePath(state.file, state.project) || files[0];
     const additions = Number.isFinite(state.linesAdded) ? Math.max(0, state.linesAdded) : null;
     const removals = Number.isFinite(state.linesRemoved) ? Math.max(0, state.linesRemoved) : null;
     const churn = options.showChurn && additions != null && removals != null ? ` (+${additions} / -${removals})` : "";
     const count = state.currentFileCount || files.length || (filename ? 1 : 0);
-    const command = !privateMode && typeof state.commandSummary === "string" ? state.commandSummary.slice(0, 64) : "";
+    const command = !privateMode ? summarizeCommand(state.commandSummary) || "" : "";
     const branch = !privateMode && typeof state.branch === "string" ? ` (${state.branch.slice(0, 80)})` : "";
     const coding = visual === "patching" || state.operationKind === "editing" || !!filename || /edit|write|patch/.test(tool) || (state.visualState === "writing" && !tool);
     telemetryDetails = visual === "error" ? `Blocked in ${target}`
@@ -258,6 +258,7 @@ export function buildActivity(state = {}, aggregate = {}, c = {}, chat = getChat
   const sceneAtDefault = !visualAsset || visualAsset.split("?")[0] === `${ASSET_BASE}/codex-pet-${visual}.gif`;
   const chosenAsset = legacyCompatible && legacyWorking && !legacyWorking.startsWith(ASSET_BASE) && sceneAtDefault ? legacyWorking : visualAsset;
   const activity = {
+    name: "Codex",
     type: options.type,
     details: (telemetryDetails || (options.stats === "chat" ? statusDetails[status] : details || `${actions[status]} ${project}`)).slice(0, 128),
     state: (telemetryState || parts.join(" · ")).slice(0, 128),
