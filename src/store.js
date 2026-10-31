@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
+import { normalizePetBaseUrl } from "./pet-url.js";
 export const home = () =>
   process.env.CODEX_RPC_HOME || path.join(os.homedir(), ".codex-rpc");
 export const codexHome = () =>
@@ -21,6 +22,7 @@ export const defaults = {
   privacy: "private",
   clientId: "1565535814308470814",
   buttons: [],
+  pet: { id: "codex", baseUrl: "" },
   presence: { type: 3, showTask: true, stats: "telemetry", showChurn: true, timer: "operation" },
   assets: {
     working:
@@ -74,6 +76,7 @@ export function config() {
   return {
     ...defaults,
     ...c,
+    pet: { ...defaults.pet, ...c.pet },
     assets: { ...defaults.assets, ...c.assets },
     presence: { ...defaults.presence, ...c.presence },
     timing: { ...defaults.timing, ...c.timing },
@@ -87,6 +90,15 @@ export function validateConfig(c) {
   for (const k of Object.keys(c))
     if (!(k in defaults)) throw Error(`Unknown setting: ${k}`);
   const n = { ...config(), ...c };
+  if (c.pet !== undefined && (!c.pet || typeof c.pet !== "object" || Array.isArray(c.pet)))
+    throw Error("Pet settings must be an object");
+  n.pet = { ...config().pet, ...n.pet };
+  if (Object.keys(n.pet).some((key) => !["id", "baseUrl"].includes(key)) ||
+    typeof n.pet.id !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(n.pet.id))
+    throw Error("Invalid pet settings");
+  n.pet.baseUrl = normalizePetBaseUrl(n.pet.baseUrl);
+  if (!["codex", "codex-bloom"].includes(n.pet.id) && !n.pet.baseUrl)
+    throw Error("Custom pet settings require a public HTTPS base URL for Discord");
   if (
     c.presence !== undefined &&
     (!c.presence || typeof c.presence !== "object" || Array.isArray(c.presence))

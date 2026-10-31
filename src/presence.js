@@ -3,6 +3,7 @@ import { summarizeCommand } from "./watcher.js";
 import { presenceFilePath } from "./paths.js";
 import { getChatStats } from "./chat.js";
 import { conversationName } from "./threads.js";
+import { resolvePetAsset } from "./pets.js";
 // Compact, Claude-RPC-style card text. No network access or raw prompt storage.
 export const ASSET_BASE =
   "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet";
@@ -257,13 +258,16 @@ export function buildActivity(state = {}, aggregate = {}, c = {}, chat = getChat
   const legacyCompatible = ["writing", "patching"].includes(visual) || automaticWorking;
   const sceneAtDefault = !visualAsset || visualAsset.split("?")[0] === `${ASSET_BASE}/codex-pet-${visual}.gif`;
   const chosenAsset = legacyCompatible && legacyWorking && !legacyWorking.startsWith(ASSET_BASE) && sceneAtDefault ? legacyWorking : visualAsset;
+  const selectedPetAsset = c.pet?.id && c.pet.id !== "codex" && sceneAtDefault &&
+    !(legacyCompatible && legacyWorking && !legacyWorking.startsWith(ASSET_BASE))
+    ? resolvePetAsset(visual, c) : null;
   const activity = {
     name: "Codex",
     type: options.type,
     details: (telemetryDetails || (options.stats === "chat" ? statusDetails[status] : details || `${actions[status]} ${project}`)).slice(0, 128),
     state: (telemetryState || parts.join(" · ")).slice(0, 128),
     assets: {
-      large_image: chosenAsset || c.assets?.[status] || `${ASSET_BASE}/codex-pet-${visual}.gif?v=smooth-1`,
+      large_image: selectedPetAsset?.url || chosenAsset || c.assets?.[status] || `${ASSET_BASE}/codex-pet-${visual}.gif?v=smooth-1`,
       large_text: (options.stats === "chat"
         ? status === "working" ? `Working with ${toolName || "Codex"}`
           : status === "thinking" ? `Reasoning with ${model}`

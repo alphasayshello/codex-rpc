@@ -13,8 +13,22 @@ import { statsSVG, heatmapSVG, badgeSVG } from "./statcards.js";
 import { startDaemon, stopDaemon } from "./service.js";
 import { watchDirectory } from "./directory-watch.js";
 import { animationCatalog } from "./assets/generate-pet-gifs.js";
+import { listPets, importPet, selectPet, exportPet, downloadPet, readPetAsset } from "./pets.js";
 const animationIds = new Set(animationCatalog.map(({ id }) => id));
 const appVersion = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
+let petUpload = false;
+async function requestText(req, limit) {
+  if (Number(req.headers["content-length"]) > limit) {
+    req.resume(); throw Object.assign(Error("Request too large"), { statusCode: 413 });
+  }
+  const chunks = []; let length = 0;
+  for await (const chunk of req) {
+    length += chunk.length;
+    if (length > limit) throw Object.assign(Error("Request too large"), { statusCode: 413 });
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
 export function createServer() {
   const token = randomBytes(24).toString("hex"),
     clients = new Set();
@@ -69,14 +83,21 @@ export function createServer() {
           json(403, { error: "Invalid local request token/origin" });
           return;
         }
-        let text = "";
-        for await (const chunk of req) {
-          text += chunk;
-          if (Buffer.byteLength(text) > 65536) {
-            json(413, { error: "Request too large" });
-            return;
-          }
+        if (url.pathname === "/api/pets/import") {
+          // Reserve before buffering: several authenticated uploads must not
+          // each allocate an entire 65 MiB body while one worker is busy.
+          if (petUpload) { req.resume(); json(409, { error: "Another pet import is in progress. Wait for it to finish" }); return; }
+          petUpload = true;
+          const timeout = setTimeout(() => req.destroy(), 30000);
+          try {
+            const text = await requestText(req, 65 * 1024 * 1024);
+            clearTimeout(timeout);
+            json(200, await importPet(JSON.parse(text)));
+          } finally { clearTimeout(timeout); petUpload = false; }
+          return;
         }
+        const text = await requestText(req, 65536);
+        if (url.pathname === "/api/pets/select") { json(200, selectPet(JSON.parse(text))); return; }
         if (url.pathname === "/api/pin") {
           const { id, source = "codex" } = JSON.parse(text);
           const pinned = id === null ? unpinChat() : pinChat(id, source);
@@ -114,6 +135,26 @@ export function createServer() {
       if (req.method !== "GET") {
         res.writeHead(405).end();
         return;
+      }
+      if (url.pathname === "/api/pets") {
+        json(200, { pets: listPets(), selected: config().pet?.id || "codex" }); return;
+      }
+      const petExport = /^\/api\/pets\/([a-z0-9][a-z0-9-]{0,63})\/(export|download)$/.exec(url.pathname);
+      if (petExport) {
+        if (petExport[2] === "download") {
+          const bytes = downloadPet(petExport[1]);
+          res.writeHead(200, { "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="${petExport[1]}.zip"` }); res.end(bytes);
+        } else {
+          const pack = exportPet(petExport[1]);
+          res.setHeader("Content-Disposition", `attachment; filename="${petExport[1]}.pet.json"`); json(200, pack);
+        }
+        return;
+      }
+      const libraryAsset = /^\/(?:pets\/([a-z0-9][a-z0-9-]{0,63})|assets\/pets\/(codex-bloom))\/([a-z][a-z0-9-]{0,31}\.(?:gif|png))$/.exec(url.pathname);
+      if (libraryAsset) {
+        const asset = readPetAsset(libraryAsset[1] || libraryAsset[2], libraryAsset[3]);
+        if (!asset) { json(404, { error: "Pet asset not found" }); return; }
+        res.writeHead(200, { "Content-Type": asset.contentType }); res.end(asset.bytes); return;
       }
       if (url.pathname === "/api/animations") {
         json(200, { animations: animationCatalog, baseURL: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/" });
@@ -253,7 +294,7 @@ export function createServer() {
       res.end(bytes);
     } catch (e) {
       json(
-        e.statusCode === 400 || e instanceof SyntaxError ||
+        [400, 404, 409, 413].includes(e.statusCode) ? e.statusCode : e instanceof SyntaxError ||
           /Invalid range|setting|must|Invalid enabled|Assets|Timing|Use up/.test(
             e.message,
           )

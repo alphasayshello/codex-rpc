@@ -1,0 +1,230 @@
+{
+  "schemaVersion": 1,
+  "id": "codex-bloom",
+  "name": "Codex Bloom",
+  "description": "The supplied purple Codex flower mascot, with its original typing arms and illustrated scenes.",
+  "provenance": {
+    "kind": "user-supplied",
+    "source": "Supplied assets folder from the project owner; no upstream license or creator attribution was included.",
+    "processing": "Original GIF compositing and backgrounds preserved; bilinear resize, timeline sampling at100ms, palette quantization, GIF89a re-encoding. No AI redraw or background removal.",
+    "sources": {
+      "coding": {
+        "filename": "coding.gif",
+        "bytes": 8817399,
+        "sha256": "6bb97e280e48ad088a66152cc9dd65a35228ed69ec4556beb1e22cf5f4ade3c7",
+        "width": 512,
+        "height": 512,
+        "frames": 228,
+        "durationMs": 19000
+      },
+      "thinking": {
+        "filename": "thinking.gif",
+        "bytes": 6768507,
+        "sha256": "b536a4f468cc9bb1831090e3369775da051e0819b445f8dca1faecae5743ea6b",
+        "width": 512,
+        "height": 512,
+        "frames": 266,
+        "durationMs": 19000
+      },
+      "reading": {
+        "filename": "reading.gif",
+        "bytes": 3324309,
+        "sha256": "ae489c0afd74621e563973bfbe5ba7625ec36b7e76ca7b7ad8f5b3b5e2a68ca1",
+        "width": 512,
+        "height": 512,
+        "frames": 180,
+        "durationMs": 15000
+      },
+      "searching": {
+        "filename": "searching.gif",
+        "bytes": 3165625,
+        "sha256": "17cb753b813930c44aabd4e664f6812b55ac56c46807d72033c6dd840eee6290",
+        "width": 512,
+        "height": 512,
+        "frames": 180,
+        "durationMs": 15000
+      },
+      "debugging": {
+        "filename": "debugging.gif",
+        "bytes": 3079184,
+        "sha256": "1a012e161c091b507192092484f7cf92e4b14ed7cd6cdc0124e174dcb1fc2b44",
+        "width": 512,
+        "height": 512,
+        "frames": 180,
+        "durationMs": 15000
+      },
+      "building": {
+        "filename": "building.gif",
+        "bytes": 3807354,
+        "sha256": "cf97500a5706966acf15ebbdeccfe28184d2eb84287c5de49f905bfd08e10630",
+        "width": 512,
+        "height": 512,
+        "frames": 180,
+        "durationMs": 15000
+      },
+      "deploying": {
+        "filename": "deploying.gif",
+        "bytes": 3080323,
+        "sha256": "da245aae50a1757619918fe5974776fd688fe1057dbf98531501bd5dde8296da",
+        "width": 512,
+        "height": 512,
+        "frames": 180,
+        "durationMs": 15000
+      },
+      "success": {
+        "filename": "success.gif",
+        "bytes": 3594700,
+        "sha256": "2b83771078d1c3d7868ee0d35ea2ef7021a4693855a90dd30bf0e4c0a6d8abc8",
+        "width": 512,
+        "height": 512,
+        "frames": 180,
+        "durationMs": 15000
+      },
+      "error": {
+        "filename": "error.gif",
+        "bytes": 3136043,
+        "sha256": "1e0784a0e4165c78043bdbda26d43b0f8b31465191f2709a3316d5451ea89051",
+        "width": 512,
+        "height": 512,
+        "frames": 180,
+        "durationMs": 15000
+      },
+      "sleeping": {
+        "filename": "sleeping.gif",
+        "bytes": 6155530,
+        "sha256": "52a6e6bf73ef0d742f41d29509a1415f485bb904e6309e10b94ddbfbdbe24279",
+        "width": 512,
+        "height": 512,
+        "frames": 266,
+        "durationMs": 19000
+      },
+      "icon": {
+        "filename": "codex.png",
+        "bytes": 41938,
+        "sha256": "076ff86b1c8d143a6f6863bade769a8a2d34e72862feee40b29b8ac8f0c88a18"
+      }
+    }
+  },
+  "animations": {
+    "coding": {
+      "gif": "coding.gif",
+      "preview": "coding.png",
+      "width": 160,
+      "height": 160,
+      "frames": 190,
+      "durationMs": 19000,
+      "fps": 10,
+      "bytes": 973267,
+      "sha256": "915ab278f0b7181b034c3fb23c370dd047568b6f535549c9a381643976149f26",
+      "previewSHA256": "011b1b0bf5ba309e13da08409b7b549c0455eb30db297b1b666398c02218c9f2"
+    },
+    "thinking": {
+      "gif": "thinking.gif",
+      "preview": "thinking.png",
+      "width": 160,
+      "height": 160,
+      "frames": 190,
+      "durationMs": 19000,
+      "fps": 10,
+      "bytes": 404941,
+      "sha256": "aca348e54ab9f9bf28afbaf1426c669b782599c23b1747e896cc2739c12b67a0",
+      "previewSHA256": "e327f5bb4f59c09f72078486b6ed2cc115935582be53aca1753a5517c0d664c4"
+    },
+    "reading": {
+      "gif": "reading.gif",
+      "preview": "reading.png",
+      "width": 160,
+      "height": 160,
+      "frames": 150,
+      "durationMs": 15000,
+      "fps": 10,
+      "bytes": 759427,
+      "sha256": "405146b16477c6e9b24ea36df2a6da4c12b590ade99f70b7c360a8a7c38c33af",
+      "previewSHA256": "6af50863baa71e5616340cc24607c1516c22cdd87acf6e20dcb0b69417554a55"
+    },
+    "searching": {
+      "gif": "searching.gif",
+      "preview": "searching.png",
+      "width": 160,
+      "height": 160,
+      "frames": 150,
+      "durationMs": 15000,
+      "fps": 10,
+      "bytes": 414341,
+      "sha256": "cda70d8f6ad8f2884cbe3b6beedad2df9bf3d21b3891c4748da0c3ad5d0558a9",
+      "previewSHA256": "bcdc9dbdfc704daec285128991feba3c1da76f86c6d8cb855cf0a4fbff69a1b4"
+    },
+    "debugging": {
+      "gif": "debugging.gif",
+      "preview": "debugging.png",
+      "width": 160,
+      "height": 160,
+      "frames": 150,
+      "durationMs": 15000,
+      "fps": 10,
+      "bytes": 255850,
+      "sha256": "d5370a9e07efd648e112db293f55b1e60addcf778b50dddb15e59d7085945297",
+      "previewSHA256": "498eb501c20d58c1b6487cb68372418e23aa47ae503fe651198b27d4b9f27aaa"
+    },
+    "building": {
+      "gif": "building.gif",
+      "preview": "building.png",
+      "width": 160,
+      "height": 160,
+      "frames": 150,
+      "durationMs": 15000,
+      "fps": 10,
+      "bytes": 570750,
+      "sha256": "c4aa5de065166ade513d7c5e2f541c6321175731bde02a825a4eafeac40b492a",
+      "previewSHA256": "3c325a95bdd78028e681e36e802a3eeae491e63b30572b3389edc07bd7426c51"
+    },
+    "deploying": {
+      "gif": "deploying.gif",
+      "preview": "deploying.png",
+      "width": 160,
+      "height": 160,
+      "frames": 150,
+      "durationMs": 15000,
+      "fps": 10,
+      "bytes": 263807,
+      "sha256": "1d5662beab3faa245d1e10d9ee627ca0e2bd44c4b3f8cc22ea5cb41f7368c4ac",
+      "previewSHA256": "0469553be71685d91fbb83e01771d5180744f0e6310394e5133a6e0bbe7228ef"
+    },
+    "success": {
+      "gif": "success.gif",
+      "preview": "success.png",
+      "width": 160,
+      "height": 160,
+      "frames": 150,
+      "durationMs": 15000,
+      "fps": 10,
+      "bytes": 405053,
+      "sha256": "fdc17265597639d7cc57b21bd42f0822408cf9c9ad22dbb4aeb0fb12a31b02e7",
+      "previewSHA256": "35d99ef3b820206caed3dd553a5b77edccb1171d4846334c41d9a7c464bb58b6"
+    },
+    "error": {
+      "gif": "error.gif",
+      "preview": "error.png",
+      "width": 160,
+      "height": 160,
+      "frames": 150,
+      "durationMs": 15000,
+      "fps": 10,
+      "bytes": 661943,
+      "sha256": "61f6118f5a1c7d2b83456525acd6d32917b9b5db288e545d2544835193a8d23c",
+      "previewSHA256": "af8a75ef7fa94876f72dbbcbe9273e42881d05a0c747fa59e5adc5b3cd5b8424"
+    },
+    "sleeping": {
+      "gif": "sleeping.gif",
+      "preview": "sleeping.png",
+      "width": 128,
+      "height": 128,
+      "frames": 190,
+      "durationMs": 19000,
+      "fps": 10,
+      "bytes": 693744,
+      "sha256": "60396cb3694216be3fda79a55b5e4ed6444c3165816aa0b8cbf5600c2f142583",
+      "previewSHA256": "11d035bf252798d0b8a215f2c71a6b22548777892eb4fbb63f37164d3dc83f91"
+    }
+  }
+}

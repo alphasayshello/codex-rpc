@@ -139,30 +139,39 @@ export function encodePNG(width, height, rgba) {
     chunk("IEND", Buffer.alloc(0)),
   ]);
 }
-export function decodePNG(buffer) {
-  if (!buffer.subarray(0, 8).equals(signature))
+export function decodePNG(buffer, { maxDimension = 4096, maxPixels = 16_777_216 } = {}) {
+  if (!Buffer.isBuffer(buffer) || !buffer.subarray(0, 8).equals(signature))
     throw Error("Invalid PNG signature");
-  let pos = 8,
-    width,
-    height,
-    idat = [];
+  let pos = 8, width, height, depth, color, palette, alpha, ended = false;
+  const idat = [];
   while (pos < buffer.length) {
+    if (pos + 12 > buffer.length) throw Error("Truncated PNG chunk");
     const length = buffer.readUInt32BE(pos),
       type = buffer.toString("ascii", pos + 4, pos + 8),
       data = buffer.subarray(pos + 8, pos + 8 + length);
+    if (length > buffer.length - pos - 12) throw Error("Truncated PNG chunk");
+    if (crc32(buffer.subarray(pos + 4, pos + 8 + length)) !== buffer.readUInt32BE(pos + 8 + length)) throw Error("Invalid PNG checksum");
+    if (!width && type !== "IHDR") throw Error("PNG must start with IHDR");
     if (type === "IHDR") {
+      if (width || length !== 13) throw Error("Invalid PNG header");
       width = data.readUInt32BE(0);
       height = data.readUInt32BE(4);
-      if (data[8] !== 8 || data[9] !== 6 || data[12] !== 0)
-        throw Error("Sprite PNG must be non-interlaced RGBA8");
+      depth = data[8]; color = data[9];
+      if (!width || !height || width > maxDimension || height > maxDimension || width * height > maxPixels) throw Error("PNG dimensions exceed the image limit");
+      const depths = { 0: [1, 2, 4, 8, 16], 2: [8, 16], 3: [1, 2, 4, 8], 4: [8, 16], 6: [8, 16] };
+      if (!depths[color]?.includes(depth) || data[10] || data[11] || data[12]) throw Error("Use a non-interlaced PNG in RGB, RGBA, grayscale or indexed color");
     }
+    if (type === "PLTE") { if (!length || length > 768 || length % 3) throw Error("Invalid PNG palette"); palette = data; }
+    if (type === "tRNS") alpha = data;
     if (type === "IDAT") idat.push(data);
     pos += length + 12;
-    if (type === "IEND") break;
+    if (type === "IEND") { if (length) throw Error("Invalid PNG end chunk"); ended = true; break; }
   }
-  const stride = width * 4,
-    raw = inflateSync(Buffer.concat(idat)),
-    rgba = Buffer.alloc(stride * height);
+  if (!ended || !idat.length || (color === 3 && !palette)) throw Error("Incomplete PNG image");
+  const channels = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[color];
+  const stride = Math.ceil(width * channels * depth / 8), bpp = Math.max(1, Math.ceil(channels * depth / 8));
+  const raw = inflateSync(Buffer.concat(idat), { maxOutputLength: (stride + 1) * height });
+  const filtered = Buffer.alloc(stride * height);
   if (raw.length !== (stride + 1) * height)
     throw Error("Invalid PNG scanline length");
   const paeth = (a, b, c) => {
@@ -176,13 +185,36 @@ export function decodePNG(buffer) {
     const filter = raw[y * (stride + 1)];
     if (filter > 4) throw Error("Unknown PNG filter");
     for (let x = 0; x < stride; x++) {
-      const a = x >= 4 ? rgba[y * stride + x - 4] : 0,
-        b = y ? rgba[(y - 1) * stride + x] : 0,
-        c = y && x >= 4 ? rgba[(y - 1) * stride + x - 4] : 0;
-      rgba[y * stride + x] =
+      const a = x >= bpp ? filtered[y * stride + x - bpp] : 0,
+        b = y ? filtered[(y - 1) * stride + x] : 0,
+        c = y && x >= bpp ? filtered[(y - 1) * stride + x - bpp] : 0;
+      filtered[y * stride + x] =
         (raw[y * (stride + 1) + 1 + x] +
           [0, a, b, Math.floor((a + b) / 2), paeth(a, b, c)][filter]) &
         255;
+    }
+  }
+  if (color === 6 && depth === 8) return { width, height, rgba: filtered };
+  const rgba = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const offset = (y * width + x) * 4;
+    const sample = (channel) => {
+      if (depth >= 8) return depth === 16 ? filtered.readUInt16BE(y * stride + (x * channels + channel) * 2) : filtered[y * stride + x * channels + channel];
+      const bit = x * depth;
+      return (filtered[y * stride + (bit >> 3)] >> (8 - depth - bit % 8)) & ((1 << depth) - 1);
+    };
+    const scale = (value) => Math.round(value * 255 / ((2 ** depth) - 1));
+    if (color === 3) {
+      const index = sample(0);
+      if (index * 3 + 2 >= palette.length) throw Error("Invalid PNG palette index");
+      rgba[offset] = palette[index * 3]; rgba[offset + 1] = palette[index * 3 + 1]; rgba[offset + 2] = palette[index * 3 + 2]; rgba[offset + 3] = alpha?.[index] ?? 255;
+    } else if (color === 0 || color === 4) {
+      const gray = sample(0); rgba.fill(scale(gray), offset, offset + 3);
+      rgba[offset + 3] = color === 4 ? scale(sample(1)) : alpha?.length === 2 && alpha.readUInt16BE(0) === gray ? 0 : 255;
+    } else {
+      const rgb = [sample(0), sample(1), sample(2)];
+      for (let channel = 0; channel < 3; channel++) rgba[offset + channel] = scale(rgb[channel]);
+      rgba[offset + 3] = color === 6 ? scale(sample(3)) : alpha?.length === 6 && rgb.every((value, channel) => value === alpha.readUInt16BE(channel * 2)) ? 0 : 255;
     }
   }
   return { width, height, rgba };
