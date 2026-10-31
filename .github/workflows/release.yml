@@ -23,6 +23,7 @@ jobs:
       - run: npm run check
       - run: node scripts/ci-check.js
       - run: npm run release:prepare -- --sea
+      - run: node scripts/verify-sea-pets.js
       - uses: actions/upload-artifact@v4
         with:
           name: codex-rpc-${{ matrix.os }}

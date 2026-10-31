@@ -2,6 +2,8 @@
 
 codex-rpc follows Semantic Versioning. The current release is 0.3.1; the initial source version was 0.1.0.
 
+The current source preview is 0.4.0 (unreleased), adding the pet library, reference-image prompt and custom imports. It does not replace the published 0.3.1 registry version until a separate release is published.
+
 - Patch: compatible bug fixes, parser coverage, asset corrections, docs.
 - Minor: additive commands/settings/metrics and integrations. Before 1.0, breaking changes may appear in a minor with migration notes.
 - Major: incompatible stable CLI, config or on-disk schema changes after 1.0.

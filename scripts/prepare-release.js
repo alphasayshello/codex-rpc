@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { animationCatalog } from "../src/assets/generate-pet-gifs.js";
+import { bloomStates } from "../src/pet-format.js";
 const root = fileURLToPath(new URL("../", import.meta.url));
 process.chdir(root);
 const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
@@ -21,6 +22,10 @@ if (process.platform === "win32" && !npmCLI) throw Error("Run through npm run re
 const packed = JSON.parse(execFileSync(npmCLI ? process.execPath : npm, [...(npmCLI ? [npmCLI] : []), "pack", "--json", "--pack-destination", directory], { encoding: "utf8" }))[0];
 for (const required of [...animationCatalog.flatMap(({ id }) => [`assets/pet/codex-pet-${id}.gif`, `assets/pet/codex-pet-${id}.svg`]), "assets/pet/animation-gallery.js", "assets/pet/animation-catalog.json", "src/hooks-config.js", "src/native-events.js", "src/event-queue.js", "docs/HOOKS.md", "src/selection.js", "src/timeline.js", "src/watcher.js", "src/config.js", "src/presence-scheduler.js", "src/recaps.js", "bin/codex-rpc.js", "assets/pet/codex-pet-writing.gif", "assets/pet/codex-pet-patching.gif", "assets/pet/codex-pet-error.gif", "assets/pet/codex-pet-done.gif"]) {
   if (!packed.files.some((entry) => entry.path === required)) throw Error(`Missing package file: ${required}`);
+}
+for (const required of ["src/pets.js", "src/pet-import-worker.js", "src/pet-format.js", "src/pet-url.js", "src/zip.js", "src/assets/gif.js", "docs/PET-STUDIO.md", "assets/pets/codex-bloom/manifest.json",
+  ...[...new Set(Object.values(bloomStates))].flatMap((state) => [`assets/pets/codex-bloom/${state}.gif`, `assets/pets/codex-bloom/${state}.png`])]) {
+  if (!packed.files.some((entry) => entry.path === required)) throw Error(`Missing pet library file: ${required}`);
 }
 // Stable filename keeps GitHub /releases/latest/download links evergreen.
 // npm adds the account scope to its pack filename. GitHub's public download

@@ -14,6 +14,8 @@ Node 18+ · zero runtime dependencies · no accounts · no telemetry
 
 </div>
 
+> **0.4.0 development preview:** Codex Bloom, the pet library and image-based imports are available from the current source checkout. The latest published npm release is 0.3.1.
+
 ## install
 
 Keep **Discord Desktop** running. Browser-only Discord does not expose the local IPC connection.
@@ -75,6 +77,14 @@ Thinking shows `Pondering solution... (Elapsed: 1:05)`. Shell work shows `Runnin
 
 **Presence settings** let you choose operation or session timing and switch between live telemetry, Claude-style, cost, and compact output-token layouts. `codex-rpc preview` prints the exact card text and image URLs before you share anything.
 
+## choose your companion
+
+**Codex Classic** keeps the original blue pixel pet and its 19 tool-aware scenes. **Codex Bloom** adds the purple companion from the supplied animation pack: typing arms, thinking, reading, searching, building, debugging, deploying, success, error and sleeping. Its ten illustrated loops retain their original 15–19 second timing, with 10 fps playback and every GIF under 1 MB.
+
+<img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pets/codex-bloom/coding.gif" width="160" alt="Codex Bloom typing on a keyboard" /> <img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pets/codex-bloom/thinking.gif" width="160" alt="Codex Bloom thinking" />
+
+Choose a base pet in **Settings → Codex Pet Assets**, or preview one in **Pet Studio** and press **Use on Discord**. Per-state custom URLs remain overrides; **Use this pet’s automatic scenes** restores automatic selection when you want the full pet set.
+
 ## a pet for every state
 
 | State | Preview | What it does |
@@ -99,7 +109,9 @@ Real tool metadata selects reading, searching, terminal, testing, building, inst
 
 Open **Pet studio** in the dashboard for a larger preview, search, category filters, dark/light/checkerboard backgrounds, GIF/SVG downloads and copyable hosted URLs. In **Settings → Codex Pet Assets**, choose a target state and click a thumbnail to change its art, then **Save changes**. Automatic scene selection continues to follow your tools. The studio is also available at `/assets/pet/animation-gallery.html`.
 
-**Make your own pet.** Pet Studio includes an editable character brief and a one-pass ChatGPT image prompt with the exact 1536 × 1872 transparent PNG sheet, 8 × 9 grid, pose map and typing alignment requirements. Copy it into ChatGPT with your character reference and the downloadable layout guide. Generated sheets require manual validation and integration; the studio does not automatically replace the bundled artwork. [Format guide](https://github.com/alphasayshello/codex-rpc/blob/main/docs/PET-STUDIO.md). **Reduce motion** freezes bundled artwork and disables effects; OS reduced-motion preferences are respected. Live updates preserve animations already playing.
+**Make your own pet from an image.** Attach your character image in ChatGPT and paste Pet Studio’s reference-first prompt. It asks for one transparent PNG: eight animation frames across seven rows—idle, thinking, waiting, writing, patching, error and done. Download the result and drag it into **Import a pet**. Studio builds all seven GIFs, keeps the reference’s drawing style, and shows previews before activation. No hand-color sampler or code edits are needed.
+
+You can also import named GIF files or a portable `.pet.json` pack. Export a JSON pack to share or back up your pet, or download a ZIP of hosting files. Imported art works locally immediately; Discord needs its GIFs at a public HTTPS hosting folder, which you provide before choosing **Use on Discord**. The app does not upload your images automatically. [Import and hosting guide](https://github.com/alphasayshello/codex-rpc/blob/main/docs/PET-STUDIO.md). **Reduce motion** freezes previews, and a normal live update does not restart the animation.
 
 <img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/docs/pet-studio.png" width="1000" alt="Local Pet studio with large animated preview, motion controls and a browsable collection" />
 

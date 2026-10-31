@@ -1,6 +1,6 @@
 {
   "name": "@alphasayshello/codex-rpc",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Local Discord presence and lifetime analytics for Codex and ChatGPT Desktop",
   "type": "module",
   "license": "MIT",
@@ -35,7 +35,8 @@
     "check": "node scripts/check.js",
     "verify:desktop": "npm --prefix electron run verify",
     "release:prepare": "node scripts/prepare-release.js",
-    "prepublishOnly": "npm run check && npm test -- --test-concurrency=4"
+    "prepublishOnly": "npm run check && npm test -- --test-concurrency=4",
+    "verify:pets": "npm --prefix electron run verify:pets"
   },
   "keywords": [
     "codex",

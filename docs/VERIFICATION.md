@@ -106,3 +106,15 @@ The 0.3.1 installer also reproduces Codex trust/disable records being serialized
 Prepared `@alphasayshello/codex-rpc@0.3.1` with explicit public registry/access, the existing `codex-rpc` executable, no install-time setup scripts, and no runtime dependency additions. A publish dry run passed all 184 tests (182 passing, two Windows-only skips on macOS) and syntax checks. The publish preflight limits file-level test concurrency to four after an unrestricted run hit a daemon CLI subprocess timeout under local CPU load; the isolated CLI suite also passed.
 
 Reviewed all 189 packed entries for local credentials, state, build output and nested dependencies. A disposable scoped installation verified the CLI version and ten native hooks using setup without service/start. A separate upgrade fixture reproduced the command-link collision from the previous unscoped GitHub archive, then verified that removing only the old npm package and installing the scope preserves analytics and config. GitHub versioned/latest archive names stay stable despite npm's scoped filename. README images and documentation links use public repository URLs for npm rendering.
+
+## 0.4.0 pet library development preview
+
+Verified on macOS ARM64, 2026-10-31:
+
+- All 201 unit/integration tests passed with 199 passes and two Windows-only skips. Syntax checks pass. Focused backend/selection/GIF checks were repeated after the final metadata and non-regular-file protections.
+- Ten supplied Codex Bloom animations were composited, resized and sampled without redrawing the character or removing backgrounds. GIF total fell from 44,928,974 to 5,403,123 bytes. All remain below 1 MB, with the full original 15/19-second timelines and source/output SHA-256 provenance.
+- Actual import of all ten original supplied GIFs completed within the worker deadline. Classic and Bloom exported JSON packs both re-imported successfully. Unit tests cover PNG rows, frame counts, fallback mappings, GIF alias names, CRC/inflate bounds, invalid media, unsafe hosts, path/symlink/FIFO defenses, request tokens/origins, early upload reservation, JSON exports and hosting ZIPs.
+- The main Electron suite passed, including whole-pet draft/save selection, resetting state overrides, local Bloom rendering and reduced-motion PNG fallback. The dedicated pet suite passed local reference privacy, PNG upload through the file input, seven previews, explicit selection, HTTPS hosting, JSON roundtrip, ZIP export, malformed/XSS input, offline browsing and 430px mobile layout with no JavaScript errors. Screenshots use synthetic sample data.
+- Built the macOS ARM64 standalone executable with official Node 26.10.0. `scripts/verify-sea-pets.js` launched that executable in disposable homes and verified worker-based PNG import, eight-frame GIF output, ZIP download, custom-host enforcement and built-in pet selection. Release builds now run this integration probe on every native platform.
+
+This is a source/local preview. The published npm/GitHub release remains 0.3.1 until a separate 0.4.0 publication.
