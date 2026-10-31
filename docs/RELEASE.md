@@ -1,8 +1,8 @@
-# codex-rpc 0.3.0 — release procedure
+# codex-rpc 0.3.1 — release procedure
 
-Nineteen smooth pet scenes, automatic tool-aware animation selection, a visual settings picker and an interactive Pet studio, alongside live telemetry, analytics and chat pinning.
+Shorter public file labels and safer outgoing command summaries, alongside 19 pet scenes, live telemetry, analytics, native hooks and chat pinning.
 
-Published release: [v0.3.0](https://github.com/alphasayshello/codex-rpc/releases/tag/v0.3.0). For a future release, update all package versions and release notes first, and substitute that new version in the steps below. Published tags are retained.
+Published release: [v0.3.1](https://github.com/alphasayshello/codex-rpc/releases/tag/v0.3.1). For a future release, update all package versions and release notes first, and substitute that new version in the steps below. Published tags are retained.
 
 This is a GitHub-only release. The unscoped npm name `codex-rpc` belongs to an unrelated project. Do not use `npx codex-rpc@latest` or `npm publish` for this repository. The package is marked private to prevent accidental registry publication; the tarball still installs normally.
 
@@ -10,10 +10,10 @@ This is a GitHub-only release. The unscoped npm name `codex-rpc` belongs to an u
 
 1. Commit all changes and push `main`: `git push origin main`.
 2. Wait for the **verify** workflow: all nine macOS/Linux/Windows × Node 18/22/26 jobs must pass. Resolve failures before tagging.
-3. Run **Build release archives** from GitHub Actions → Run workflow → `main`. It tests and builds each native platform with official Node 26, then uploads archives and checksums. It does not publish a release.
+3. Optionally run **Build release archives** from GitHub Actions → Run workflow → `main` for a rehearsal. It tests and builds each native platform with official Node 26, then uploads archives and checksums.
 4. Download and extract all three workflow artifacts. Test each native binary and background service on its target OS before claiming native installer coverage. macOS binaries are ad-hoc signed, not notarized; Windows binaries are not Authenticode signed.
-5. Create and push the release tag only after checks: `git tag -a v0.3.0 -m "codex-rpc 0.3.0"` then `git push origin v0.3.0`. Tagging also builds archives again from that exact commit; use these final artifacts.
-6. Create a draft GitHub release for `v0.3.0`. Paste [RELEASE-NOTES-v0.3.0.md](RELEASE-NOTES-v0.3.0.md) into the release body. Upload both `codex-rpc.tgz` and `codex-rpc-0.3.0.tgz` from one platform build, plus each platform executable. Verify each build's manifest, then generate one combined `SHA256SUMS` from the exact files being attached. The published 0.3.0 release also includes `release.json` with source revision, build/test runs and artifact hashes. Review then publish manually.
+5. Create and push the release tag only after checks: `git tag -a v0.3.1 -m "codex-rpc 0.3.1"` then `git push origin v0.3.1`. Tagging also builds archives again from that exact commit; use these final artifacts.
+6. The successful tag build creates a **draft** release. Its assembly job checks every platform's SHA-256 manifest, chooses both tarball aliases from one build, and attaches the three native executables, tarballs, combined `SHA256SUMS` and `release.json` recording source/build provenance. Review the [release notes](RELEASE-NOTES-v0.3.1.md), confirm all nine verify jobs passed, compare uploaded asset digests with the manifest, then publish manually. No workflow automatically publishes a release. To assemble downloaded build artifacts locally, run `node scripts/assemble-release.js <artifact-directory> <output-directory>`.
 
 GitHub release page: https://github.com/alphasayshello/codex-rpc/releases/new
 

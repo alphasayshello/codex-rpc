@@ -8,7 +8,7 @@
 
 Discord Rich Presence and local analytics for Codex, with lightweight ChatGPT Desktop detection.
 
-[Download latest](https://github.com/alphasayshello/codex-rpc/releases/latest) · [Release notes](docs/RELEASE-NOTES-v0.3.0.md) · [MIT](LICENSE) · [Security](SECURITY.md)
+[Download latest](https://github.com/alphasayshello/codex-rpc/releases/latest) · [Release notes](docs/RELEASE-NOTES-v0.3.1.md) · [MIT](LICENSE) · [Security](SECURITY.md)
 
 Node 18+ · zero runtime dependencies · no accounts · no telemetry
 
@@ -50,12 +50,16 @@ After setup, open **`/hooks` in Codex** to review and trust the new handlers. Ex
 ## on Discord
 
 ```text
-Watching Codex RPC
+Watching Codex
 Writing code across 2 files
-Editing src/client.js (+42 / -12) · o4-mini · 22.8k output tokens
+Editing codex-rpc/src/client.js (+42 / -12) · o4-mini · 22.8k output tokens
 ```
 
 The card follows the selected conversation: edited files, logged line changes, safe command summaries, model, **output tokens for that chat**, and an elapsed timer. Input and cached tokens never inflate its output counter. Reasoning is already included in output.
+
+**0.3.1 keeps file paths short.** Public cards show `project/src/file.ts`, without home directories, usernames, drive letters or network-share prefixes. Files outside a known project fall back to their filename. Private mode hides files entirely. Existing snapshots get the same protection immediately after updating.
+
+The activity explicitly sets its name to **Codex**, with **Watching** as the default activity type. Older Discord clients may fall back to the registered application's name; if needed, name your application **Codex** in the [Developer Portal](https://discord.com/developers/applications).
 
 Thinking shows `Pondering solution... (Elapsed: 1:05)`. Shell work shows `Running: npm test`. Idle shows the workspace and Git branch when available. Missing metadata falls back to project/model status. There are no Discord card buttons.
 
@@ -214,6 +218,6 @@ npm run release:prepare -- --sea
 
 Normal runtime supports Node 18+. Some Homebrew Node builds disable SEA; standalone builds need an official SEA-enabled build. Output goes to `dist/release/<platform>-<arch>/`, with versioned archives, the stable `codex-rpc.tgz` alias, release notes and checksums. Native executables must be built on each target platform.
 
-[Release checklist](docs/RELEASE.md) · [Paste-ready v0.3.0 notes](docs/RELEASE-NOTES-v0.3.0.md) · [Verification](docs/VERIFICATION.md) · [Versioning](VERSIONING.md)
+[Release checklist](docs/RELEASE.md) · [Paste-ready v0.3.1 notes](docs/RELEASE-NOTES-v0.3.1.md) · [Verification](docs/VERIFICATION.md) · [Versioning](VERSIONING.md)
 
 Inspired by [rar-file/claude-rpc](https://github.com/rar-file/claude-rpc): three small Node pieces joined by JSON, adapted independently for Codex. Unaffiliated with OpenAI or Discord. Original project code is MIT; bundled OpenAI artwork has separate provenance.

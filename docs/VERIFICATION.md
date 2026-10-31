@@ -85,3 +85,16 @@ The platform matrix also executes a real Windows encoded-PowerShell-to-Node stdi
 All seven published assets match their local file lengths and GitHub-computed SHA-256 digests. The combined manifest covers three native executables, the identical stable/versioned source archives and source provenance metadata. The downloaded macOS executable runs as 0.3.0. Its isolated setup installed ten native hooks and successfully processed private callback stdin and exact Stop JSON. The public README latest-download URL returns the expected archive hash, and a disposable global-prefix npm installation executes version and hook diagnostics correctly. This supersedes earlier pending publication and cross-platform notes for this release.
 
 The local runtime was upgraded in public mode with the custom notifier preserved. Native hooks still require Codex's own trust review. Discord Desktop was closed during the final local health check, so the daemon was running and waiting to reconnect; this release check does not claim a newly observed real Discord card.
+
+## 0.3.1 presence privacy patch
+
+Verified locally on macOS ARM64, 2026-10-31:
+
+- A real Discord IPC `SET_ACTIVITY` acknowledgement returned `name: "Codex"`, `type: 3`, and the requested test details. Test presence was cleared afterward; no application rename or account token was required. This exercises the current client's name override, not just a mocked frame.
+- Public file labels now normalize POSIX, drive-letter and UNC paths before card formatting, retain known project-relative context, and fall back to a filename for unknown external locations. Cached-state and private-mode tests inspect serialized Discord frames across all four layouts. Parent traversal and malformed paths have explicit cases.
+- Cached shell summaries are checked against the executable/subcommand allowlist at the outgoing boundary.
+- Full local suite: 183 tests, 181 passed, two Windows-only probes skipped on macOS. The nine focused API/path/IPC/release-assembly checks passed after the final server version change.
+- Electron render checks passed for the new heading, project-relative edit label and live package version, alongside existing accessibility, mobile, privacy, settings, SSE, animation and pinning checks. Updated synthetic-data screenshots were inspected.
+- Asset regeneration left all committed GIF/SVG bytes unchanged. The release assembler test checks three-platform completeness, identical tarball aliases and rejection of corrupted downloads.
+
+Cross-platform release CI and uploaded artifact digests are checked before publication; local results alone do not certify native Windows/Linux installation.
