@@ -1,5 +1,5 @@
-import { buildPetPrompt } from "./pet-prompt.js";
-const defaultPetBrief = "A tiny friendly robot with a cobalt-blue rounded head, a dark face screen, expressive cyan eyes, small mitten-like hands, and a miniature laptop.";
+import { buildPetPrompt, petLayoutSVG } from "./pet-prompt.js";
+const defaultPetBrief = "";
 const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const titleCase = (value) => value.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 const base = "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/";
@@ -22,15 +22,17 @@ export function buildGallery({ states = {}, visualStates = [], bonusStates = [],
 <html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"><title>Codex Pet · Animation studio</title><link rel="icon" href="codex-pet-writing.svg"><link rel="stylesheet" href="animation-gallery.css"><script src="animation-gallery.js" defer></script></head>
 <body data-background="dark"><a class="skip-link" href="#scene-library">Skip to scenes</a>
 <header class="topbar"><a class="brand" href="animation-gallery.html"><span class="brand-mark" aria-hidden="true">&gt;_</span> codex-rpc <span class="brand-note">/ pet studio</span></a><a class="quiet-link" href="/">Back to dashboard <span aria-hidden="true">↗</span></a></header>
-<main><div class="page-intro"><p class="eyebrow"><span class="pixel-dot" aria-hidden="true"></span> THE ORIGINAL BLUE CODEX PET</p><h1>A little character.<br>A lot of personality.</h1><p>From the first thought to the final green check. Find the right little moment for your Discord presence.</p><div class="intro-tags"><span>${core.length} live states</span><span>${bonus.length} extra scenes</span><span>Pixel-perfect loops</span><a class="create-pet-link" href="#create-pet">Make your own pet ↘</a></div></div>
+<main><div class="page-intro"><p class="eyebrow"><span class="pixel-dot" aria-hidden="true"></span> FIND YOUR CODING COMPANION</p><h1>A little character.<br>A lot of personality.</h1><p>From the first thought to the final green check. Two built-in companions, your own characters, and a scene for every little moment.</p><div class="intro-tags"><span>${core.length} live states</span><span>${bonus.length} extra scenes</span><span>Animated GIFs</span><a class="create-pet-link" href="#create-pet">Make your own pet ↘</a></div></div>
+<section id="pet-library" class="pet-library" aria-labelledby="pet-library-title"><div class="library-heading"><div><p class="eyebrow">YOUR COMPANIONS</p><h2 id="pet-library-title">Your pet library.</h2></div><a class="quiet-link" href="#import-pet">Import your own ↘</a></div><div class="pet-library-controls"><label class="pet-picker-label" for="pet-select">Preview pet<select id="pet-select"><option value="codex">Original Codex Pet</option><option value="codex-bloom">Codex Bloom</option></select></label><button id="use-pet" class="primary" type="button" disabled>Use on Discord</button><a id="export-pet" class="secondary" aria-disabled="true">Export pet pack</a><a id="download-pet-assets" class="secondary" aria-disabled="true">Download hosting files</a></div><div id="pet-hosting" class="pet-hosting" hidden><label for="pet-host-url">Public GIF folder URL</label><input id="pet-host-url" type="url" spellcheck="false" placeholder="https://raw.githubusercontent.com/you/repo/main/my-pet/"><p>Preview stays local. For Discord, download the hosting files, upload the extracted GIFs to GitHub or another HTTPS host, then paste the folder URL. Keep the filenames unchanged.</p></div><p id="pet-library-status" class="copy-status" role="status" aria-live="polite">Connecting to your local pet library…</p></section>
 <section class="preview-panel" aria-labelledby="preview-title"><div class="preview-stage"><span class="stage-corner">LIVE PREVIEW</span><img id="preview-image" class="scene-image" src="codex-pet-${first.id}.gif" width="384" height="416" alt="Codex Pet ${escape(first.label)}" data-scene="${first.id}"><span id="motion-status" class="stage-caption">Playing · seamless loop</span></div><div class="preview-details"><p id="preview-category" class="eyebrow">${first.kind === "core" ? "CANONICAL STATE" : "EXTRA SCENE"}</p><h2 id="preview-title">${escape(first.label)}</h2><p id="preview-description">${escape(first.description)}</p><dl class="preview-facts"><div><dt>Frame rate</dt><dd id="preview-fps">${first.fps} fps</dd></div><div><dt>Loop length</dt><dd id="preview-duration">${escape(first.duration || "—")}s</dd></div><div><dt>Suggested state</dt><dd id="preview-recommended">${escape(first.recommended)}</dd></div></dl><div class="asset-actions"><button id="copy-url" class="primary" type="button">Copy GIF URL <span aria-hidden="true">↗</span></button><a id="download-gif" class="secondary" href="codex-pet-${first.id}.gif" download>Download GIF</a><a id="download-svg" class="quiet-link" href="codex-pet-${first.id}.svg" download>Static SVG</a></div><label class="url-label" for="asset-url">Direct asset URL</label><input id="asset-url" class="asset-url" type="text" readonly spellcheck="false" value="${base}codex-pet-${first.id}.gif?v=smooth-1"><p id="copy-status" class="copy-status" role="status" aria-live="polite">Use this URL in your Codex Pet asset settings.</p></div></section>
 <section id="scene-library" aria-labelledby="library-heading"><div class="library-heading"><div><p class="eyebrow">THE COLLECTION</p><h2 id="library-heading">A scene for every state of mind.</h2></div><span id="scene-count" class="muted" role="status">${scenes.length} scenes</span></div><div class="library-toolbar"><div class="filters" role="group" aria-label="Scene collection"><button type="button" data-filter="all" aria-pressed="true">All scenes</button><button type="button" data-filter="core" aria-pressed="false">Live states</button><button type="button" data-filter="bonus" aria-pressed="false">Extra scenes</button></div><label class="select-label">Mood <select id="family-filter"><option value="all">All moods</option>${families.map((family) => `<option value="${escape(family)}">${escape(titleCase(family))}</option>`).join("")}</select></label><label class="search-label"><span class="sr-only">Search scenes</span><input id="scene-search" type="search" placeholder="Find a scene…"></label></div>
 <div class="view-toolbar"><div class="motion-controls"><button id="play-toggle" class="secondary" type="button" aria-pressed="true">Pause animations</button><label class="check-label"><input id="reduce-motion" type="checkbox"> Reduce motion</label></div><label class="select-label">Preview background <select id="background-select"><option value="dark">Dark</option><option value="light">Light</option><option value="checkerboard">Checkerboard</option></select></label></div>
 <section class="scene-section" data-section="core" aria-labelledby="core-heading"><div class="group-heading"><h3 id="core-heading">Live states</h3><p>The familiar lifecycle, with a little more life.</p></div><div class="scene-grid">${scenes.filter((scene) => scene.kind === "core").map(sceneCard).join("")}</div></section><section class="scene-section" data-section="bonus" aria-labelledby="bonus-heading"><div class="group-heading"><h3 id="bonus-heading">Extra scenes</h3><p>Fresh loops for reading, building, debugging, and everything in between.</p></div><div class="scene-grid">${scenes.filter((scene) => scene.kind === "bonus").map(sceneCard).join("")}</div></section><p id="empty-scenes" class="empty-scenes" hidden>No scenes match. Try another mood or clear your search.</p></section>
-<section id="create-pet" class="prompt-studio" aria-labelledby="prompt-heading"><div class="library-heading"><div><p class="eyebrow">MAKE IT YOURS</p><h2 id="prompt-heading">Your character. Ready for its little screen.</h2></div><span class="prompt-tag">ChatGPT prompt</span></div><p class="prompt-intro">Describe a character, copy the prompt, and paste it into ChatGPT with image generation. Attach a character reference if you have one, plus the layout reference below for consistent poses.</p><div class="prompt-format" aria-label="Sprite sheet format"><span>PNG · transparent</span><span>1536 × 1872 px</span><span>8 columns × 9 rows</span><span>192 × 208 px per frame</span></div><div class="prompt-editor"><div class="prompt-brief"><label for="pet-brief">Meet your pet</label><textarea id="pet-brief" rows="5" maxlength="1000" aria-describedby="pet-brief-help">${escape(defaultPetBrief)}</textarea><p id="pet-brief-help" class="muted">Describe its shape, colors, personality and a distinctive detail. Your brief stays in this page until you copy it.</p><a class="quiet-link" href="source/codex-spritesheet-v4.png" download>Download pose / layout reference ↗</a></div><div class="prompt-how"><p class="eyebrow">ONE PROMPT, ONE SHEET</p><ol><li>Describe your character above.</li><li>Copy the complete prompt into ChatGPT.</li><li>Save the resulting transparent PNG and check its grid and poses.</li></ol><p class="muted">The 19 GIF scenes are composed from these base poses and pixel effects. Generate the character sheet first.</p></div></div><label class="prompt-label" for="pet-prompt">Your complete image-generation prompt</label><textarea id="pet-prompt" rows="16" readonly spellcheck="false" aria-describedby="pet-prompt-status">${escape(buildPetPrompt(defaultPetBrief))}</textarea><div class="prompt-actions"><button id="copy-pet-prompt" class="primary" type="button">Copy ChatGPT prompt</button><button id="reset-pet-prompt" class="secondary" type="button">Reset brief</button></div><p id="pet-prompt-status" class="copy-status" role="status" aria-live="polite">Ready to copy. Nothing is sent to ChatGPT from this page.</p><p class="prompt-note">Generated sheets need a visual check, exact sizing and pose alignment before use. The current typing rig also needs hands aligned to its keyboard region. Pet Studio does not import or replace artwork automatically.</p></section>
+<section id="create-pet" class="prompt-studio" aria-labelledby="prompt-heading"><div class="library-heading"><div><p class="eyebrow">YOUR IMAGE, BROUGHT TO LIFE</p><h2 id="prompt-heading">Keep your character. Give it a little life.</h2></div><span class="prompt-tag">Reference-image prompt</span></div><p class="prompt-intro">Attach your character image in ChatGPT, then paste this prompt. It describes every animation state while preserving your character’s identity and visual style. Bring the finished PNG back here to import it.</p><div class="prompt-format" aria-label="Sprite sheet format"><span>Transparent PNG</span><span>1536 × 1344 px</span><span>8 frames × 7 states</span><span>All 56 frames become animation</span></div><div class="prompt-editor"><div class="prompt-brief"><label for="pet-reference">Your character image <span class="muted">optional local preview</span></label><input id="pet-reference" type="file" accept="image/png,image/jpeg,image/webp"><div id="reference-preview-wrap" class="reference-preview" hidden><img id="pet-reference-preview" alt="Your selected character reference"><button id="clear-reference" class="secondary" type="button">Clear preview</button></div><p id="reference-status" class="muted" role="status">This preview stays on your computer. Attach the image yourself in ChatGPT.</p><label for="pet-brief">Optional art direction</label><textarea id="pet-brief" rows="3" maxlength="1000" placeholder="For example: a tiny matching laptop and calm, gentle gestures." aria-describedby="pet-brief-help"></textarea><p id="pet-brief-help" class="muted">The attached image defines the character. Leave this blank to follow it faithfully.</p><a id="download-pet-guide" class="quiet-link" download="codex-rpc-pet-layout.svg">Download the 8 × 7 layout guide ↗</a></div><div class="prompt-how"><p class="eyebrow">ONE IMAGE IN. ONE SHEET OUT.</p><ol><li>Attach your character image in ChatGPT.</li><li>Paste the complete prompt below and generate the transparent PNG.</li><li>Drop that PNG into the importer and preview its states.</li><li>Choose it for Discord when its GIFs are publicly hosted.</li></ol><p>The importer reads every frame. Typing comes from the character’s actual hand poses, without a blue-pet-specific hand sampler.</p><p class="muted">Only the grid guide is optional. Your character reference is required in ChatGPT.</p></div></div><label class="prompt-label" for="pet-prompt">Your complete image-generation prompt</label><textarea id="pet-prompt" rows="16" readonly spellcheck="false" aria-describedby="pet-prompt-status"></textarea><div class="prompt-actions"><button id="copy-pet-prompt" class="primary" type="button">Copy ChatGPT prompt</button><button id="reset-pet-prompt" class="secondary" type="button">Clear art direction</button><a class="secondary" href="#import-pet">I have my image →</a></div><p id="pet-prompt-status" class="copy-status" role="status" aria-live="polite">Attach your character image in ChatGPT, then paste this prompt.</p><p class="prompt-note">Image generation can miss a grid or change a face. Preview every imported state before using it. Pet Studio never uploads your image or sends a prompt to ChatGPT.</p></section>
+<section id="import-pet" class="import-studio" aria-labelledby="import-heading"><div class="library-heading"><div><p class="eyebrow">WELCOME YOUR NEW PET</p><h2 id="import-heading">Drop it in. See it move.</h2></div><span class="prompt-tag">Local import</span></div><p class="prompt-intro">Import one generated PNG sheet, a collection of state-named GIFs, or an exported <code>.pet.json</code> pack. Your original files and the bundled pets stay intact.</p><div id="pet-dropzone" class="pet-dropzone" tabindex="0" role="button" aria-label="Choose pet files, or drop them here"><span class="drop-icon" aria-hidden="true">＋</span><strong>Drop your pet here</strong><span>PNG sprite sheet · state GIFs · .pet.json pack</span><span class="secondary">Choose files</span><input id="pet-import-files" class="sr-only" type="file" accept="image/png,image/gif,.json" multiple tabindex="-1" aria-label="Pet files"></div><div class="import-options"><label for="pet-import-name">Pet name<input id="pet-import-name" type="text" maxlength="64" placeholder="My coding companion" autocomplete="off"></label><label for="pet-import-format">Image layout<select id="pet-import-format"><option value="sheet-v2">8 columns × 7 states (new prompt)</option><option value="legacy-v1">8 columns × 9 rows (legacy atlas)</option><option value="gif-pack">State GIFs / exported pet pack</option></select></label></div><div id="import-file-previews" class="import-file-previews" hidden></div><p id="import-files-status" class="copy-status" role="status">No files selected. PNG/GIF files: up to 10 MB each, 48 MB total. Exported packs: up to 64 MB.</p><div class="prompt-actions"><button id="import-pet-button" class="primary" type="button" disabled>Import &amp; preview</button><button id="clear-import" class="secondary" type="button" disabled>Clear files</button></div><p id="import-status" class="import-status" role="status" aria-live="polite">Run codex-rpc serve to enable local imports.</p><div id="import-state-previews" class="import-state-previews" hidden aria-label="Imported pet state previews"></div><p class="prompt-note">PNG rows are idle, thinking, waiting, writing, patching, error and done. GIF names can use these states or names such as coding, sleeping and success. Related extra states reuse the closest supplied animation. Importing does not change your live Discord pet until you choose <strong>Use on Discord</strong>.</p></section>
 <details class="provenance"><summary>About this little pet</summary><p>The original blue Codex Pet artwork is preserved. Motion and surrounding pixel effects are authored for codex-rpc. Static previews retain the source pixels; GIF colors use an indexed palette.</p><a class="quiet-link" href="manifest.json">View source provenance and animation metadata ↗</a><a class="quiet-link" href="animation-spritesheet.png">Open the motion contact sheet ↗</a></details>
 <footer><span><span class="brand-mark" aria-hidden="true">&gt;_</span> codex-rpc · made for your flow</span><span>Open source · local first · MIT</span></footer></main></body></html>`;
-  return { html, css: galleryCSS, js: galleryJS };
+  return { html, css: galleryCSS + studioCSS, js: `const studioConfig = ${JSON.stringify({ base, bloomBase: "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pets/codex-bloom/", promptTemplate: buildPetPrompt("[[CHARACTER_BRIEF]]"), guide: petLayoutSVG() })};\n(${studioRuntime.toString()})();` };
 }
 
 const galleryCSS = `
@@ -47,92 +49,171 @@ const galleryCSS = `
 @media(max-width:760px){.topbar,main{padding-left:20px;padding-right:20px}.topbar{min-height:72px}.brand-note{display:none}.page-intro{padding-top:40px}.page-intro h1{font-size:36px;letter-spacing:-1.2px}.preview-panel{grid-template-columns:minmax(0,1fr)}.preview-stage{min-height:300px}.preview-stage img{width:220px}.preview-details{padding:26px}.scene-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.library-heading{align-items:flex-start;flex-direction:column;gap:10px}.library-heading h2{font-size:21px}.library-toolbar{gap:12px}.filters{width:100%;justify-content:space-between}.filters button{flex:1}.search-label{flex:1;min-width:130px}input[type=search]{width:100%}.select-label{flex-wrap:wrap}.view-toolbar{align-items:flex-start;gap:15px}.motion-controls{gap:12px;flex-wrap:wrap}.group-heading{display:block}.group-heading p{margin-top:6px}.scene-stage{min-height:150px}.scene-stage img{width:120px;height:130px}.scene-info{padding:12px}.preview-facts{gap:24px}.asset-actions{gap:8px}.asset-actions .quiet-link{margin-left:3px}.brand{font-size:14px}.topbar>.quiet-link{font-size:10px}footer{flex-direction:column}.stage-caption{bottom:14px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}`;
 
-const galleryJS = `
-const $ = (selector) => document.querySelector(selector);
-const cards = [...document.querySelectorAll('.scene-card')];
-const petPromptTemplate = ${JSON.stringify(buildPetPrompt('[[CHARACTER_BRIEF]]'))};
-const defaultPetBrief = ${JSON.stringify(defaultPetBrief)};
-const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
-const storage = {get(key){try{return localStorage.getItem(key)}catch{return null}},set(key,value){try{localStorage.setItem(key,value)}catch{}}};
-let selected = cards.find(card=>card.getAttribute('aria-pressed')==='true') || cards[0];
-let paused = storage.get('codex-pet-gallery-paused')==='true';
-let reduced = storage.get('codex-pet-gallery-reduced') == null ? motionPreference.matches : storage.get('codex-pet-gallery-reduced')==='true';
-let filter = 'all';
-function motion(){
-  const still = paused || reduced;
-  for(const image of document.querySelectorAll('.scene-image')){
-    const path = 'codex-pet-'+image.dataset.scene+(still?'.svg':'.gif');
-    if(image.getAttribute('src')!==path) image.src=path;
-  }
-  $('#play-toggle').textContent=reduced?'Motion reduced':paused?'Play animations':'Pause animations';
-  $('#play-toggle').disabled=reduced;
-  $('#play-toggle').setAttribute('aria-pressed',String(!still));
-  $('#reduce-motion').checked=reduced;
-  $('#motion-status').textContent=reduced?'Reduced motion · static preview':paused?'Paused · static preview':'Playing · seamless loop';
-}
-function choose(card){
-  selected=card;
-  for(const other of cards)other.setAttribute('aria-pressed',String(other===card));
-  const id=card.dataset.scene;
-  $('#preview-image').dataset.scene=id;
-  $('#preview-image').alt='Codex Pet '+card.dataset.label;
-  $('#preview-title').textContent=card.dataset.label;
-  $('#preview-category').textContent=card.dataset.kind==='core'?'CANONICAL STATE':'EXTRA SCENE';
-  $('#preview-description').textContent=card.dataset.description;
-  $('#preview-fps').textContent=card.dataset.fps+' fps';
-  $('#preview-duration').textContent=card.dataset.duration?card.dataset.duration+'s':'Not recorded';
-  $('#preview-recommended').textContent=card.dataset.recommended;
-  $('#download-gif').href='codex-pet-'+id+'.gif';
-  $('#download-svg').href='codex-pet-'+id+'.svg';
-  $('#asset-url').value='${base}codex-pet-'+id+'.gif?v=smooth-1';
-  $('#copy-status').textContent='Use this URL in your Codex Pet asset settings.';
-  motion();
-}
-function applyFilters(){
-  const family=$('#family-filter').value, query=$('#scene-search').value.toLowerCase().trim();
-  let count=0;
-  for(const card of cards){
-    const matches=(filter==='all'||card.dataset.kind===filter)&&(family==='all'||card.dataset.family===family)&&(!query||(card.dataset.label+' '+card.dataset.description).toLowerCase().includes(query));
-    card.hidden=!matches;if(matches)count++;
-  }
-  for(const group of document.querySelectorAll('.scene-section'))group.hidden=![...group.querySelectorAll('.scene-card')].some(card=>!card.hidden);
-  $('#scene-count').textContent=count+' '+(count===1?'scene':'scenes');
-  $('#empty-scenes').hidden=count>0;
-}
-for(const card of cards){card.addEventListener('click',()=>choose(card));card.addEventListener('keydown',event=>{
-  const shown=cards.filter(item=>!item.hidden);let index=shown.indexOf(card);
-  if(event.key==='ArrowRight'||event.key==='ArrowDown')index=(index+1)%shown.length;
-  else if(event.key==='ArrowLeft'||event.key==='ArrowUp')index=(index-1+shown.length)%shown.length;
-  else if(event.key==='Home')index=0;else if(event.key==='End')index=shown.length-1;else return;
-  event.preventDefault();shown[index]?.focus();
-})}
-for(const button of document.querySelectorAll('[data-filter]'))button.addEventListener('click',()=>{
-  filter=button.dataset.filter;
-  for(const other of document.querySelectorAll('[data-filter]'))other.setAttribute('aria-pressed',String(other===button));
-  applyFilters();
-});
-$('#family-filter').addEventListener('change',applyFilters);$('#scene-search').addEventListener('input',applyFilters);
-$('#play-toggle').addEventListener('click',()=>{paused=!paused;storage.set('codex-pet-gallery-paused',String(paused));motion()});
-$('#reduce-motion').addEventListener('change',()=>{reduced=$('#reduce-motion').checked;storage.set('codex-pet-gallery-reduced',String(reduced));motion()});
-motionPreference.addEventListener('change',()=>{if(storage.get('codex-pet-gallery-reduced')==null){reduced=motionPreference.matches;motion()}});
-function background(value){document.body.dataset.background=value;document.documentElement.dataset.theme=value==='light'?'light':'dark';$('#background-select').value=value;storage.set('codex-pet-gallery-background',value)}
-$('#background-select').addEventListener('change',()=>background($('#background-select').value));
-$('#copy-url').addEventListener('click',async()=>{
-  try{await navigator.clipboard.writeText($('#asset-url').value);$('#copy-status').textContent='GIF URL copied. Ready for your presence settings.'}
-  catch{$('#asset-url').focus();$('#asset-url').select();$('#copy-status').textContent='Select and copy the URL above.'}
-});
-function updatePetPrompt(){
-  const brief=$('#pet-brief').value.replace(/[\\x00-\\x1f\\x7f]/g,' ').trim().slice(0,1000) || 'A friendly small companion with expressive eyes and small mitten-like hands.';
-  const slash=String.fromCharCode(92);
-  const literal=JSON.stringify(brief).replaceAll('<',slash+'u003c').replaceAll('>',slash+'u003e').replaceAll('&',slash+'u0026');
-  $('#pet-prompt').value=petPromptTemplate.replace('[[CHARACTER_BRIEF]]',()=>literal.slice(1,-1));
-  $('#pet-prompt-status').textContent='Prompt updated locally. Ready to copy into ChatGPT.';
-}
-$('#pet-brief').addEventListener('input',updatePetPrompt);
-$('#reset-pet-prompt').addEventListener('click',()=>{$('#pet-brief').value=defaultPetBrief;updatePetPrompt();$('#pet-brief').focus()});
-$('#copy-pet-prompt').addEventListener('click',async()=>{
-  try{await navigator.clipboard.writeText($('#pet-prompt').value);$('#pet-prompt-status').textContent='Prompt copied. Paste it into ChatGPT and attach your reference images.'}
-  catch{$('#pet-prompt').focus();$('#pet-prompt').select();$('#pet-prompt-status').textContent='Select and copy the prompt above.'}
-});
-const savedBackground=storage.get('codex-pet-gallery-background');background(['dark','light','checkerboard'].includes(savedBackground)?savedBackground:'dark');choose(selected);applyFilters();
+const studioCSS = `
+.page-intro{padding-top:40px;padding-bottom:24px}.page-intro h1{font-size:clamp(30px,3.7vw,44px)}.page-intro .intro-tags{margin-top:16px}.pet-library{margin:0 0 24px;padding:18px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}.pet-library .library-heading{margin-bottom:12px}.pet-library .library-heading .eyebrow{display:none}.pet-library .library-heading h2{font-size:17px}.pet-library-controls{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}.pet-picker-label{display:flex;flex-direction:column;gap:7px;font-size:11px;color:var(--muted);flex:1;min-width:210px}.pet-picker-label select{width:100%;font-size:13px;color:var(--text)}.pet-library-controls>a,.pet-library-controls>button{font-size:12px}.pet-hosting{margin-top:20px;max-width:800px}.pet-hosting label{display:block;font-size:12px;margin-bottom:8px}.pet-hosting input{display:block;width:100%;padding:11px;background:var(--stage);border:1px solid var(--border);border-radius:10px;font:12px ui-monospace,monospace}.pet-hosting p{font-size:12px;color:var(--muted)}a[aria-disabled=true],button:disabled{opacity:.5;cursor:not-allowed}.copy-status[data-error=true],.import-status[data-error=true]{color:#f2a8ab}.reference-preview{display:flex;align-items:center;gap:18px;padding:15px;border:1px solid var(--border);border-radius:12px;margin-top:12px;background:var(--stage)}.reference-preview img{width:100px;height:100px;object-fit:contain}.prompt-brief input[type=file]{display:block;width:100%;padding:12px;background:var(--stage);border:1px solid var(--border);border-radius:10px;font-size:12px}.prompt-brief input[type=file]::file-selector-button{border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);padding:7px 10px;margin-right:10px;cursor:pointer}.prompt-brief>label:not(:first-child){margin-top:22px}.import-studio{margin:40px 0 30px;padding-top:20px;border-top:1px solid var(--border);scroll-margin-top:20px}.pet-dropzone{border:1px dashed var(--muted);border-radius:16px;background:var(--stage);padding:30px;display:flex;align-items:center;flex-direction:column;gap:10px;text-align:center;cursor:pointer}.pet-dropzone:hover,.pet-dropzone[data-dragging=true]{border-color:var(--blue);background:var(--blue-bg)}.pet-dropzone>strong{font-size:17px;font-weight:550}.pet-dropzone>span:not(.drop-icon):not(.secondary){font-size:12px;color:var(--muted)}.drop-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--surface);font-size:25px;color:var(--blue)}.import-options{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:20px}.import-options>label{display:flex;flex-direction:column;gap:8px;font-size:12px}.import-options input{padding:10px 12px;min-height:42px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}.import-options select{min-height:42px}.import-status{font-size:12px;color:var(--muted);min-height:22px;max-width:850px;overflow-wrap:anywhere}.import-file-previews{display:flex;gap:12px;align-items:center;overflow:auto;padding:16px 0}.import-file-previews figure,.import-state-previews figure{margin:0;display:flex;align-items:center;flex-direction:column;gap:8px;min-width:100px}.import-file-previews img{max-width:180px;height:130px;object-fit:contain;border:1px solid var(--border);border-radius:10px;background:var(--stage)}.import-file-previews figcaption,.import-state-previews figcaption{font-size:11px;color:var(--muted);max-width:160px;overflow-wrap:anywhere}.import-state-previews{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:12px;margin-top:24px}.import-state-previews figure{min-width:0;padding:10px;background:var(--stage);border:1px solid var(--border);border-radius:12px}.import-state-previews img{width:100%;max-width:140px;aspect-ratio:1;object-fit:contain}body[data-pet-style=smooth] .scene-image{image-rendering:auto}.import-studio[aria-busy=true] .pet-dropzone{opacity:.6;cursor:wait}@media(max-width:900px){.import-state-previews{grid-template-columns:repeat(4,minmax(0,1fr))}}@media(max-width:760px){.pet-library{padding:20px}.pet-library-controls{align-items:stretch}.pet-picker-label{flex-basis:100%}.pet-library-controls>button,.pet-library-controls>a{flex:1}.import-options{grid-template-columns:minmax(0,1fr)}.pet-dropzone{padding:26px 18px}.import-state-previews{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.reference-preview{align-items:flex-start}.reference-preview img{width:85px;height:85px}}
 `;
+
+function studioRuntime() {
+  const $ = selector => document.querySelector(selector);
+  const cards = [...document.querySelectorAll('.scene-card')];
+  const stateIds = ['idle', 'thinking', 'waiting', 'writing', 'patching', 'error', 'done'];
+  const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
+  const storage = { get(key) { try { return localStorage.getItem(key); } catch { return null; } }, set(key, value) { try { localStorage.setItem(key, value); } catch {} } };
+  let selected = cards.find(card => card.getAttribute('aria-pressed') === 'true') || cards[0];
+  let paused = storage.get('codex-pet-gallery-paused') === 'true';
+  let reduced = storage.get('codex-pet-gallery-reduced') == null ? motionPreference.matches : storage.get('codex-pet-gallery-reduced') === 'true';
+  let filter = 'all', online = false, token = null, busy = false, selectedFiles = [], fileTicket = 0, referenceTicket = 0;
+  const original = { id: 'codex', name: 'Original Codex Pet', builtin: true, requiresHosting: false, animations: {} };
+  const bloom = { id: 'codex-bloom', name: 'Codex Bloom', builtin: true, requiresHosting: false, animations: {} };
+  const bloomAliases = { idle: 'sleeping', thinking: 'thinking', waiting: 'thinking', writing: 'coding', patching: 'coding', error: 'error', done: 'success', reading: 'reading', searching: 'searching', terminal: 'coding', testing: 'building', building: 'building', installing: 'deploying', reviewing: 'reading', debugging: 'debugging', connecting: 'deploying', focus: 'thinking', celebrating: 'success', 'idle-cozy': 'sleeping' };
+  for (const card of cards) {
+    const state = card.dataset.scene;
+    original.animations[state] = { path: 'codex-pet-' + state + '.gif', previewPath: 'codex-pet-' + state + '.svg', url: studioConfig.base + 'codex-pet-' + state + '.gif?v=smooth-1' };
+    const name = bloomAliases[state] || 'coding';
+    bloom.animations[state] = { path: '../pets/codex-bloom/' + name + '.gif', previewPath: '../pets/codex-bloom/' + name + '.png', url: studioConfig.bloomBase + name + '.gif' };
+  }
+  let pets = [original, bloom], currentPet = original, livePet = 'codex';
+  function record(state) { return currentPet.animations?.[state] || currentPet.animations?.writing || currentPet.animations?.thinking; }
+  function errorMessage(error) { return String(error?.message || error || 'Something went wrong.').slice(0, 500); }
+  function status(selector, message, isError = false) { const element = $(selector); element.textContent = message; element.dataset.error = String(isError); element.setAttribute('role', isError ? 'alert' : 'status'); }
+  async function api(path, body) {
+    if (location.protocol !== 'http:' || !['localhost', '127.0.0.1'].includes(location.hostname)) throw Error('Open Pet Studio through codex-rpc serve to use the local library.');
+    if (body !== undefined && !token) { const session = await api('/api/session'); token = session.token; }
+    const response = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-codex-rpc-token': token }, body: JSON.stringify(body) });
+    let value; try { value = await response.json(); } catch { throw Error('The local pet service is unavailable. Run codex-rpc serve, then reload this page.'); }
+    if (!response.ok) throw Error(value.error || 'The pet request could not be completed.');
+    return value;
+  }
+  function motion() {
+    const still = paused || reduced;
+    for (const image of document.querySelectorAll('.scene-image')) {
+      const asset = record(image.dataset.scene), path = asset && (still ? asset.previewPath : asset.path);
+      if (path && image.getAttribute('src') !== path) image.src = path;
+    }
+    $('#play-toggle').textContent = reduced ? 'Motion reduced' : paused ? 'Play animations' : 'Pause animations';
+    $('#play-toggle').disabled = reduced;
+    $('#play-toggle').setAttribute('aria-pressed', String(!still));
+    $('#reduce-motion').checked = reduced;
+    $('#motion-status').textContent = reduced ? 'Reduced motion · static preview' : paused ? 'Paused · static preview' : 'Playing · seamless loop';
+    for (const image of document.querySelectorAll('#import-state-previews img')) { const asset = record(image.dataset.scene); if (asset) image.src = still ? asset.previewPath : asset.path; }
+  }
+  function sceneDescription(card) {
+    if (currentPet.id === 'codex') return card.dataset.description;
+    const source = (record(card.dataset.scene)?.path?.split('/').pop() || card.dataset.scene).replace(/\.gif$/i, '').replace(/[-_]/g, ' ');
+    return currentPet.builtin ? currentPet.name + '’s supplied ' + source + ' animation. Related scenes can share the same source loop.' : currentPet.name + '’s imported ' + source + ' frames. Preview this loop before using it on Discord.';
+  }
+  function choose(card) {
+    selected = card;
+    for (const other of cards) other.setAttribute('aria-pressed', String(other === card));
+    const id = card.dataset.scene, asset = record(id);
+    $('#preview-image').dataset.scene = id;
+    $('#preview-image').alt = currentPet.name + ' ' + card.dataset.label;
+    $('#preview-title').textContent = card.dataset.label;
+    $('#preview-category').textContent = currentPet.name + ' · ' + (card.dataset.kind === 'core' ? 'LIVE STATE' : 'EXTRA SCENE');
+    $('#preview-description').textContent = sceneDescription(card);
+    $('#preview-fps').textContent = Number.isFinite(asset?.fps) ? Number(asset.fps.toFixed(1)) + ' fps' : currentPet.id === 'codex' ? card.dataset.fps + ' fps' : '—';
+    $('#preview-duration').textContent = Number.isFinite(asset?.durationMs) ? (asset.durationMs / 1000).toFixed(1) + 's' : currentPet.id === 'codex' && card.dataset.duration ? card.dataset.duration + 's' : 'Imported loop';
+    $('#preview-recommended').textContent = card.dataset.recommended;
+    $('#download-gif').href = asset?.path || '#';
+    $('#download-svg').href = asset?.previewPath || '#';
+    $('#download-svg').textContent = currentPet.id === 'codex' ? 'Static SVG' : 'Static PNG';
+    $('#asset-url').value = asset?.url || '';
+    $('#asset-url').placeholder = 'Add a public HTTPS folder URL before using this pet on Discord';
+    $('#copy-url').disabled = !asset?.url;
+    $('#copy-status').textContent = asset?.url ? 'Use this hosted URL in your Codex Pet asset settings.' : 'Local preview only. Host this pet’s GIFs to get Discord-ready URLs.';
+    motion();
+  }
+  function applyFilters() {
+    const family = $('#family-filter').value, query = $('#scene-search').value.toLowerCase().trim();
+    let count = 0;
+    for (const card of cards) { const matches = (filter === 'all' || card.dataset.kind === filter) && (family === 'all' || card.dataset.family === family) && (!query || (card.dataset.label + ' ' + sceneDescription(card)).toLowerCase().includes(query)); card.hidden = !matches; if (matches) count++; }
+    for (const group of document.querySelectorAll('.scene-section')) group.hidden = ![...group.querySelectorAll('.scene-card')].some(card => !card.hidden);
+    $('#scene-count').textContent = count + ' ' + (count === 1 ? 'scene' : 'scenes'); $('#empty-scenes').hidden = count > 0;
+  }
+  function updateControls() {
+    const hostingOK = !currentPet.requiresHosting || /^https:\/\//i.test($('#pet-host-url').value.trim());
+    $('#use-pet').disabled = !online || busy || !hostingOK;
+    $('#use-pet').textContent = currentPet.id === livePet ? 'Apply pet to Discord' : 'Use on Discord';
+    $('#import-pet-button').disabled = !online || busy || !selectedFiles.length || !$('#pet-import-name').value.trim();
+    $('#clear-import').disabled = busy || !selectedFiles.length;
+    for (const id of ['export-pet', 'download-pet-assets']) { const link = $('#' + id); link.setAttribute('aria-disabled', String(!online || busy)); if (online) link.href = '/api/pets/' + encodeURIComponent(currentPet.id) + (id === 'export-pet' ? '/export' : '/download'); else link.removeAttribute('href'); }
+  }
+  function hostingBase(pet) { const url = pet.animations?.writing?.url; if (!url) return ''; try { return new URL('.', url).href; } catch { return ''; } }
+  function choosePet(id) {
+    currentPet = pets.find(pet => pet.id === id) || pets[0]; $('#pet-select').value = currentPet.id;
+    document.body.dataset.petStyle = currentPet.id === 'codex' ? 'pixel' : 'smooth';
+    for (const card of cards) { const label = card.querySelector('.scene-info > span'); if (label) label.textContent = card.dataset.family.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) + ' · ' + (Number.isFinite(record(card.dataset.scene)?.fps) ? Number(record(card.dataset.scene).fps.toFixed(1)) + ' fps' : currentPet.id === 'codex' ? card.dataset.fps + ' fps' : 'source timing'); }
+    $('#pet-hosting').hidden = !currentPet.requiresHosting; $('#pet-host-url').value = currentPet.requiresHosting ? hostingBase(currentPet) : '';
+    status('#pet-library-status', online ? (currentPet.id === livePet ? currentPet.name + ' is selected for Discord.' : 'Previewing ' + currentPet.name + '. Your Discord pet has not changed.') : 'Preview the bundled pets here. Run codex-rpc serve to import or change your Discord pet.');
+    $('#import-state-previews').hidden = true; choose(selected); applyFilters(); updateControls();
+  }
+  function renderPetOptions() { const select = $('#pet-select'); select.replaceChildren(); for (const pet of pets) { const option = document.createElement('option'); option.value = pet.id; option.textContent = pet.name + (pet.builtin ? ' · built in' : ' · imported'); select.append(option); } }
+  async function connectLibrary(preferredId) {
+    try { const response = await api('/api/pets'); pets = response.pets; if (!Array.isArray(pets) || !pets.length) throw Error('The pet library is empty.'); livePet = response.selected || 'codex'; online = true; renderPetOptions(); choosePet(preferredId || livePet); status('#import-status', 'Ready. Files are processed locally when you choose Import & preview.'); }
+    catch (error) { online = false; status('#import-status', 'Local imports are unavailable. Run codex-rpc serve and reload this page.'); choosePet(currentPet.id); }
+    updateControls();
+  }
+  for (const card of cards) { card.addEventListener('click', () => choose(card)); card.addEventListener('keydown', event => { const shown = cards.filter(item => !item.hidden); let index = shown.indexOf(card); if (event.key === 'ArrowRight' || event.key === 'ArrowDown') index = (index + 1) % shown.length; else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') index = (index - 1 + shown.length) % shown.length; else if (event.key === 'Home') index = 0; else if (event.key === 'End') index = shown.length - 1; else return; event.preventDefault(); shown[index]?.focus(); }); }
+  for (const button of document.querySelectorAll('[data-filter]')) button.addEventListener('click', () => { filter = button.dataset.filter; for (const other of document.querySelectorAll('[data-filter]')) other.setAttribute('aria-pressed', String(other === button)); applyFilters(); });
+  $('#family-filter').addEventListener('change', applyFilters); $('#scene-search').addEventListener('input', applyFilters);
+  $('#play-toggle').addEventListener('click', () => { paused = !paused; storage.set('codex-pet-gallery-paused', String(paused)); motion(); });
+  $('#reduce-motion').addEventListener('change', () => { reduced = $('#reduce-motion').checked; storage.set('codex-pet-gallery-reduced', String(reduced)); motion(); });
+  motionPreference.addEventListener('change', () => { if (storage.get('codex-pet-gallery-reduced') == null) { reduced = motionPreference.matches; motion(); } });
+  function background(value) { document.body.dataset.background = value; document.documentElement.dataset.theme = value === 'light' ? 'light' : 'dark'; $('#background-select').value = value; storage.set('codex-pet-gallery-background', value); }
+  $('#background-select').addEventListener('change', () => background($('#background-select').value));
+  $('#copy-url').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#asset-url').value); status('#copy-status', 'GIF URL copied. Ready for your presence settings.'); } catch { $('#asset-url').focus(); $('#asset-url').select(); status('#copy-status', 'Select and copy the URL above.'); } });
+  function updatePetPrompt() { const brief = $('#pet-brief').value.replace(/[\x00-\x1f\x7f]/g, ' ').trim().slice(0, 1000); const slash = String.fromCharCode(92), literal = JSON.stringify(brief).replaceAll('<', slash + 'u003c').replaceAll('>', slash + 'u003e').replaceAll('&', slash + 'u0026'); $('#pet-prompt').value = studioConfig.promptTemplate.replace('[[CHARACTER_BRIEF]]', () => literal.slice(1, -1)); status('#pet-prompt-status', 'Attach your character image in ChatGPT, then paste this prompt.'); }
+  $('#pet-brief').addEventListener('input', updatePetPrompt); $('#reset-pet-prompt').addEventListener('click', () => { $('#pet-brief').value = ''; updatePetPrompt(); $('#pet-brief').focus(); });
+  $('#copy-pet-prompt').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#pet-prompt').value); status('#pet-prompt-status', 'Prompt copied. Paste it into ChatGPT with your attached character image.'); } catch { $('#pet-prompt').focus(); $('#pet-prompt').select(); status('#pet-prompt-status', 'Select and copy the prompt above. Attach your character image in ChatGPT.'); } });
+  $('#download-pet-guide').href = URL.createObjectURL(new Blob([studioConfig.guide], { type: 'image/svg+xml' }));
+  function readData(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(Error('Could not read ' + file.name + '. Choose the file again.')); reader.readAsDataURL(file); }); }
+  $('#pet-reference').addEventListener('change', async () => { const file = $('#pet-reference').files[0], ticket = ++referenceTicket; if (!file) return; try { if (!/\.(png|jpe?g|webp)$/i.test(file.name) || file.size > 10 * 1024 * 1024) throw Error('Choose a PNG, JPEG or WebP character image up to 10 MB.'); const data = await readData(file); if (ticket !== referenceTicket) return; $('#pet-reference-preview').src = data; $('#reference-preview-wrap').hidden = false; status('#reference-status', 'Previewing ' + file.name + ' locally. Remember to attach this file in ChatGPT.'); } catch (error) { if (ticket === referenceTicket) status('#reference-status', errorMessage(error), true); } });
+  $('#clear-reference').addEventListener('click', () => { referenceTicket++; $('#pet-reference').value = ''; $('#pet-reference-preview').removeAttribute('src'); $('#reference-preview-wrap').hidden = true; status('#reference-status', 'This preview stays on your computer. Attach the image yourself in ChatGPT.'); });
+  function clearFiles() { fileTicket++; selectedFiles = []; $('#pet-import-files').value = ''; $('#import-file-previews').replaceChildren(); $('#import-file-previews').hidden = true; $('#import-state-previews').replaceChildren(); $('#import-state-previews').hidden = true; status('#import-files-status', 'No files selected. PNG/GIF files: up to 10 MB each, 48 MB total. Exported packs: up to 64 MB.'); updateControls(); }
+  async function stageFiles(files) {
+    const chosen = [...files]; clearFiles(); const ticket = fileTicket;
+    try {
+      if (!chosen.length) return;
+      const isJSON = chosen.length === 1 && /\.json$/i.test(chosen[0].name), isPNG = chosen.length === 1 && /\.png$/i.test(chosen[0].name), isGIF = chosen.every(file => /\.gif$/i.test(file.name));
+      if (!isJSON && !isPNG && !isGIF) throw Error('Choose one PNG sheet, state-named GIF files, or one exported .pet.json pack.');
+      if (chosen.length > 24) throw Error('Choose no more than 24 state GIFs at once.');
+      if (isJSON ? chosen[0].size > 64 * 1024 * 1024 : chosen.some(file => file.size > 10 * 1024 * 1024) || chosen.reduce((n, file) => n + file.size, 0) > 48 * 1024 * 1024) throw Error('These files exceed the import size limit. Use files up to 10 MB each and 48 MB total, or a pet pack up to 64 MB.');
+      selectedFiles = chosen; $('#pet-import-format').value = isPNG ? 'sheet-v2' : 'gif-pack'; $('#pet-import-format').disabled = !isPNG;
+      if (!$('#pet-import-name').value.trim()) $('#pet-import-name').value = chosen[0].name.replace(/(?:\.pet)?\.(png|gif|json)$/i, '').replace(/[-_]/g, ' ').slice(0, 64);
+      const previews = $('#import-file-previews'); previews.hidden = false;
+      if (isJSON) { const label = document.createElement('p'); label.textContent = chosen[0].name + ' · portable pet pack'; previews.append(label); }
+      else for (const file of chosen.slice(0, 10)) { const figure = document.createElement('figure'), image = document.createElement('img'), caption = document.createElement('figcaption'); const data = await readData(file); if (ticket !== fileTicket) return; image.src = data; image.alt = file.name; caption.textContent = file.name; figure.append(image, caption); previews.append(figure); }
+      status('#import-files-status', chosen.length === 1 ? chosen[0].name + ' selected. Review the name and layout, then import.' : chosen.length + ' GIFs selected. Review their filenames, then import.');
+      status('#import-status', online ? 'Ready to import. Your Discord pet will stay unchanged.' : 'Run codex-rpc serve and reload this page to import.');
+    } catch (error) { if (ticket !== fileTicket) return; selectedFiles = []; status('#import-files-status', errorMessage(error), true); }
+    updateControls();
+  }
+  const dropzone = $('#pet-dropzone');
+  dropzone.addEventListener('click', event => { if (event.target !== $('#pet-import-files') && !busy) $('#pet-import-files').click(); });
+  dropzone.addEventListener('keydown', event => { if (['Enter', ' '].includes(event.key) && !busy) { event.preventDefault(); $('#pet-import-files').click(); } });
+  for (const type of ['dragenter', 'dragover']) dropzone.addEventListener(type, event => { event.preventDefault(); dropzone.dataset.dragging = 'true'; });
+  for (const type of ['dragleave', 'drop']) dropzone.addEventListener(type, event => { event.preventDefault(); delete dropzone.dataset.dragging; if (type === 'drop' && !busy) stageFiles(event.dataTransfer.files); });
+  $('#pet-import-files').addEventListener('change', event => stageFiles(event.target.files)); $('#clear-import').addEventListener('click', clearFiles); $('#pet-import-name').addEventListener('input', updateControls);
+  function statePreviews() { const target = $('#import-state-previews'); target.replaceChildren(); target.hidden = false; for (const state of stateIds) { const asset = record(state); if (!asset) continue; const figure = document.createElement('figure'), image = document.createElement('img'), caption = document.createElement('figcaption'); image.dataset.scene = state; image.src = paused || reduced ? asset.previewPath : asset.path; image.alt = currentPet.name + ' ' + state; caption.textContent = state; figure.append(image, caption); target.append(figure); } }
+  $('#import-pet-button').addEventListener('click', async () => {
+    if (busy || !selectedFiles.length) return;
+    busy = true; $('#import-pet').setAttribute('aria-busy', 'true'); updateControls();
+    status('#import-status', 'Building your pet’s animated states locally. This can take a moment…');
+    try {
+      const name = $('#pet-import-name').value.trim(); let payload;
+      if (selectedFiles.length === 1 && /\.json$/i.test(selectedFiles[0].name)) { payload = JSON.parse(await selectedFiles[0].text()); if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw Error('This is not an exported pet pack.'); payload = { ...payload, name: name || payload.name }; }
+      else if (selectedFiles.length === 1 && /\.png$/i.test(selectedFiles[0].name)) payload = { name, format: $('#pet-import-format').value, image: (await readData(selectedFiles[0])).split(',')[1] };
+      else payload = { name, format: 'gif-pack', files: await Promise.all(selectedFiles.map(async file => ({ name: file.name, data: (await readData(file)).split(',')[1] }))) };
+      const response = await api('/api/pets/import', payload); await connectLibrary(response.pet.id); statePreviews();
+      const warnings = Array.isArray(response.warnings) ? response.warnings.join(' ') : '';
+      status('#import-status', 'Imported ' + response.pet.name + '. Preview every state below, then use the pet selector to choose it for Discord.' + (warnings ? ' ' + warnings : ''));
+      $('#import-state-previews').scrollIntoView({ behavior: reduced ? 'instant' : 'smooth', block: 'nearest' });
+    } catch (error) { status('#import-status', errorMessage(error), true); }
+    finally { busy = false; $('#import-pet').removeAttribute('aria-busy'); updateControls(); }
+  });
+  $('#pet-select').addEventListener('change', event => choosePet(event.target.value)); $('#pet-host-url').addEventListener('input', updateControls);
+  $('#use-pet').addEventListener('click', async () => { if (busy || !online) return; busy = true; updateControls(); try { const response = await api('/api/pets/select', { id: currentPet.id, ...(currentPet.requiresHosting ? { baseUrl: $('#pet-host-url').value.trim() } : {}) }); livePet = response.pet.id; if (response.pet) { pets = pets.map(pet => pet.id === response.pet.id ? response.pet : pet); currentPet = response.pet; } choose(selected); status('#pet-library-status', currentPet.name + ' selected. The daemon will update Discord when connected.'); } catch (error) { status('#pet-library-status', errorMessage(error), true); } finally { busy = false; updateControls(); } });
+  for (const id of ['export-pet', 'download-pet-assets']) $('#' + id).addEventListener('click', event => { if (!online || busy) event.preventDefault(); });
+  const savedBackground = storage.get('codex-pet-gallery-background'); background(['dark', 'light', 'checkerboard'].includes(savedBackground) ? savedBackground : 'dark');
+  updatePetPrompt(); choosePet('codex'); applyFilters(); connectLibrary();
+}
