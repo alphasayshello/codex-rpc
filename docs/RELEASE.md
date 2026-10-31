@@ -4,7 +4,7 @@ Shorter public file labels and safer outgoing command summaries, alongside 19 pe
 
 Published release: [v0.3.1](https://github.com/alphasayshello/codex-rpc/releases/tag/v0.3.1). For a future release, update all package versions and release notes first, and substitute that new version in the steps below. Published tags are retained.
 
-This is a GitHub-only release. The unscoped npm name `codex-rpc` belongs to an unrelated project. Do not use `npx codex-rpc@latest` or `npm publish` for this repository. The package is marked private to prevent accidental registry publication; the tarball still installs normally.
+The published 0.3.1 GitHub release remains available. npm publishing uses `@alphasayshello/codex-rpc`; see [npm setup](NPM.md) for the reviewed publishing steps. The unscoped npm name `codex-rpc` belongs to an unrelated project. Do not use `npx codex-rpc@latest` for this repository.
 
 ## Maintainer steps
 

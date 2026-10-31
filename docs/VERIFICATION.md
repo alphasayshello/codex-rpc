@@ -100,3 +100,9 @@ Verified locally on macOS ARM64, 2026-10-31:
 Cross-platform release CI and uploaded artifact digests are checked before publication; local results alone do not certify native Windows/Linux installation.
 
 The 0.3.1 installer also reproduces Codex trust/disable records being serialized inside owned markers. LF/CRLF fixtures prove records survive setup, repeated setup and uninstall byte-for-byte, and trust remains reported as unknown. The first candidate passed all nine OS/Node CI jobs before this additional upgrade regression was discovered during the real installation; the final tag is validated separately.
+
+## Scoped npm distribution
+
+Prepared `@alphasayshello/codex-rpc@0.3.1` with explicit public registry/access, the existing `codex-rpc` executable, no install-time setup scripts, and no runtime dependency additions. A publish dry run passed all 184 tests (182 passing, two Windows-only skips on macOS) and syntax checks. The publish preflight limits file-level test concurrency to four after an unrestricted run hit a daemon CLI subprocess timeout under local CPU load; the isolated CLI suite also passed.
+
+Reviewed all 189 packed entries for local credentials, state, build output and nested dependencies. A disposable scoped installation verified the CLI version and ten native hooks using setup without service/start. A separate upgrade fixture reproduced the command-link collision from the previous unscoped GitHub archive, then verified that removing only the old npm package and installing the scope preserves analytics and config. GitHub versioned/latest archive names stay stable despite npm's scoped filename. README images and documentation links use public repository URLs for npm rendering.

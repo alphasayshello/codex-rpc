@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/pet/codex-pet-writing.gif" width="144" alt="The original blue Codex Pet typing with alternating paws" />
+<img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-writing.gif" width="144" alt="The original blue Codex Pet typing with alternating paws" />
 
 # codex-rpc
 
@@ -8,7 +8,7 @@
 
 Discord Rich Presence and local analytics for Codex, with lightweight ChatGPT Desktop detection.
 
-[Download latest](https://github.com/alphasayshello/codex-rpc/releases/latest) · [Release notes](docs/RELEASE-NOTES-v0.3.1.md) · [MIT](LICENSE) · [Security](SECURITY.md)
+[npm](https://www.npmjs.com/package/@alphasayshello/codex-rpc) · [Download latest](https://github.com/alphasayshello/codex-rpc/releases/latest) · [Release notes](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE-NOTES-v0.3.1.md) · [MIT](https://github.com/alphasayshello/codex-rpc/blob/main/LICENSE) · [Security](https://github.com/alphasayshello/codex-rpc/blob/main/SECURITY.md)
 
 Node 18+ · zero runtime dependencies · no accounts · no telemetry
 
@@ -18,17 +18,27 @@ Node 18+ · zero runtime dependencies · no accounts · no telemetry
 
 Keep **Discord Desktop** running. Browser-only Discord does not expose the local IPC connection.
 
-Install from the **latest GitHub release** with Node 18+:
+Install with Node 18+:
 
 ```sh
-npm install -g https://github.com/alphasayshello/codex-rpc/releases/latest/download/codex-rpc.tgz
+npm install -g @alphasayshello/codex-rpc
 codex-rpc setup
 codex-rpc serve
 ```
 
 Open **http://localhost:47474**. The Discord application ID and pet URLs are built in.
 
-If no release is published yet, install from source:
+For a one-command setup without a global CLI installation, use `npx @alphasayshello/codex-rpc@latest setup`. To open the dashboard afterward, use `npx @alphasayshello/codex-rpc@latest serve`. Setup keeps a stable runtime under `~/.codex-rpc/`, so temporary npx files can disappear safely.
+
+GitHub archives remain available:
+
+```sh
+npm install -g https://github.com/alphasayshello/codex-rpc/releases/latest/download/codex-rpc.tgz
+```
+
+Upgrading an older GitHub installation can cause a command-name collision with its unscoped local package. See the [migration steps](https://github.com/alphasayshello/codex-rpc/blob/main/docs/NPM.md#upgrade-from-an-older-github-archive) before using force flags.
+
+To work from a source checkout:
 
 ```sh
 git clone https://github.com/alphasayshello/codex-rpc.git
@@ -41,11 +51,11 @@ codex-rpc serve
 
 Standalone binaries, when attached to a release, bundle Node. Download the file matching your OS and architecture, check its SHA-256 checksum, and run it with `setup`. On macOS/Linux, mark it executable first with `chmod +x <filename>`.
 
-**GitHub downloads only:** the npm name `codex-rpc` belongs to another project. Do not use `npx codex-rpc@latest` for this repository.
+**Use the scoped package:** the unscoped npm name `codex-rpc` belongs to another project. Use `@alphasayshello/codex-rpc`; the installed command remains `codex-rpc`. [npm publishing guide](https://github.com/alphasayshello/codex-rpc/blob/main/docs/NPM.md).
 
 `setup` installs a stable local runtime, registers native Codex lifecycle hooks plus the legacy completion notifier, enables app detection, installs per-user login startup, and starts the daemon. Existing notifiers and custom asset URLs are preserved. Use `setup --no-service` to skip login startup, or `setup --no-service --no-start` to prepare the integration without starting it.
 
-After setup, open **`/hooks` in Codex** to review and trust the new handlers. Existing trust and disabled feature flags are preserved. `codex-rpc hooks` shows registration and review guidance; the log watcher remains a fallback. [Hook setup and event reference](docs/HOOKS.md).
+After setup, open **`/hooks` in Codex** to review and trust the new handlers. Existing trust and disabled feature flags are preserved. `codex-rpc hooks` shows registration and review guidance; the log watcher remains a fallback. [Hook setup and event reference](https://github.com/alphasayshello/codex-rpc/blob/main/docs/HOOKS.md).
 
 ## on Discord
 
@@ -69,35 +79,35 @@ Thinking shows `Pondering solution... (Elapsed: 1:05)`. Shell work shows `Runnin
 
 | State | Preview | What it does |
 | --- | --- | --- |
-| Writing | <img src="assets/pet/codex-pet-writing.gif" width="88" alt="Steady seated typing" /> | Alternating paw presses; head, body and laptop stay still. |
-| Thinking | <img src="assets/pet/codex-pet-thinking.gif" width="88" alt="Planning" /> | A gentle pace, orbiting planning pixels and a steady thoughtful expression. |
-| Patching | <img src="assets/pet/codex-pet-patching.gif" width="88" alt="Applying a patch" /> | Focused movement and sliding plus/minus file cards. |
-| Error | <img src="assets/pet/codex-pet-error.gif" width="88" alt="An error needs attention" /> | Smoke, an alert and the original panic expression. |
-| Done | <img src="assets/pet/codex-pet-done.gif" width="88" alt="Celebrating" /> | A short celebration, then idle. |
-| Idle | <img src="assets/pet/codex-pet-idle.gif" width="88" alt="Sleeping" /> | Sleeping, breathing and floating Z pixels. |
-| Waiting | <img src="assets/pet/codex-pet-waiting.gif" width="88" alt="Waiting for approval" /> | A separate attention pose with bobbing speech-bubble dots. |
+| Writing | <img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-writing.gif" width="88" alt="Steady seated typing" /> | Alternating paw presses; head, body and laptop stay still. |
+| Thinking | <img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-thinking.gif" width="88" alt="Planning" /> | A gentle pace, orbiting planning pixels and a steady thoughtful expression. |
+| Patching | <img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-patching.gif" width="88" alt="Applying a patch" /> | Focused movement and sliding plus/minus file cards. |
+| Error | <img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-error.gif" width="88" alt="An error needs attention" /> | Smoke, an alert and the original panic expression. |
+| Done | <img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-done.gif" width="88" alt="Celebrating" /> | A short celebration, then idle. |
+| Idle | <img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-idle.gif" width="88" alt="Sleeping" /> | Sleeping, breathing and floating Z pixels. |
+| Waiting | <img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-waiting.gif" width="88" alt="Waiting for approval" /> | A separate attention pose with bobbing speech-bubble dots. |
 
 The mascot is the **original blue Codex Pet**, composed from its existing sprite artwork. All 19 scenes run at 20 fps with periodic motion and a consistent expression within each scene. Static previews and animated pixel badges ship too. Legacy `working` remains an alias for `writing`.
 
 **Twelve extra scenes:** reading, searching, terminal, testing, building, installing, reviewing, debugging, connecting, focus, celebrating and cozy idle.
 
 <table>
-<tr><td align="center"><img src="assets/pet/codex-pet-reading.gif" width="104" alt="Reading a pixel book" /><br>Reading</td><td align="center"><img src="assets/pet/codex-pet-terminal.gif" width="104" alt="Typing beside a terminal" /><br>Terminal</td><td align="center"><img src="assets/pet/codex-pet-testing.gif" width="104" alt="Checking a test matrix" /><br>Testing</td><td align="center"><img src="assets/pet/codex-pet-idle-cozy.gif" width="104" alt="Sleeping under moonlight" /><br>Cozy idle</td></tr>
+<tr><td align="center"><img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-reading.gif" width="104" alt="Reading a pixel book" /><br>Reading</td><td align="center"><img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-terminal.gif" width="104" alt="Typing beside a terminal" /><br>Terminal</td><td align="center"><img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-testing.gif" width="104" alt="Checking a test matrix" /><br>Testing</td><td align="center"><img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-idle-cozy.gif" width="104" alt="Sleeping under moonlight" /><br>Cozy idle</td></tr>
 </table>
 
 Real tool metadata selects reading, searching, terminal, testing, building, installing and reviewing automatically. Missing metadata keeps the normal writing scene. Extra decorative scenes are available as asset overrides; the daemon never invents activity or cycles them at random.
 
 Open **Pet studio** in the dashboard for a larger preview, search, category filters, dark/light/checkerboard backgrounds, GIF/SVG downloads and copyable hosted URLs. In **Settings → Codex Pet Assets**, choose a target state and click a thumbnail to change its art, then **Save changes**. Automatic scene selection continues to follow your tools. The studio is also available at `/assets/pet/animation-gallery.html`.
 
-**Make your own pet.** Pet Studio includes an editable character brief and a one-pass ChatGPT image prompt with the exact 1536 × 1872 transparent PNG sheet, 8 × 9 grid, pose map and typing alignment requirements. Copy it into ChatGPT with your character reference and the downloadable layout guide. Generated sheets require manual validation and integration; the studio does not automatically replace the bundled artwork. [Format guide](docs/PET-STUDIO.md). **Reduce motion** freezes bundled artwork and disables effects; OS reduced-motion preferences are respected. Live updates preserve animations already playing.
+**Make your own pet.** Pet Studio includes an editable character brief and a one-pass ChatGPT image prompt with the exact 1536 × 1872 transparent PNG sheet, 8 × 9 grid, pose map and typing alignment requirements. Copy it into ChatGPT with your character reference and the downloadable layout guide. Generated sheets require manual validation and integration; the studio does not automatically replace the bundled artwork. [Format guide](https://github.com/alphasayshello/codex-rpc/blob/main/docs/PET-STUDIO.md). **Reduce motion** freezes bundled artwork and disables effects; OS reduced-motion preferences are respected. Live updates preserve animations already playing.
 
-<img src="docs/pet-studio.png" width="1000" alt="Local Pet studio with large animated preview, motion controls and a browsable collection" />
+<img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/docs/pet-studio.png" width="1000" alt="Local Pet studio with large animated preview, motion controls and a browsable collection" />
 
-Artwork provenance and composition details: [asset manifest](assets/pet/manifest.json) · [third-party notices](THIRD_PARTY_NOTICES.md).
+Artwork provenance and composition details: [asset manifest](https://github.com/alphasayshello/codex-rpc/blob/main/assets/pet/manifest.json) · [third-party notices](https://github.com/alphasayshello/codex-rpc/blob/main/THIRD_PARTY_NOTICES.md).
 
 ## your local workspace
 
-<img src="docs/telemetry.png" width="1000" alt="Dark local dashboard with live file telemetry, original Codex Pet and per-chat output usage; synthetic sample data" />
+<img src="https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/docs/telemetry.png" width="1000" alt="Dark local dashboard with live file telemetry, original Codex Pet and per-chat output usage; synthetic sample data" />
 
 - **Pin a chat to Discord.** Choose a conversation and press **Pin to Discord**. Other chats cannot steal the card; **Follow latest** restores automatic selection.
 - **Inspect tool activity.** A live timeline shows running durations, completed calls, failures and exit codes—without raw arguments or output.
@@ -174,7 +184,7 @@ Settings live in `~/.codex-rpc/config.json`; see [the full example](config.examp
 }
 ```
 
-`enabled: false` stops new collection and clears presence without deleting history. Local scanner caches may contain paths; hashed filenames are not encryption. Read [SECURITY.md](SECURITY.md) for the complete local-data model.
+`enabled: false` stops new collection and clears presence without deleting history. Local scanner caches may contain paths; hashed filenames are not encryption. Read [SECURITY.md](https://github.com/alphasayshello/codex-rpc/blob/main/SECURITY.md) for the complete local-data model.
 
 Use `CODEX_RPC_HOME` for an alternate state directory and `CODEX_HOME` for an alternate Codex log root. `CODEX_RPC_IPC` selects a trusted socket bridge; `CODEX_RPC_CODEX_BIN` selects the wrapped Codex executable.
 
@@ -218,6 +228,6 @@ npm run release:prepare -- --sea
 
 Normal runtime supports Node 18+. Some Homebrew Node builds disable SEA; standalone builds need an official SEA-enabled build. Output goes to `dist/release/<platform>-<arch>/`, with versioned archives, the stable `codex-rpc.tgz` alias, release notes and checksums. Native executables must be built on each target platform.
 
-[Release checklist](docs/RELEASE.md) · [Paste-ready v0.3.1 notes](docs/RELEASE-NOTES-v0.3.1.md) · [Verification](docs/VERIFICATION.md) · [Versioning](VERSIONING.md)
+[Release checklist](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE.md) · [Paste-ready v0.3.1 notes](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE-NOTES-v0.3.1.md) · [Verification](https://github.com/alphasayshello/codex-rpc/blob/main/docs/VERIFICATION.md) · [Versioning](https://github.com/alphasayshello/codex-rpc/blob/main/VERSIONING.md)
 
 Inspired by [rar-file/claude-rpc](https://github.com/rar-file/claude-rpc): three small Node pieces joined by JSON, adapted independently for Codex. Unaffiliated with OpenAI or Discord. Original project code is MIT; bundled OpenAI artwork has separate provenance.

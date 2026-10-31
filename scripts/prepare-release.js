@@ -23,9 +23,14 @@ for (const required of [...animationCatalog.flatMap(({ id }) => [`assets/pet/cod
   if (!packed.files.some((entry) => entry.path === required)) throw Error(`Missing package file: ${required}`);
 }
 // Stable filename keeps GitHub /releases/latest/download links evergreen.
+// npm adds the account scope to its pack filename. GitHub's public download
+// names remain stable for existing users and the multi-platform assembler.
+const versionedName = `codex-rpc-${pkg.version}.tgz`;
+if (packed.filename !== versionedName)
+  fs.renameSync(path.join(directory, packed.filename), path.join(directory, versionedName));
 const latestName = "codex-rpc.tgz";
-fs.copyFileSync(path.join(directory, packed.filename), path.join(directory, latestName));
-const artifacts = [packed.filename, latestName];
+fs.copyFileSync(path.join(directory, versionedName), path.join(directory, latestName));
+const artifacts = [versionedName, latestName];
 if (process.argv.includes("--sea")) {
   execFileSync(process.execPath, ["scripts/build-sea.js"], { stdio: "inherit" });
   const exe = process.platform === "win32" ? ".exe" : "";

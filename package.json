@@ -1,5 +1,5 @@
 {
-  "name": "codex-rpc",
+  "name": "@alphasayshello/codex-rpc",
   "version": "0.3.1",
   "description": "Local Discord presence and lifetime analytics for Codex and ChatGPT Desktop",
   "type": "module",
@@ -34,7 +34,8 @@
     "build:sea": "node scripts/build-sea.js",
     "check": "node scripts/check.js",
     "verify:desktop": "npm --prefix electron run verify",
-    "release:prepare": "node scripts/prepare-release.js"
+    "release:prepare": "node scripts/prepare-release.js",
+    "prepublishOnly": "npm run check && npm test -- --test-concurrency=4"
   },
   "keywords": [
     "codex",
@@ -51,5 +52,8 @@
   "bugs": {
     "url": "https://github.com/alphasayshello/codex-rpc/issues"
   },
-  "private": true
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
 }
