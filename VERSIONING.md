@@ -1,6 +1,6 @@
 # Versioning
 
-codex-rpc follows Semantic Versioning. The current published release is 0.4.0; source development is 0.5.0; the initial source version was 0.1.0.
+codex-rpc follows Semantic Versioning. The current GitHub release is 0.5.0; the npm registry remains at 0.4.0; the initial source version was 0.1.0.
 
 
 - Patch: compatible bug fixes, parser coverage, asset corrections, docs.

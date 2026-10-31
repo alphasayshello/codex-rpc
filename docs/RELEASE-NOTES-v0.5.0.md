@@ -1,6 +1,6 @@
 # codex-rpc 0.5.0 — your workspace, in focus
 
-Source/local preview. Not yet published to npm or GitHub Releases.
+Available on **GitHub Releases**. The npm registry remains at **0.4.0** for now.
 
 - A ChatGPT-inspired workspace with a quieter sidebar, matching light/dark themes, focused pages and a seven-tab settings dialog.
 - Search conversations and open their output usage, tools and turn recaps without changing your Discord card. Pinning remains an explicit action.
@@ -11,8 +11,22 @@ Source/local preview. Not yet published to npm or GitHub Releases.
 - Legacy absolute hotspot/tool paths get safe labels, and metadata named `constructor`, `__proto__` or `toString` counts correctly.
 - Settings preserve typing and focus even if a configuration refresh arrives while you edit.
 
-The synthetic comparison recorded 234 → 13 API requests for 12 chat updates, with no unchanged heatmap-cell replacements. Batching adds a short delay; [measurement details](PERFORMANCE.md) include latency and memory limits.
+The synthetic comparison recorded 234 → 13 API requests for 12 chat updates, with no unchanged heatmap-cell replacements. Batching adds a short delay; [measurement details](https://github.com/alphasayshello/codex-rpc/blob/v0.5.0/docs/PERFORMANCE.md) include latency and memory limits.
 
 All processing stays local. Existing configuration, pets, history and Discord pins are preserved.
 
-Published users should continue using 0.4.0 until this preview is released. Source testers can run `npm ci`, `node bin/codex-rpc.js setup`, then `node bin/codex-rpc.js serve`.
+## Install or update
+
+With Node 18+:
+
+```sh
+npm install -g https://github.com/alphasayshello/codex-rpc/releases/download/v0.5.0/codex-rpc.tgz
+codex-rpc setup
+codex-rpc serve
+```
+
+Restart any dashboard already running before the update. Existing configuration, history, pets and Discord pins are retained. Keep Discord Desktop running.
+
+Standalone downloads bundle Node for macOS ARM64, Linux x64 and Windows x64. Choose the matching executable, verify it against `SHA256SUMS`, and run it with `setup`; on macOS/Linux, mark it executable first. The macOS binary is ad-hoc signed; the Windows binary is unsigned. Electron remains an optional source wrapper.
+
+`codex-rpc.tgz` and `codex-rpc-0.5.0.tgz` contain the same package. `release.json` records the source revision, build run and artifact hashes. The generated GitHub source-code archives are for development; use the attached package or executable for installation.

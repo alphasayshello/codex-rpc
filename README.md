@@ -8,37 +8,37 @@
 
 Discord Rich Presence and local analytics for Codex, with lightweight ChatGPT Desktop detection.
 
-[npm](https://www.npmjs.com/package/@alphasayshello/codex-rpc) · [Download latest](https://github.com/alphasayshello/codex-rpc/releases/latest) · [Release notes](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE-NOTES-v0.4.0.md) · [MIT](https://github.com/alphasayshello/codex-rpc/blob/main/LICENSE) · [Security](https://github.com/alphasayshello/codex-rpc/blob/main/SECURITY.md)
+[npm](https://www.npmjs.com/package/@alphasayshello/codex-rpc) · [Download latest](https://github.com/alphasayshello/codex-rpc/releases/latest) · [Release notes](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE-NOTES-v0.5.0.md) · [MIT](https://github.com/alphasayshello/codex-rpc/blob/main/LICENSE) · [Security](https://github.com/alphasayshello/codex-rpc/blob/main/SECURITY.md)
 
 Node 18+ · zero runtime dependencies · no accounts · no telemetry
 
 </div>
 
-**Latest: 0.4.0** — Codex Bloom, a pet library, reference-image prompts and drag-and-drop imports. [What changed](https://github.com/alphasayshello/codex-rpc/releases/tag/v0.4.0).
+**Latest GitHub release: 0.5.0** — a calmer ChatGPT-style workspace, searchable conversations, embedded Pet Studio and lighter live updates. [What changed](https://github.com/alphasayshello/codex-rpc/releases/tag/v0.5.0).
 
-**Source preview: 0.5.0** — a calmer ChatGPT-style workspace, searchable conversations, embedded Pet Studio, and fewer live-update requests. [Preview notes](docs/RELEASE-NOTES-v0.5.0.md). The published npm/GitHub version above remains 0.4.0.
+**npm remains at 0.4.0.** Get 0.5.0 from the GitHub downloads below; the registry will be updated separately.
 
 ## install
 
 Keep **Discord Desktop** running. Browser-only Discord does not expose the local IPC connection.
 
-Install with Node 18+:
+Install **0.5.0 from GitHub** with Node 18+:
 
 ```sh
-npm install -g @alphasayshello/codex-rpc
+npm install -g https://github.com/alphasayshello/codex-rpc/releases/latest/download/codex-rpc.tgz
 codex-rpc setup
 codex-rpc serve
 ```
 
-Open **http://localhost:47474**. The Discord application ID and pet URLs are built in.
+Open **http://localhost:47474**. The Discord application ID and pet URLs are built in. Restart an already running dashboard after updating so it loads the new server code.
 
-For a one-command setup without a global CLI installation, use `npx @alphasayshello/codex-rpc@latest setup`. To open the dashboard afterward, use `npx @alphasayshello/codex-rpc@latest serve`. Setup keeps a stable runtime under `~/.codex-rpc/`, so temporary npx files can disappear safely.
-
-GitHub archives remain available:
+The npm registry currently supplies **0.4.0**:
 
 ```sh
-npm install -g https://github.com/alphasayshello/codex-rpc/releases/latest/download/codex-rpc.tgz
+npm install -g @alphasayshello/codex-rpc
 ```
+
+For a one-command 0.4.0 setup without a global CLI installation, use `npx @alphasayshello/codex-rpc@latest setup`. To open that version's dashboard afterward, use `npx @alphasayshello/codex-rpc@latest serve`. Setup keeps a stable runtime under `~/.codex-rpc/`, so temporary npx files can disappear safely.
 
 Upgrading an older GitHub installation can cause a command-name collision with its unscoped local package. See the [migration steps](https://github.com/alphasayshello/codex-rpc/blob/main/docs/NPM.md#upgrade-from-an-older-github-archive) before using force flags.
 
@@ -131,7 +131,7 @@ Artwork provenance and composition details: [asset manifest](https://github.com/
 - **Choose a range.** 7d, 30d, 90d, 1y or all time. The current-chat panel stays independent of the history range.
 - **Make it yours.** A ChatGPT-inspired sidebar, light/dark themes, mobile navigation and a seven-tab settings dialog. Pet Studio opens inside the workspace and keeps your import draft when you switch pages.
 
-The dashboard binds to loopback only and updates over SSE. Source 0.5.0 uses one snapshot request per live refresh, caches historical ranges and keeps unchanged charts in place. Hidden tabs stop requesting snapshots; offscreen animated previews use still frames. No UI framework or runtime dependency is added. Optional Electron wraps the same dashboard with Node integration disabled:
+The dashboard binds to loopback only and updates over SSE. Version 0.5.0 uses one snapshot request per live refresh, caches historical ranges and keeps unchanged charts in place. Hidden tabs stop requesting snapshots; offscreen animated previews use still frames. No UI framework or runtime dependency is added. Optional Electron wraps the same dashboard with Node integration disabled:
 
 ```sh
 cd electron
@@ -243,6 +243,6 @@ npm run release:prepare -- --sea
 
 Normal runtime supports Node 18+. Some Homebrew Node builds disable SEA; standalone builds need an official SEA-enabled build. Output goes to `dist/release/<platform>-<arch>/`, with versioned archives, the stable `codex-rpc.tgz` alias, release notes and checksums. Native executables must be built on each target platform.
 
-[Release checklist](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE.md) · [Paste-ready v0.4.0 notes](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE-NOTES-v0.4.0.md) · [Verification](https://github.com/alphasayshello/codex-rpc/blob/main/docs/VERIFICATION.md) · [Versioning](https://github.com/alphasayshello/codex-rpc/blob/main/VERSIONING.md)
+[Release checklist](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE.md) · [Paste-ready v0.5.0 notes](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE-NOTES-v0.5.0.md) · [Verification](https://github.com/alphasayshello/codex-rpc/blob/main/docs/VERIFICATION.md) · [Versioning](https://github.com/alphasayshello/codex-rpc/blob/main/VERSIONING.md)
 
 Inspired by [rar-file/claude-rpc](https://github.com/rar-file/claude-rpc): three small Node pieces joined by JSON, adapted independently for Codex. Unaffiliated with OpenAI or Discord. Original project code is MIT; bundled OpenAI artwork has separate provenance.

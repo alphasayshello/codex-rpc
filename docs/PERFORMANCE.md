@@ -1,4 +1,4 @@
-# Dashboard performance — 0.5.0 source preview
+# Dashboard performance — 0.5.0
 
 The CLI and daemon still have zero runtime dependencies. These changes reduce browser and local HTTP work; they do not change scanner totals or Discord update limits.
 
@@ -14,7 +14,7 @@ The CLI and daemon still have zero runtime dependencies. These changes reduce br
 
 macOS ARM64, Electron 45.1.0, same isolated synthetic fixture: 365 daily entries, 200 sessions, 12 sequential chat updates. Baseline is release commit `04cf4aa`. The benchmark runs the HTTP server in Electron's main process. Main CPU includes the test harness and server; it is not a daemon-only measurement. These are one-run observations, not cross-platform guarantees.
 
-| Measurement | 0.4.0 | 0.5.0 preview |
+| Measurement | 0.4.0 | 0.5.0 |
 | --- | ---: | ---: |
 | API requests during 12 logical updates | 234 | 13 |
 | Requests per live refresh | 9 | 1 |

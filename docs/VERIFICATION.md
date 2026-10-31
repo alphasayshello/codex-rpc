@@ -120,7 +120,7 @@ Verified on macOS ARM64, 2026-10-31:
 This section records the original local preview. Version 0.4.0 was subsequently published to both GitHub Releases and npm; its source tag is `04cf4aa`.
 
 
-## 0.5.0 workspace source/local preview
+## 0.5.0 workspace
 
 On 2026-10-31, `npm test -- --test-concurrency=4` completed 214 tests: 212 passed, no failures, two Windows-only checks skipped on macOS. New coverage verifies cached historical ranges (file/settings/UTC-day invalidation), stable section signatures, read-only per-chat viewing, source isolation, immediate privacy redaction of old public scans, safe legacy filename labels, literal prototype-like metadata keys, SSE burst/shutdown handling and same-origin Studio appearance/draft behavior.
 
@@ -130,4 +130,4 @@ The optional Pet Studio Electron integration verifies the built-in library, PNG 
 
 The isolated synthetic comparison in [PERFORMANCE.md](PERFORMANCE.md) records fewer requests and chart mutations, memory observations, and the batching latency tradeoff. Baseline is the published 0.4.0 source commit. Neither the benchmark nor renderer fixtures use personal chat history.
 
-The published npm/GitHub release remains **0.4.0**. Version **0.5.0** is a source/local preview, with [draft release notes](RELEASE-NOTES-v0.5.0.md).
+The source preview was installed and connected to real Discord on macOS. All nine OS × Node 18/22/26 CI jobs passed for `618c1c6`. GitHub distribution is **0.5.0**, with [release notes](RELEASE-NOTES-v0.5.0.md); npm remains **0.4.0**. Release artifacts are built again from the final tag and carry source/build provenance.
