@@ -1,8 +1,7 @@
 # Versioning
 
-codex-rpc follows Semantic Versioning. The current release is 0.3.1; the initial source version was 0.1.0.
+codex-rpc follows Semantic Versioning. The current release is 0.4.0; the initial source version was 0.1.0.
 
-The current source preview is 0.4.0 (unreleased), adding the pet library, reference-image prompt and custom imports. It does not replace the published 0.3.1 registry version until a separate release is published.
 
 - Patch: compatible bug fixes, parser coverage, asset corrections, docs.
 - Minor: additive commands/settings/metrics and integrations. Before 1.0, breaking changes may appear in a minor with migration notes.
@@ -12,6 +11,6 @@ The current source preview is 0.4.0 (unreleased), adding the pet library, refere
 
 Prices are dated estimates and may be updated in patch releases. Asset filenames and state names are stable public interfaces. A mascot redraw preserving those names is compatible. New lifecycle log shapes are best-effort parser additions, never grounds to fabricate missing metrics.
 
-Release checklist: regenerate assets; run `npm run check` and `npm test`; inspect the dashboard and all 19 scenes and approval waiting; run `npm pack --dry-run`; build/test SEA using an official SEA-enabled Node; update verification notes and release changes; bump all versions; commit and tag `vX.Y.Z`. Test OS-specific installers on target platforms before claiming installed-service coverage. Publish npm/packages and public Git remotes only as a separate, explicit release action. npm publication is prepared under `@alphasayshello/codex-rpc`; the unscoped npm name is owned by another project. GitHub download filenames remain stable. See docs/NPM.md for registry setup and docs/RELEASE.md for archive preparation and manual publication.
+Release checklist: regenerate assets; run `npm run check` and `npm test`; inspect the dashboard and all 19 scenes and approval waiting; run `npm pack --dry-run`; build/test SEA using an official SEA-enabled Node; update verification notes and release changes; bump all versions; commit and tag `vX.Y.Z`. Test OS-specific installers on target platforms before claiming installed-service coverage. Publish npm/packages and public Git remotes only as a separate, explicit release action. npm publication uses `@alphasayshello/codex-rpc`; the unscoped npm name is owned by another project. GitHub download filenames remain stable. See docs/NPM.md for registry setup and docs/RELEASE.md for archive preparation and manual publication.
 
 The latest release receives security fixes. Older 0.x versions are not maintained separately. Keep source logs if you need to rebuild analytics after a schema migration.

@@ -8,13 +8,13 @@
 
 Discord Rich Presence and local analytics for Codex, with lightweight ChatGPT Desktop detection.
 
-[npm](https://www.npmjs.com/package/@alphasayshello/codex-rpc) · [Download latest](https://github.com/alphasayshello/codex-rpc/releases/latest) · [Release notes](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE-NOTES-v0.3.1.md) · [MIT](https://github.com/alphasayshello/codex-rpc/blob/main/LICENSE) · [Security](https://github.com/alphasayshello/codex-rpc/blob/main/SECURITY.md)
+[npm](https://www.npmjs.com/package/@alphasayshello/codex-rpc) · [Download latest](https://github.com/alphasayshello/codex-rpc/releases/latest) · [Release notes](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE-NOTES-v0.4.0.md) · [MIT](https://github.com/alphasayshello/codex-rpc/blob/main/LICENSE) · [Security](https://github.com/alphasayshello/codex-rpc/blob/main/SECURITY.md)
 
 Node 18+ · zero runtime dependencies · no accounts · no telemetry
 
 </div>
 
-> **0.4.0 development preview:** Codex Bloom, the pet library and image-based imports are available from the current source checkout. The latest published npm release is 0.3.1.
+**Latest: 0.4.0** — Codex Bloom, a pet library, reference-image prompts and drag-and-drop imports. [What changed](https://github.com/alphasayshello/codex-rpc/releases/tag/v0.4.0).
 
 ## install
 
@@ -240,6 +240,6 @@ npm run release:prepare -- --sea
 
 Normal runtime supports Node 18+. Some Homebrew Node builds disable SEA; standalone builds need an official SEA-enabled build. Output goes to `dist/release/<platform>-<arch>/`, with versioned archives, the stable `codex-rpc.tgz` alias, release notes and checksums. Native executables must be built on each target platform.
 
-[Release checklist](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE.md) · [Paste-ready v0.3.1 notes](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE-NOTES-v0.3.1.md) · [Verification](https://github.com/alphasayshello/codex-rpc/blob/main/docs/VERIFICATION.md) · [Versioning](https://github.com/alphasayshello/codex-rpc/blob/main/VERSIONING.md)
+[Release checklist](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE.md) · [Paste-ready v0.3.1 notes](https://github.com/alphasayshello/codex-rpc/blob/main/docs/RELEASE-NOTES-v0.4.0.md) · [Verification](https://github.com/alphasayshello/codex-rpc/blob/main/docs/VERIFICATION.md) · [Versioning](https://github.com/alphasayshello/codex-rpc/blob/main/VERSIONING.md)
 
 Inspired by [rar-file/claude-rpc](https://github.com/rar-file/claude-rpc): three small Node pieces joined by JSON, adapted independently for Codex. Unaffiliated with OpenAI or Discord. Original project code is MIT; bundled OpenAI artwork has separate provenance.
