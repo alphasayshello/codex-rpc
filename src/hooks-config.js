@@ -13,6 +13,9 @@ const begin = "# codex-rpc lifecycle hooks begin", end = "# codex-rpc lifecycle 
 const guidance = "Open /hooks in Codex to review and trust the codex-rpc hooks. Trust cannot be inferred from configuration; changed hooks require another review.";
 const targetPath = () => path.join(codexHome(), "config.toml");
 const read = (target) => { try { return fs.readFileSync(target, "utf8"); } catch (e) { if (e.code === "ENOENT") return ""; throw e; } };
+// Codex's TOML editor can append trust/disable records immediately before our
+// trailing marker. They belong to Codex, never to this installer's hook block.
+const stateTable = /^\s*\[\s*hooks\s*\.\s*state(?:\s*\.\s*(?:"(?:[^"\\]|\\.)*"|'[^']*'|[A-Za-z0-9_-]+))*\s*\]\s*(?:#.*)?$/;
 // Mask strings/comments before recognizing structural lines. In particular,
 // marker-looking text inside a user's multiline TOML string is never ours.
 function linesOf(text) {
@@ -46,12 +49,21 @@ function managed(text) {
     throw Error("Incomplete or duplicate codex-rpc lifecycle markers; config.toml was preserved. Repair the owned marker block manually.");
   const first = markers[0], last = markers[1], events = [];
   const body = rows.filter((row) => row.start > first.start && row.start < last.start);
-  let group = null, handler = false, fields = new Set();
+  let group = null, handler = false, fields = new Set(), inState = false;
+  const preservedState = [];
   const finishHandler = () => {
     if (group && (!handler || !["type", "command", "command_windows", "timeout"].every((field) => fields.has(field))))
       throw Error("Incomplete owned lifecycle handler; config.toml was preserved.");
   };
   for (const row of body) {
+    if (row.atStart && stateTable.test(row.raw)) {
+      finishHandler(); group = null; handler = false; fields = new Set(); inState = true;
+      preservedState.push(text.slice(row.start, row.stop)); continue;
+    }
+    if (inState) {
+      if (/^\[/.test(row.visible)) inState = false;
+      else { preservedState.push(text.slice(row.start, row.stop)); continue; }
+    }
     if (!row.visible) continue;
     const table = /^\[\[hooks\.([A-Za-z]+)(\.hooks)?\]\]$/.exec(row.visible);
     if (table && lifecycleEvents.includes(table[1])) {
@@ -76,7 +88,9 @@ function managed(text) {
   let start = first.start;
   if (text.slice(start - 2, start) === "\r\n") start -= 2;
   else if (text[start - 1] === "\n") start--;
-  return { clean: text.slice(0, start) + text.slice(last.stop), events, present: true };
+  const prefix = text.slice(0, start), state = preservedState.join("");
+  const separator = state && prefix && !prefix.endsWith("\n") ? text.includes("\r\n") ? "\r\n" : "\n" : "";
+  return { clean: prefix + separator + state + text.slice(last.stop), events, present: true };
 }
 export function stripLifecycleHooks(text) { return managed(text).clean; }
 function atomicWrite(target, text, expected) {
@@ -102,6 +116,7 @@ export function installLifecycleHooks(options = {}) {
   let table = "", hooksTable = false;
   for (const row of linesOf(existing.clean)) {
     if (/^\[/.test(row.visible)) { table = row.visible; hooksTable = /^\s*\[\s*(?:hooks|"hooks"|'hooks')\s*\]\s*(?:#.*)?$/.test(row.raw); }
+    if (row.atStart && stateTable.test(row.raw)) continue;
     if ((!table && row.atStart && /^\s*(?:hooks|"hooks"|'hooks')(?:\s*\.\s*(?:[A-Za-z]+|"[A-Za-z]+"|'[A-Za-z]+'))?\s*=/.test(row.raw)) ||
       (hooksTable && lifecycleEvents.some((event) => new RegExp(`^\\s*(?:${event}|"${event}"|'${event}')\\s*=`).test(row.raw))) ||
       /^\s*\[\s*(?:hooks|"hooks"|'hooks')\s*\.\s*(?:[A-Za-z]+|"[A-Za-z]+"|'[A-Za-z]+')\s*\]\s*(?:#.*)?$/.test(row.raw))

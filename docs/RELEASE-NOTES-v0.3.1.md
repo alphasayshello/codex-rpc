@@ -8,6 +8,7 @@
 - **Watching Codex.** Every activity now explicitly sends `name: "Codex"`, and the dashboard preview uses that same name. Watching remains the default, with Playing still available as a preference. Older Discord clients may require naming the registered application `Codex` in the Developer Portal as a fallback.
 - **Verified release assembly.** Tagged builds now create a draft with all three native executables, identical latest/versioned tarballs, a source/build manifest and combined SHA-256 checksums. Publication remains a separate review step.
 - **Accurate dashboard version.** The footer reads the running server's package version instead of a hardcoded release number.
+- **Upgrading after trusting hooks.** Setup recognizes Codex trust/disable records inserted inside its managed marker block and preserves them byte-for-byte outside that block. Existing trust is never fabricated or silently reset; unrelated configuration remains protected.
 
 All 19 pet scenes, output-only chat counters, lifecycle hooks and settings remain compatible. No data migration is required.
 

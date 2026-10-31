@@ -93,8 +93,10 @@ Verified locally on macOS ARM64, 2026-10-31:
 - A real Discord IPC `SET_ACTIVITY` acknowledgement returned `name: "Codex"`, `type: 3`, and the requested test details. Test presence was cleared afterward; no application rename or account token was required. This exercises the current client's name override, not just a mocked frame.
 - Public file labels now normalize POSIX, drive-letter and UNC paths before card formatting, retain known project-relative context, and fall back to a filename for unknown external locations. Cached-state and private-mode tests inspect serialized Discord frames across all four layouts. Parent traversal and malformed paths have explicit cases.
 - Cached shell summaries are checked against the executable/subcommand allowlist at the outgoing boundary.
-- Full local suite: 183 tests, 181 passed, two Windows-only probes skipped on macOS. The nine focused API/path/IPC/release-assembly checks passed after the final server version change.
+- Full local suite: 184 tests, 182 passed, two Windows-only probes skipped on macOS. The nine focused API/path/IPC/release-assembly checks passed after the final server version change.
 - Electron render checks passed for the new heading, project-relative edit label and live package version, alongside existing accessibility, mobile, privacy, settings, SSE, animation and pinning checks. Updated synthetic-data screenshots were inspected.
 - Asset regeneration left all committed GIF/SVG bytes unchanged. The release assembler test checks three-platform completeness, identical tarball aliases and rejection of corrupted downloads.
 
 Cross-platform release CI and uploaded artifact digests are checked before publication; local results alone do not certify native Windows/Linux installation.
+
+The 0.3.1 installer also reproduces Codex trust/disable records being serialized inside owned markers. LF/CRLF fixtures prove records survive setup, repeated setup and uninstall byte-for-byte, and trust remains reported as unknown. The first candidate passed all nine OS/Node CI jobs before this additional upgrade regression was discovered during the real installation; the final tag is validated separately.

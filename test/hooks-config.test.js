@@ -48,6 +48,27 @@ test("owned registration preserves byte layout and first backup across upgrades"
   assert.equal(fs.readFileSync(path.join(rpc, "codex-config.backup.toml"), "utf8"), 'model = "gpt-5"');
   assert.ok(!fs.readdirSync(codex).some((name) => name.endsWith(".tmp")));
 });
+test("Codex trust and disable records inside owned markers survive setup and uninstall byte-for-byte", (t) => {
+  const { codex } = sandbox(t), target = path.join(codex, "config.toml");
+  for (const eol of ["\n", "\r\n"]) {
+    const original = 'notify = ["existing-notifier"]' + eol;
+    fs.writeFileSync(target, original); installLifecycleHooks();
+    const records = ['[hooks.state]', '', '[hooks.state."/example/config.toml:stop:0:0"]', 'trusted_hash = "sha256:existing-user-trust"', 'enabled = false', '', "[hooks.state.'C:\\Users\\Example\\config.toml:pre_tool_use:0:0']", 'trusted_hash = "sha256:another-existing-decision"', ''].join(eol);
+    fs.writeFileSync(target, fs.readFileSync(target, "utf8").replace(nativeEnd, records + nativeEnd));
+    assert.equal(inspectLifecycleHooks().configured, true);
+    installLifecycleHooks();
+    const upgraded = fs.readFileSync(target, "utf8");
+    assert.ok(upgraded.includes(records));
+    assert.ok(upgraded.indexOf(records) < upgraded.indexOf(nativeBegin));
+    assert.equal(inspectLifecycleHooks().trust, "unknown");
+    installLifecycleHooks(); assert.equal(fs.readFileSync(target, "utf8"), upgraded);
+    removeLifecycleHooks();
+    const removed = fs.readFileSync(target, "utf8");
+    assert.ok(removed.startsWith(original)); assert.ok(removed.includes(records));
+    assert.ok(!removed.includes(nativeBegin));
+    assert.equal((removed.match(/trusted_hash/g) || []).length, 2);
+  }
+});
 test("malformed or foreign-content marker blocks never consume user configuration", (t) => {
   const { codex, rpc } = sandbox(t), target = path.join(codex, "config.toml");
   for (const value of [
