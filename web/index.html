@@ -5,32 +5,34 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Codex RPC · Activity</title>
     <link rel="icon" href="/assets/pet/codex-pet-working.svg" />
+    <link rel="stylesheet" href="/assets/ui/tokens.css" />
     <link rel="stylesheet" href="/style.css" />
     <script type="module" src="/app.js"></script>
   </head>
-  <body>
+  <body data-page="overview">
     <a class="skip-link" href="#overview">Skip to activity</a>
     <button class="sidebar-overlay" id="sidebar-overlay" aria-label="Close navigation" tabindex="-1" hidden></button>
     <aside id="sidebar" aria-label="Workspace navigation">
       <div class="sidebar-brand-row">
-        <a class="brand" href="#overview"><span class="mark" aria-hidden="true">&gt;_</span> codex-rpc</a>
-        <button id="sidebar-close" class="icon-button" aria-label="Close sidebar" type="button">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
-        </button>
+        <a class="brand" href="#overview" aria-label="Codex RPC overview"><span class="mark" aria-hidden="true">&gt;_</span><span>codex-rpc</span></a>
+        <button id="sidebar-close" class="icon-button" aria-label="Close sidebar" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
       </div>
-      <div class="navlabel">Workspace</div>
-      <nav aria-label="Main navigation">
-        <a href="#overview" class="selected" aria-current="location"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Overview</a>
-        <a href="#activity"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m8 10V4m8 16v-7M2 21h20"/></svg>Activity</a>
-        <a href="#settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg>Settings</a>
+      <nav class="workspace-nav" aria-label="Main navigation">
+        <a href="#overview" class="selected" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Overview</span></a>
+        <a href="#activity"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m8 10V4m8 16v-7M2 21h20"/></svg><span>Activity</span></a>
+        <a href="#studio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19h14M7 15l8-10 3 3-8 10-4 1zM14 6l3 3"/></svg><span>Pet studio</span></a>
       </nav>
-      <div class="sidebar-note"><span class="dot"></span> Live on your device<small>Codex &amp; ChatGPT Desktop</small></div>
+      <div class="sidebar-conversations">
+        <label class="chat-search-wrap" for="chat-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="chat-search" type="search" placeholder="Search recent chats" autocomplete="off" spellcheck="false" aria-label="Search recent conversations" /></label>
+        <div class="conversation-heading"><h2>Recent chats</h2><span class="local-label">Local</span></div>
+        <ul id="sidebar-chats" aria-label="Recent conversations"></ul>
+        <p id="chat-search-empty" class="sidebar-empty" hidden>No conversations match your search.</p>
+      </div>
       <div class="aside-bottom">
-        <a class="sidebar-gallery-link" href="/assets/pet/animation-gallery.html" target="_blank" rel="noopener"><img src="/assets/pet/codex-pet-writing.svg" width="24" height="26" alt="" />Pet studio <span aria-hidden="true">↗</span></a>
-        <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><span id="theme-label">Light mode</span></button>
-        <button id="motion-toggle" class="theme-toggle" type="button" aria-pressed="false"><span aria-hidden="true">▦</span><span id="motion-label">Reduce motion</span></button>
-        <a class="sidebar-card-link" href="/cards/stats.svg" target="_blank" rel="noopener">Your stats card <span aria-hidden="true">↗</span></a>
-        <small>Local data. No telemetry.<br />codex-rpc <span class="version"></span></small>
+        <button id="open-settings" class="sidebar-settings" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg><span>Settings</span></button>
+        <div class="aside-preferences"><button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><span id="theme-label">Light mode</span></button><button id="motion-toggle" class="theme-toggle" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h9M5 17h6"/></svg><span id="motion-label">Reduce motion</span></button></div>
+        <div class="sidebar-status"><span class="dot" aria-hidden="true"></span><span>Local data. No telemetry.</span><a class="sidebar-card-link" href="/cards/stats.svg" target="_blank" rel="noopener" aria-label="Open your stats card">↗</a></div>
+        <small class="sidebar-version">codex-rpc <span class="version"></span></small>
       </div>
     </aside>
     <main id="main-content">
@@ -41,14 +43,11 @@
         </div>
         <div class="connection" role="status"><span id="stream-dot" class="dot"></span><span id="connection">Connecting</span></div>
       </div>
-      <header class="workspace-header">
-        <div><span class="eyebrow">YOUR WORKSPACE</span><h1>Your activity</h1><p>The work in front of you. The progress behind it.</p></div>
-        <a class="studio-link" href="/assets/pet/animation-gallery.html" target="_blank" rel="noopener"><img src="/assets/pet/codex-pet-writing.svg" width="28" height="30" alt="" /><span>Meet your next mood<small>Explore the pet studio</small></span><span aria-hidden="true">↗</span></a>
+      <header id="workspace-header" class="workspace-header">
+        <div><span id="page-eyebrow" class="eyebrow">YOUR WORKSPACE</span><h1 id="page-title">Your activity</h1><p id="page-subtitle">A little presence. A clearer picture of your work.</p></div>
+        <a class="studio-link" href="#studio"><img src="/assets/pet/codex-pet-writing.svg" width="28" height="30" alt="" /><span>Open Pet Studio<small>Choose or import a companion</small></span><span aria-hidden="true">↗</span></a>
       </header>
-      <section id="overview">
-        <div class="section-head">
-          <h2>Usage overview <span class="pill">UTC</span></h2>
-          <label class="range"
+      <div id="usage-toolbar" class="workspace-toolbar"><span class="toolbar-note">Your usage, over time</span><label class="range"
             >Time range
             <select id="range" aria-label="Time range">
               <option value="7d">Last 7 days</option>
@@ -57,13 +56,17 @@
               <option value="1y">Last year</option>
               <option value="all">All time</option>
             </select></label
-          >
+          ></div>
+      <section id="overview" class="workspace-page" data-page="overview">
+        <div class="section-head">
+          <h2>Usage overview <span class="pill">UTC</span></h2>
+
         </div>
         <div class="overview-grid">
           <article class="live panel">
             <div class="panel-label">
               <span class="dot"></span>
-              <span class="pixel-signal" aria-hidden="true"><i></i><i></i><i></i></span><span id="activity-type">WATCHING CODEX RPC</span>
+              <span class="pixel-signal" aria-hidden="true"><i></i><i></i><i></i></span><span id="activity-type">WATCHING Codex</span>
               <span id="live-status" class="pill">idle</span>
             </div>
             <div class="pet-live">
@@ -119,9 +122,11 @@
             </article>
           </div>
         </div>
-        <article class="panel chat-panel" aria-labelledby="chat-heading">
+
+      </section>
+        <article id="chat" class="panel chat-panel" aria-labelledby="chat-heading">
           <div class="chat-selection">
-            <label for="chat-picker">Conversation on Discord</label>
+            <label for="chat-picker">Conversation selection</label>
             <div class="chat-selection-controls">
               <select id="chat-picker" aria-describedby="chat-pin-status"><option value="">Automatic · follow latest conversation</option></select>
               <button id="pin-chat" class="primary" type="button" disabled>Pin to Discord</button>
@@ -166,8 +171,7 @@
             <ol id="tool-timeline" aria-labelledby="timeline-heading"><li class="timeline-empty">No tools recorded for this conversation yet.</li></ol>
           </div>
         </article>
-      </section>
-      <section id="activity">
+      <section id="activity" class="workspace-page" data-page="activity" hidden>
         <div class="section-head">
           <h2>Activity over time</h2>
           <span class="muted">Last 12 months</span>
@@ -216,11 +220,20 @@
           <div id="histogram" aria-label="Hourly activity histogram"></div>
         </article>
       </section>
-      <section id="settings">
-        <div class="section-head">
-          <h2>Settings</h2>
-          <span class="muted">Saved on this device</span>
-        </div>
+      <section id="studio" class="workspace-page studio-page" data-page="studio" aria-labelledby="studio-page-heading" hidden>
+        <div class="studio-frame-heading"><h2 id="studio-page-heading">Companions &amp; animations</h2><a href="/assets/pet/animation-gallery.html" target="_blank" rel="noopener">Open separately <span aria-hidden="true">↗</span></a></div>
+        <iframe id="studio-frame" loading="lazy" data-src="/assets/pet/animation-gallery.html?embed=1" title="Pet Studio: choose, create and import a companion" allow="clipboard-write" sandbox="allow-scripts allow-same-origin allow-downloads" referrerpolicy="no-referrer"></iframe>
+      </section>
+      <footer>
+        <span>&gt;_ codex-rpc · open source · MIT</span
+        ><a href="/cards/stats.svg" target="_blank" rel="noopener"
+          >Open your live stats card ↗</a
+        >
+      </footer>
+    </main>
+    <dialog id="settings-dialog" aria-labelledby="settings-dialog-title" aria-describedby="settings-dialog-description">
+      <div class="dialog-header"><div><h2 id="settings-dialog-title">Settings</h2><p id="settings-dialog-description">Your preferences, saved on this device.</p></div><button id="close-settings" class="icon-button" type="button" aria-label="Close settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+      <section id="settings" aria-label="Settings categories and fields">
         <article class="panel settings">
           <div
             class="tabs"
@@ -236,12 +249,6 @@
           </form>
         </article>
       </section>
-      <footer>
-        <span>&gt;_ codex-rpc · open source · MIT</span
-        ><a href="/cards/stats.svg" target="_blank" rel="noopener"
-          >Open your live stats card ↗</a
-        >
-      </footer>
-    </main>
+    </dialog>
   </body>
 </html>

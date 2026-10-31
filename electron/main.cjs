@@ -9,7 +9,7 @@ app.whenReady().then(async () => {
     height: 1000,
     minWidth: 650,
     minHeight: 600,
-    backgroundColor: "#0b1013",
+    backgroundColor: "#212121",
     title: "codex-rpc",
     webPreferences: {
       nodeIntegration: false,

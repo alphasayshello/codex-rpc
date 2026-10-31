@@ -4,6 +4,35 @@ const $ = (s) => document.querySelector(s),
       notation: "compact",
       maximumFractionDigits: 1,
     }).format(n || 0);
+let viewedChat = null;
+// Keep GIF decoders idle when their view is offscreen or the page is hidden.
+const animatedPictures = new Set();
+const visiblePictures = new WeakMap();
+function updatePicture(picture) {
+  const obscured = $("#settings-dialog")?.open && !picture.closest("#settings-dialog");
+  const still = document.hidden || obscured || !!picture.closest("[inert]") || document.documentElement.dataset.motion === "reduced" || visiblePictures.get(picture) === false;
+  const src = still ? picture.dataset.still : picture.dataset.animated;
+  if (src && picture.getAttribute("src") !== src) picture.src = src;
+}
+const pictureObserver = new IntersectionObserver(entries => {
+  for (const entry of entries) { visiblePictures.set(entry.target, entry.isIntersecting); updatePicture(entry.target); }
+});
+function animatePicture(picture, animated, still = animated) {
+  picture.dataset.animated = animated;
+  picture.dataset.still = still;
+  if (!animatedPictures.has(picture)) { animatedPictures.add(picture); pictureObserver.observe(picture); }
+  updatePicture(picture);
+}
+function updatePictures() {
+  for (const picture of animatedPictures) {
+    if (!picture.isConnected) { pictureObserver.unobserve(picture); animatedPictures.delete(picture); }
+    else updatePicture(picture);
+  }
+}
+function studioAppearance() {
+  const frame = $("#studio-frame");
+  if (frame?.getAttribute("src")) frame.contentWindow?.postMessage({ type: "codex-rpc:appearance", theme: document.documentElement.dataset.theme, motion: document.documentElement.dataset.motion, active: document.body.dataset.page === "studio" && !document.hidden && !$("#settings-dialog")?.open && !$("#main-content").inert }, location.origin);
+}
 // Appearance belongs to this browser, separate from shared RPC settings.
 const storage = {
   get(key) { try { return localStorage.getItem(key); } catch { return null; } },
@@ -15,6 +44,7 @@ function setTheme(theme) {
   $("#theme-toggle").setAttribute("aria-pressed", String(light));
   $("#theme-label").textContent = light ? "Dark mode" : "Light mode";
   storage.set("codex-rpc-theme", light ? "light" : "dark");
+  studioAppearance();
 }
 setTheme(storage.get("codex-rpc-theme") || "dark");
 $("#theme-toggle").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"));
@@ -24,11 +54,8 @@ function setMotion(reduced, persist = true) {
   $("#motion-toggle").setAttribute("aria-pressed", String(reduced));
   $("#motion-label").textContent = reduced ? "Animate effects" : "Reduce motion";
   if (persist) storage.set("codex-rpc-motion", reduced ? "reduced" : "full");
-  for (const picture of document.querySelectorAll(".animation-option img")) {
-    const scene = picture.closest("[data-animation]").dataset.animation;
-    const asset = petData.pets.find((pet) => pet.id === cfg?.pet?.id)?.animations?.[scene];
-    picture.src = asset ? reduced ? asset.previewPath : asset.path : `/assets/pet/codex-pet-${scene}.${reduced ? "svg" : "gif"}`;
-  }
+  updatePictures();
+  studioAppearance();
 }
 setMotion(storage.get("codex-rpc-motion") ? storage.get("codex-rpc-motion") === "reduced" : motionPreference.matches, false);
 $("#motion-toggle").addEventListener("click", () => { setMotion(document.documentElement.dataset.motion !== "reduced"); refresh(); });
@@ -47,6 +74,7 @@ function updateSidebar() {
   $("#sidebar-overlay").hidden = !(mobile && drawerOpen);
   $("#sidebar-close").hidden = !mobile;
   $(".tabs").setAttribute("aria-orientation", mobile ? "horizontal" : "vertical");
+  updatePictures(); studioAppearance();
 }
 function closeDrawer(restoreFocus = true) {
   drawerOpen = false;
@@ -69,30 +97,87 @@ $("#sidebar-overlay").addEventListener("click", () => closeDrawer());
 mobileNavigation.addEventListener("change", () => { drawerOpen = false; updateSidebar(); });
 updateSidebar();
 const navigationLinks = [...document.querySelectorAll("nav a")];
+let currentPage = "overview", settingsReturnFocus = null;
+const pageCopy = {
+  overview: ["Overview", "Your workspace", "Your live Discord card and recent conversations."],
+  activity: ["Analytics", "Your activity", "Explore usage, tools, and your coding rhythm."],
+  chat: ["Conversations", "Inside this chat", "Output usage, tool activity, and turn recaps. Browsing never changes your Discord pin."],
+  studio: ["Pet Studio", "Your companions", "Explore animations, create a pet, or bring your own character."],
+};
 function selectNavigation(hash) {
+  const target = hash.slice(1);
+  if (target === "settings") { openSettings(); return; }
+  if ($("#settings-dialog").open) closeSettings();
+  if (target === "overview" && viewedChat) {
+    viewedChat = null; draftChat = null;
+    renderChats({ chats: chatChoices, pinned: pinnedChat });
+    refresh();
+  }
+  currentPage = Object.hasOwn(pageCopy, target) ? target : "overview";
+  document.body.dataset.page = currentPage;
+  for (const section of document.querySelectorAll(".workspace-page")) section.hidden = section.dataset.page !== currentPage;
+  $("#chat").hidden = !["overview", "chat"].includes(currentPage);
+  const [eyebrow, title, subtitle] = pageCopy[currentPage];
+  $("#page-eyebrow").textContent = eyebrow;
+  $("#page-title").textContent = title;
+  $("#page-subtitle").textContent = subtitle;
   for (const link of navigationLinks) {
-    const active = link.getAttribute("href") === hash;
+    const active = link.hash === `#${currentPage}`;
     link.classList.toggle("selected", active);
-    if (active) link.setAttribute("aria-current", "location");
+    if (active) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   }
-}
-for (const link of navigationLinks) link.addEventListener("click", () => {
-  selectNavigation(link.hash);
-  if (mobileNavigation.matches) {
-    closeDrawer(false);
-    const target = document.querySelector(link.hash);
-    target?.setAttribute("tabindex", "-1");
-    target?.focus({ preventScroll: true });
+  if (currentPage === "studio") {
+    const frame = $("#studio-frame");
+    if (!frame.getAttribute("src")) frame.src = frame.dataset.src;
+    studioAppearance();
   }
+  updatePictures();
+  studioAppearance();
+}
+function navigate(page) {
+  if (mobileNavigation.matches) closeDrawer(false);
+  if (location.hash !== `#${page}`) location.hash = page;
+  else selectNavigation(`#${page}`);
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+function openSettings() {
+  const returnFocus = mobileNavigation.matches ? $("#sidebar-toggle") : document.activeElement;
+  if (mobileNavigation.matches) closeDrawer(false);
+  const dialog = $("#settings-dialog");
+  if (!dialog.open) { settingsReturnFocus = returnFocus; dialog.showModal(); }
+  $("#close-settings").focus();
+  queueMicrotask(async () => {
+    if (!cfg || settingsDirty) return;
+    try {
+      const latest = await api("/api/config");
+      if (!settingsDirty && dialog.open && JSON.stringify(latest) !== JSON.stringify(cfg)) {
+        const focusedId = document.activeElement.id;
+        cfg = latest; settings();
+        if (focusedId) document.getElementById(focusedId)?.focus();
+      }
+    }
+    catch (error) { $("#save-status").textContent = error.message; }
+  });
+  updatePictures(); studioAppearance();
+}
+function closeSettings() { $("#settings-dialog").close(); }
+$("#open-settings").addEventListener("click", openSettings);
+$("#close-settings").addEventListener("click", closeSettings);
+$("#settings-dialog").addEventListener("click", event => { if (event.target === $("#settings-dialog")) { const r = event.target.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) closeSettings(); } });
+$("#settings-dialog").addEventListener("close", () => {
+  if (location.hash === "#settings") history.replaceState(null, "", `#${currentPage}`);
+  settingsReturnFocus?.focus(); updatePictures(); studioAppearance();
 });
+$("#studio-frame").addEventListener("load", studioAppearance);
+for (const link of navigationLinks) link.addEventListener("click", event => { event.preventDefault(); navigate(link.hash.slice(1)); });
 window.addEventListener("hashchange", () => selectNavigation(location.hash || "#overview"));
 selectNavigation(location.hash || "#overview");
 document.addEventListener("keydown", (event) => {
   if (!mobileNavigation.matches || !drawerOpen) return;
   if (event.key === "Escape") { event.preventDefault(); closeDrawer(); }
   if (event.key === "Tab") {
-    const items = [...$("#sidebar").querySelectorAll("a[href], button:not([hidden]):not([disabled])")].filter((node) => node.getClientRects().length);
+    const items = [...$("#sidebar").querySelectorAll("a[href], button:not([hidden]):not([disabled]), input:not([disabled])")].filter((node) => node.getClientRects().length);
     const first = items[0], last = items.at(-1);
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
@@ -105,6 +190,8 @@ let cfg,
   tab = "Presence",
   refreshing = false,
   refreshPending = false;
+let refreshTimer = null, hiddenRefresh = false, liveState = {}, liveStream = null;
+const renderedVersions = new Map();
 const categories = [
   "Presence",
   "Discord",
@@ -132,8 +219,15 @@ async function api(url, body) {
   if (!r.ok) throw Error(result.error || `HTTP ${r.status}`);
   return result;
 }
+function unchanged(node, value) {
+  const signature = JSON.stringify(value);
+  if (node.dataset.renderSignature === signature) return true;
+  node.dataset.renderSignature = signature;
+  return false;
+}
 function ranks(id, values) {
   const target = $(id);
+  if (unchanged(target, values || {})) return;
   target.replaceChildren();
   const list = Object.entries(values || {})
     .sort((a, b) => b[1] - a[1])
@@ -164,6 +258,7 @@ function ranks(id, values) {
 }
 function heatmap(a) {
   const grid = $("#heatmap");
+  if (unchanged(grid, [new Date().toISOString().slice(0, 10), a.days])) return;
   grid.replaceChildren();
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -237,6 +332,7 @@ function renderChat(chat = {}) {
     : "Not reported");
   function tools(id, list, active) {
     const target = $(id);
+    if (unchanged(target, list || [])) return;
     target.replaceChildren();
     if (!list?.length) {
       target.textContent = active ? "No tools running" : "No tool activity recorded";
@@ -264,7 +360,6 @@ function renderChat(chat = {}) {
   ].filter(Boolean).join(" ");
 }
 let chatChoices = [], pinnedChat = null, draftChat = null, pinBusy = false;
-let timelineData = { rows: [] };
 const chatKey = (chat) => chat?.id ? JSON.stringify([chat.source || "codex", chat.id]) : "";
 function updatePinControls() {
   const value = $("#chat-picker").value;
@@ -276,7 +371,8 @@ function renderChats(data = {}) {
   chatChoices = data.chats || [];
   pinnedChat = data.pinned || null;
   const picker = $("#chat-picker");
-  const selection = draftChat ?? chatKey(pinnedChat);
+  const selection = draftChat ?? (chatKey(viewedChat) || chatKey(pinnedChat));
+  if (!unchanged(picker, chatChoices.map(chat => [chatKey(chat), chat.title, chat.status, chat.current]))) {
   picker.replaceChildren();
   const automatic = document.createElement("option");
   automatic.value = "";
@@ -288,6 +384,8 @@ function renderChats(data = {}) {
     option.textContent = [chat.title || "Untitled conversation", chat.source === "chatgpt" ? "ChatGPT" : "Codex", chat.status || "idle", chat.current ? "current" : ""].filter(Boolean).join(" · ");
     picker.append(option);
   }
+  }
+  renderSidebarChats();
   // Keep an unsaved choice through SSE refreshes; selecting alone never pins.
   picker.value = selection;
   if (picker.selectedIndex < 0) { picker.value = ""; draftChat = null; }
@@ -300,8 +398,8 @@ function renderChats(data = {}) {
   updatePinControls();
 }
 function renderTimeline(data = {}) {
-  timelineData = data;
   const target = $("#tool-timeline");
+  if (unchanged(target, data)) return;
   target.replaceChildren();
   const rows = Array.isArray(data.rows) ? data.rows : [];
   const running = rows.filter((row) => row.status === "running").length;
@@ -337,6 +435,7 @@ function renderTimeline(data = {}) {
       ? Math.max(0, Date.now() - row.startedAt) : row.durationMs;
     const duration = document.createElement("span");
     duration.className = "timeline-duration";
+    if (kind === "running" && Number.isFinite(row.startedAt)) duration.dataset.startedAt = row.startedAt;
     duration.textContent = typeof ms === "number" && Number.isFinite(ms)
       ? ms < 1000 ? `${Math.round(ms)} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.floor(ms / 60000)}m ${Math.floor(ms / 1000) % 60}s`
       : "Duration unavailable";
@@ -362,6 +461,7 @@ async function changePin(selection) {
   try {
     await api("/api/pin", selection);
     draftChat = null;
+    viewedChat = null;
     await refresh();
   } catch (error) {
     $("#chat-pin-status").textContent = `Could not change Discord selection: ${error.message}`;
@@ -375,9 +475,62 @@ $("#pin-chat").addEventListener("click", () => {
   if (chat) changePin({ id: chat.id, source: chat.source });
 });
 $("#unpin-chat").addEventListener("click", () => changePin({ id: null }));
+function renderElapsed() {
+  const seconds = Math.max(0, Math.floor((Date.now() - (liveState.startedAt || Date.now())) / 1000));
+  $("#live-source").textContent = `${liveState.source === "chatgpt" ? "ChatGPT Desktop" : "Codex CLI"} · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} elapsed`;
+}
+function elapsed(ms) {
+  return ms < 1000 ? `${Math.round(ms)} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.floor(ms / 60000)}m ${Math.floor(ms / 1000) % 60}s`;
+}
 setInterval(() => {
-  if (timelineData.rows?.some((row) => row.status === "running")) renderTimeline(timelineData);
+  if (document.hidden || !["overview", "chat"].includes(currentPage)) return;
+  if (currentPage === "overview") renderElapsed();
+  for (const duration of document.querySelectorAll(".timeline-duration[data-started-at]")) duration.textContent = elapsed(Math.max(0, Date.now() - Number(duration.dataset.startedAt)));
 }, 1000);
+function renderSidebarChats() {
+  const list = $("#sidebar-chats"), search = $("#chat-search").value.trim().toLowerCase();
+  const choices = chatChoices.filter(chat => [chat.title, chat.model, chat.source === "chatgpt" ? "ChatGPT" : "Codex"].join(" ").toLowerCase().includes(search));
+  const selected = chatKey(viewedChat);
+  const grouped = choices.map(chat => {
+    const age = chat.lastActivityAt ? (Date.now() - chat.lastActivityAt) / 86400000 : Infinity;
+    return { chat, group: age < 1 ? "Today" : age < 7 ? "Previous 7 days" : age < 30 ? "Previous 30 days" : "Earlier" };
+  });
+  const projection = grouped.map(({ chat, group }) => [chatKey(chat), chat.title, chat.output, chat.current, chat.pinned, group]);
+  if (unchanged(list, [projection, selected])) return;
+  $("#chat-search-empty").hidden = choices.length > 0;
+  $("#chat-search-empty").textContent = search ? "No matching conversations." : "Your conversations will appear here.";
+  const existing = new Map([...list.children].map(item => [item.dataset.rowKey, item]));
+  const ordered = [];
+  let group = "";
+  for (const entry of grouped) {
+    const { chat } = entry;
+    if (entry.group !== group) {
+      group = entry.group;
+      const key = `group:${group}`, heading = existing.get(key) || document.createElement("li");
+      heading.dataset.rowKey = key; heading.className = "chat-nav-group"; heading.textContent = group; ordered.push(heading);
+    }
+    const key = chatKey(chat), item = existing.get(key) || document.createElement("li");
+    item.dataset.rowKey = key;
+    let button = item.querySelector("button");
+    if (!button) {
+      button = document.createElement("button"); button.type = "button"; button.className = "chat-nav-item"; button.dataset.chatKey = key;
+      const title = document.createElement("span"), meta = document.createElement("span"); title.className = "chat-nav-title"; meta.className = "chat-nav-meta";
+      button.append(title, meta); item.append(button);
+      button.addEventListener("click", () => { viewedChat = { id: chat.id, source: chat.source }; draftChat = key; navigate("chat"); renderChats({ chats: chatChoices, pinned: pinnedChat }); refresh(); });
+    }
+    button.classList.toggle("selected", key === selected);
+    if (key === selected) button.setAttribute("aria-current", "page"); else button.removeAttribute("aria-current");
+    const title = button.querySelector(".chat-nav-title"), meta = button.querySelector(".chat-nav-meta");
+    const titleText = chat.title || "Untitled conversation", metaText = [chat.source === "chatgpt" ? "ChatGPT" : "Codex", chat.output == null ? null : `${format(chat.output)} output`, chat.pinned ? "Pinned to Discord" : chat.current ? "Latest" : null].filter(Boolean).join(" · ");
+    if (title.textContent !== titleText) title.textContent = titleText;
+    if (meta.textContent !== metaText) meta.textContent = metaText;
+    ordered.push(item);
+  }
+  for (const [index, item] of ordered.entries()) if (list.children[index] !== item) list.insertBefore(item, list.children[index] || null);
+  const kept = new Set(ordered);
+  for (const item of [...list.children]) if (!kept.has(item)) item.remove();
+}
+$("#chat-search").addEventListener("input", renderSidebarChats);
 function renderRecaps(data = {}) {
   const target = $("#turn-recaps");
   const rows = data.rows || [];
@@ -405,28 +558,29 @@ function renderRecaps(data = {}) {
 }
 async function refresh() {
   if (refreshing) { refreshPending = true; return; }
+  if (document.hidden) { hiddenRefresh = true; return; }
   refreshing = true;
   try {
-    const [s, a, year, activity, chat, chats, timeline, recaps, pets] = await Promise.all([
-      api("/api/state"),
-      api("/api/aggregate?range=" + $("#range").value),
-      api("/api/aggregate?range=1y"),
-      api("/api/presence"),
-      api("/api/chat"),
-      api("/api/chats"),
-      api("/api/timeline"),
-      api("/api/recaps"),
-      api("/api/pets"),
-    ]);
+    const requestedView = chatKey(viewedChat), requestedRange = $("#range").value;
+    const query = new URLSearchParams({ range: $("#range").value });
+    if (viewedChat) { query.set("chatId", viewedChat.id); query.set("source", viewedChat.source); }
+    const snapshot = await api("/api/dashboard?" + query);
+    if (requestedView !== chatKey(viewedChat) || requestedRange !== $("#range").value) { refreshPending = true; return; }
+    const { state: s, aggregate: a, year, activity, chat, chats, timeline, recaps, pets } = snapshot;
+    if (liveStream?.readyState === EventSource.OPEN) $("#connection").textContent = "Live on this device";
+    function changed(name, render) {
+      const signature = snapshot.versions?.[name] || JSON.stringify(snapshot[name]);
+      if (renderedVersions.get(name) !== signature) { render(); renderedVersions.set(name, signature); }
+    }
     petData = pets;
     if (!settingsDirty && cfg.pet?.id !== pets.selected) {
       cfg.pet = (await api("/api/config")).pet;
       if (tab === "Codex Pet Assets") settings();
     }
-    renderChat(chat);
-    renderChats(chats);
-    renderTimeline(timeline);
-    renderRecaps(recaps);
+    changed("chat", () => renderChat(chat));
+    changed("chats", () => renderChats(chats));
+    changed("timeline", () => renderTimeline(timeline));
+    changed("recaps", () => renderRecaps(recaps));
     $(".version").textContent = s.version || "";
     const t = a.totals || {},
       state = ["working", "thinking", "waiting", "idle"].includes(s.status)
@@ -437,25 +591,20 @@ async function refresh() {
     const bundled =
       "https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/";
     const configuredPet = activity?.assets?.large_image;
-    const reduced = document.documentElement.dataset.motion === "reduced";
     const petName = configuredPet?.startsWith(bundled) ? configuredPet.slice(bundled.length).split(/[?#]/)[0] : "";
     const localPet = animationData.animations.some(({ id }) => petName === `codex-pet-${id}.gif`);
     const libraryPet = petData.pets.find((pet) => Object.values(pet.animations || {}).some((asset) => asset.url === configuredPet));
     const libraryAsset = libraryPet && Object.values(libraryPet.animations).find((asset) => asset.url === configuredPet);
-    const petURL = libraryAsset ? reduced ? libraryAsset.previewPath : libraryAsset.path : localPet ? `/assets/pet/${petName.replace(/\.gif$/, reduced ? ".svg" : ".gif")}`
-      : configuredPet?.startsWith("https://") ? configuredPet
-      : `/assets/pet/codex-pet-${visual}.${reduced ? "svg" : "gif"}`;
-    if ($("#pet").getAttribute("src") !== petURL) $("#pet").src = petURL;
+    const petAnimated = libraryAsset?.path || (localPet ? `/assets/pet/${petName}` : configuredPet?.startsWith("https://") ? configuredPet : `/assets/pet/codex-pet-${visual}.gif`);
+    const petStill = libraryAsset?.previewPath || (localPet ? `/assets/pet/${petName.replace(/\.gif$/, ".svg")}` : `/assets/pet/codex-pet-${visual}.svg`);
+    animatePicture($("#pet"), petAnimated, petStill);
     $("#pet").style.imageRendering = libraryPet && libraryPet.id !== "codex" ? "auto" : "pixelated";
     const configuredBadge = activity?.assets?.small_image;
     const badgeName = configuredBadge?.startsWith(bundled) ? configuredBadge.slice(bundled.length).split(/[?#]/)[0] : "";
     const localBadge = /^codex-status-(working|thinking|waiting|idle|approval|editing|reading|review|ready|error|done)\.(png|gif)$/.test(badgeName);
-    const badgeFile = reduced ? badgeName.replace(/\.(png|gif)$/, ".png").replace("codex-status-done.png", "codex-status-waiting.png") : cfg.assets.badge ? badgeName : badgeName.replace(/\.png$/, ".gif");
-    const badgeURL = localBadge ? `/assets/pet/${badgeFile}`
-      : configuredBadge?.startsWith("https://") ? configuredBadge
-      : `/assets/pet/codex-status-${s.badgeKind || state}.${reduced ? "png" : "gif"}`;
-    if ($("#status-badge").getAttribute("src") !== badgeURL)
-      $("#status-badge").src = badgeURL;
+    const badgeAnimated = localBadge ? `/assets/pet/${cfg.assets.badge ? badgeName : badgeName.replace(/\.png$/, ".gif")}` : configuredBadge?.startsWith("https://") ? configuredBadge : `/assets/pet/codex-status-${s.badgeKind || state}.gif`;
+    const badgeStill = localBadge ? `/assets/pet/${badgeName.replace(/\.(png|gif)$/, ".png").replace("codex-status-done.png", "codex-status-waiting.png")}` : `/assets/pet/codex-status-${s.badgeKind || state}.png`;
+    animatePicture($("#status-badge"), badgeAnimated, badgeStill);
     $("#activity-type").textContent =
       ((activity?.type ?? cfg.presence.type) === 3 ? "WATCHING" : "PLAYING") +
       ` ${activity?.name || "Codex"}`;
@@ -464,12 +613,8 @@ async function refresh() {
     $("#live-action").textContent = activity?.details || "Presence paused";
     $("#live-model").textContent =
       activity?.state || "Resume when you are ready.";
-    const seconds = Math.max(
-      0,
-      Math.floor((Date.now() - (s.startedAt || Date.now())) / 1000),
-    );
-    $("#live-source").textContent =
-      `${s.source === "chatgpt" ? "ChatGPT Desktop" : "Codex CLI"} · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} elapsed`;
+    liveState = s;
+    renderElapsed();
     $("#daemon").textContent =
       `Daemon ${s.daemon?.pid ? "running" : "offline"} · Discord ${s.daemon?.connected ? "connected" : "offline"}`;
     $("#toggle-presence").textContent = s.enabled
@@ -496,6 +641,7 @@ async function refresh() {
     ranks("#languages", t.languages);
     heatmap(year);
     const histogram = $("#histogram");
+    if (!unchanged(histogram, t.hours || [])) {
     histogram.replaceChildren();
     const hours = t.hours || Array(24).fill(0),
       max = Math.max(1, ...hours);
@@ -509,13 +655,14 @@ async function refresh() {
       bar.append(fill, label);
       histogram.append(bar);
     });
+    }
   } catch (e) {
     $("#connection").textContent = e.message;
   } finally {
     refreshing = false;
     if (refreshPending) {
       refreshPending = false;
-      queueMicrotask(refresh);
+      scheduleRefresh();
     }
   }
 }
@@ -616,6 +763,7 @@ function animationPicker() {
     const asset = petData.pets.find((pet) => pet.id === cfg.pet?.id)?.animations?.[scene.id];
     const picture = document.createElement("img"); picture.src = asset ? reduced ? asset.previewPath : asset.path : reduced ? scene.previewPath : scene.path; picture.alt = ""; picture.loading = "lazy"; picture.width = 96; picture.height = 104;
     picture.style.imageRendering = cfg.pet?.id === "codex" ? "pixelated" : "auto";
+    animatePicture(picture, asset?.path || scene.path, asset?.previewPath || scene.previewPath);
     const caption = document.createElement("span"); caption.textContent = scene.label;
     button.append(picture, caption);
     button.addEventListener("click", () => {
@@ -636,6 +784,7 @@ function animationPicker() {
 }
 
 function settings() {
+  queueMicrotask(updatePictures);
   const tabs = $(".tabs");
   tabs.replaceChildren();
   tabs.setAttribute("aria-orientation", mobileNavigation.matches ? "horizontal" : "vertical");
@@ -773,8 +922,8 @@ function settings() {
     gallery.className = "badge-gallery";
     content.append(gallery);
     const preview = document.createElement("a");
-    preview.href = "/assets/pet/animation-gallery.html";
-    preview.target = "_blank"; preview.rel = "noopener";
+    preview.href = "#studio";
+    preview.addEventListener("click", event => { event.preventDefault(); closeSettings(); navigate("studio"); });
     preview.className = "text-button"; preview.textContent = "Preview animated pets and pixel badges ↗";
     content.append(preview);
   }
@@ -787,6 +936,7 @@ function settings() {
   }
 }
 $("#range").addEventListener("change", refresh);
+$("#settings-form").addEventListener("input", () => { settingsDirty = true; });
 $("#settings-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   try {
@@ -816,7 +966,7 @@ try {
   [cfg, animationData, petData] = await Promise.all([api("/api/config"), api("/api/animations"), api("/api/pets")]);
   settings();
   await refresh();
-  const stream = new EventSource("/events");
+  const stream = liveStream = new EventSource("/events");
   stream.onopen = () => {
     $("#connection").textContent = "Live on this device";
     $("#stream-dot").style.background = "var(--success, #4daa77)";
@@ -825,7 +975,17 @@ try {
     $("#connection").textContent = "Reconnecting…";
     $("#stream-dot").style.background = "var(--warning, #c5975d)";
   };
-  stream.addEventListener("update", refresh);
+  stream.addEventListener("update", scheduleRefresh);
 } catch (e) {
   $("#connection").textContent = e.message;
 }
+
+function scheduleRefresh() {
+  if (document.hidden) { hiddenRefresh = true; return; }
+  if (refreshTimer) return;
+  refreshTimer = setTimeout(() => { refreshTimer = null; refresh(); }, 20);
+}
+document.addEventListener("visibilitychange", () => {
+  updatePictures(); studioAppearance();
+  if (!document.hidden && hiddenRefresh) { hiddenRefresh = false; scheduleRefresh(); }
+});

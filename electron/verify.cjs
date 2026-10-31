@@ -168,6 +168,30 @@ app
       if (stable) await window.webContents.insertCSS("* { transition: none !important; animation: none !important; scroll-behavior: auto !important; }");
       await until(() => js("document.querySelector('#connection').textContent==='Live on this device'"));
     };
+    const route = async (page) => {
+      await js(`location.hash=${JSON.stringify(page)};void 0`);
+      await until(() => js(`document.body.dataset.page===${JSON.stringify(page)}`));
+      await js("scrollTo({top:0,behavior:'instant'})");
+    };
+    const resize = async (width, height) => {
+      window.setSize(width, height);
+      await until(() => js(`matchMedia('(max-width:760px)').matches===${width <= 760} && (!document.querySelector('.tabs') || document.querySelector('.tabs').getAttribute('aria-orientation')===${JSON.stringify(width <= 760 ? 'horizontal' : 'vertical')})`));
+    };
+    const openSettings = async () => {
+      if (!(await js("document.querySelector('#settings-dialog').open"))) {
+        await js("document.querySelector('#open-settings').focus();document.querySelector('#open-settings').click()");
+        await until(() => js("document.querySelector('#settings-dialog').open"));
+        await wait(100); // The dialog refreshes a clean configuration draft.
+      }
+    };
+    const closeSettings = async (cancel = false) => {
+      if (await js("document.querySelector('#settings-dialog').open")) {
+        if (cancel) await js("document.querySelector('#settings-dialog').requestClose()");
+        else await js("document.querySelector('#close-settings').click()");
+        await until(() => js("!document.querySelector('#settings-dialog').open"));
+        await wait(30);
+      }
+    };
     const key = async (keyCode, modifiers = []) => {
       // Hidden BrowserWindows cannot receive native focus. Dispatch to the
       // focused DOM node to exercise the drawer's keyboard handlers directly.
@@ -194,12 +218,21 @@ app
     assert.equal(await js("document.documentElement.dataset.motion"), "full");
     assert.equal(await js("localStorage.getItem('codex-rpc-motion')"), "full");
     await js("window.petSourceChanges=0;window.petObserver=new MutationObserver(records=>{window.petSourceChanges+=records.filter(r=>r.attributeName==='src').length});window.petObserver.observe(document.querySelector('#pet'),{attributes:true})");
-    writeJSON("daemon.json", { connected: true, updatedAt: Date.now() });
+    writeJSON("daemon.json", { pid: process.pid, connected: true, updatedAt: Date.now() });
     await until(() => js("document.querySelector('#daemon').textContent.includes('Discord connected')"));
     writeJSON("daemon.json", { connected: false, updatedAt: Date.now() });
     await until(() => js("document.querySelector('#daemon').textContent.includes('Discord offline')"));
     assert.equal(await js("window.petSourceChanges"), 0);
     await js("window.petObserver.disconnect()");
+    // Unchanged charts retain their nodes; hidden pages defer snapshot requests.
+    await js("window.heatNode=document.querySelector('#heatmap button[title]');window.snapshotRequests=0;window.originalFetch=window.fetch;window.fetch=(...args)=>{if(String(args[0]).startsWith('/api/dashboard'))snapshotRequests++;return originalFetch(...args)};Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'))");
+    writeJSON("daemon.json", { pid: process.pid, connected: true, updatedAt: Date.now() });
+    await wait(200);
+    assert.equal(await js("window.snapshotRequests"), 0);
+    await js("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'))");
+    await until(() => js("window.snapshotRequests>0 && document.querySelector('#daemon').textContent.includes('Discord connected')"));
+    assert.equal(await js("window.heatNode===document.querySelector('#heatmap button[title]')"), true);
+    await js("window.fetch=window.originalFetch;void 0");
     // Hidden compositor animation clocks are not reliable; verify stable end
     // states while leaving native GIF animation untouched.
     await window.webContents.insertCSS("* { transition: none !important; animation: none !important; scroll-behavior: auto !important; }");
@@ -224,6 +257,22 @@ app
     assert.match(await js("document.querySelector('#chat-recent-tools').textContent"), /apply_patch.*read_file/);
     assert.match(await js("document.querySelector('#turn-recaps').textContent"), /4\.5K output tokens.*8 tools.*12\.5s.*completed/);
     assert.ok(!(await js("document.querySelector('#turn-recaps').textContent")).includes("120K"));
+    // Sidebar browsing inspects another chat without changing Discord's pin.
+    await until(() => js("document.querySelectorAll('#sidebar-chats .chat-nav-item').length===2"));
+    await js("document.querySelector('#chat-search').value='o3';document.querySelector('#chat-search').dispatchEvent(new Event('input'))");
+    assert.equal(await js("document.querySelectorAll('#sidebar-chats .chat-nav-item').length"), 1);
+    await js("document.querySelector('#sidebar-chats .chat-nav-item').click()");
+    await until(() => js("document.body.dataset.page==='chat' && document.querySelector('#chat-tokens').textContent==='8.8K'"));
+    assert.equal(readJSON("selection.json").sessionId, undefined);
+    assert.ok((await js("fetch('/api/presence').then(r=>r.json()).then(a=>a.details)")).includes(state.task));
+    assert.equal(await js("document.querySelector('#usage-toolbar').getClientRects().length"), 0);
+    await capture("chat-browse.png");
+    await js("document.querySelector('#chat-search').value='nothing-matches-this';document.querySelector('#chat-search').dispatchEvent(new Event('input'))");
+    assert.equal(await js("document.querySelector('#chat-search-empty').hidden"), false);
+    assert.equal(await js("document.querySelectorAll('#sidebar-chats .chat-nav-item').length"), 0);
+    await js("document.querySelector('#chat-search').value='';document.querySelector('#chat-search').dispatchEvent(new Event('input'))");
+    await route("overview");
+    await until(() => js("document.querySelector('#chat-tokens').textContent==='22.8K'"));
     // Choosing a conversation is a draft. Only the explicit button changes
     // shared Discord selection, and a newer event must not steal that pin.
     const secondKey = JSON.stringify(["codex", secondId]);
@@ -272,7 +321,7 @@ app
     await capture("timeline.png");
     await js("document.querySelector('.turn-recaps').scrollIntoView({block:'center'})");
     await capture("recaps.png");
-    window.setSize(430, 1050);
+    await resize(430, 1050);
     await wait(100);
     await js("document.querySelector('.tool-timeline').scrollIntoView({block:'center'})");
     assert.equal(await js("document.documentElement.scrollWidth <= innerWidth"), true);
@@ -280,7 +329,7 @@ app
     await js("document.querySelector('.turn-recaps').scrollIntoView({block:'center'})");
     assert.equal(await js("document.documentElement.scrollWidth <= innerWidth"), true);
     await capture("recaps-mobile.png");
-    window.setSize(1440, 1100);
+    await resize(1440, 1100);
     writeJSON("config.json", { ...config(), privacy: "private" });
     await until(() => js("document.querySelector('#chat-heading').textContent==='Private conversation'"));
     await until(() => js("!document.querySelector('#tool-timeline').textContent.includes('src/completed.js')"));
@@ -331,6 +380,16 @@ app
     await js("document.querySelector('.chat-panel').scrollIntoView({block:'center'})");
     await wait(100);
     await capture("chat.png");
+    // A slow clean-config refresh must not replace a draft being typed.
+    await js("window.settingsFetch=window.fetch;window.releaseSettingsConfig=null;window.settingsConfigRequested=false;window.fetch=(...args)=>String(args[0])==='/api/config'?new Promise(resolve=>{window.settingsConfigRequested=true;window.releaseSettingsConfig=()=>window.settingsFetch(...args).then(resolve)}):window.settingsFetch(...args);document.querySelector('#open-settings').focus();document.querySelector('#open-settings').click()");
+    await until(() => js("window.settingsConfigRequested && document.querySelector('#settings-dialog').open"));
+    await js("document.querySelector('#settings-tab-1').click();(()=>{const field=document.querySelector('[data-key=clientId]');field.focus();field.value='1565535814308470815';field.dispatchEvent(new Event('input',{bubbles:true}));window.draftField=field})()" );
+    await js("window.releaseSettingsConfig();window.fetch=window.settingsFetch;void 0");
+    await wait(100);
+    assert.equal(await js("document.activeElement===window.draftField && window.draftField.isConnected"), true);
+    assert.equal(await js("window.draftField.value"), "1565535814308470815");
+    assert.equal(config().clientId, "1565535814308470814");
+    await js("window.draftField.value='1565535814308470814';window.draftField.dispatchEvent(new Event('input',{bubbles:true}));window.draftField.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('#settings-tab-0').click()" );
     await js("document.querySelector('#settings-tab-0').focus()");
     await key("ArrowDown");
     assert.equal(await js("document.activeElement.id"), "settings-tab-1");
@@ -339,6 +398,15 @@ app
     assert.equal(await js("document.activeElement.id"), "settings-tab-6");
     await key("Home");
     assert.equal(await js("document.activeElement.id"), "settings-tab-0");
+    // Native cancellation restores focus; unsaved settings remain a draft.
+    await js("(()=>{const field=document.querySelector('[data-key=\"presence.showChurn\"]');field.checked=!field.checked;field.dispatchEvent(new Event('change'))})()");
+    const savedChurn = config().presence.showChurn;
+    await closeSettings(true);
+    assert.equal(await js("document.activeElement.id"), "open-settings");
+    assert.equal(config().presence.showChurn, savedChurn);
+    await openSettings();
+    assert.equal(await js("document.querySelector('[data-key=\"presence.showChurn\"]').checked"), !savedChurn);
+    await js("(()=>{const field=document.querySelector('[data-key=\"presence.showChurn\"]');field.checked=!field.checked;field.dispatchEvent(new Event('change'))})()");
     for (const tab of [
       "Presence",
       "Discord",
@@ -365,13 +433,16 @@ app
     }
     await reload();
     assert.equal(await js("document.querySelector('[data-key=\"presence.stats\"]').value"), "chat");
+    await openSettings();
     await js(
-      "Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent==='Codex Pet Assets').click(); document.querySelector('#settings').scrollIntoView({behavior:'instant'})",
+      "Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent==='Codex Pet Assets').click()",
     );
     await wait(100);
     assert.ok(await js("document.querySelector('#settings-content').getBoundingClientRect().top < innerHeight - 200"));
     await until(() => js("document.querySelector('#connection').textContent==='Live on this device'"));
     await capture("settings.png");
+    await closeSettings();
+    await route("activity");
     const before = await js("document.querySelector('#tokens').textContent");
     await js(
       "document.querySelector('#range').value='7d';document.querySelector('#range').dispatchEvent(new Event('change'))",
@@ -397,16 +468,19 @@ app
       js("document.querySelector('#live-status').textContent==='waiting'"),
     );
     await until(() => js("document.querySelector('#chat-active-tools').textContent==='No tools running'"));
+    await openSettings();
     await js(
       "Array.from(document.querySelectorAll('.tabs button')).find(b=>b.textContent==='Privacy').click(); const field=document.querySelector('[data-key=privacy]'); field.value='private';field.dispatchEvent(new Event('change'));document.querySelector('#settings-form').requestSubmit()",
     );
     await until(() => config().privacy === "private");
     await until(() => js("document.querySelector('#chat-heading').textContent==='Private conversation'"));
+    await closeSettings();
+    await route("overview");
     await js("document.querySelector('#toggle-presence').click()");
     await until(() => config().enabled === false);
-    window.setSize(430, 950);
+    await resize(430, 950);
     await js("scrollTo({top:0,behavior:'instant'})");
-    await wait(100);
+    await until(() => js("document.querySelector('#sidebar-toggle').getAttribute('aria-expanded')==='false'"));
     assert.equal(await js("document.querySelector('#sidebar-toggle').getAttribute('aria-expanded')"), "false");
     assert.equal(await js("document.querySelector('#sidebar').inert"), true);
     assert.equal(await js("document.querySelector('#sidebar').getAttribute('aria-hidden')"), "true");
@@ -426,12 +500,12 @@ app
     assert.equal(await js("document.querySelector('#main-content').inert"), false);
     assert.equal(await js("document.activeElement.id"), "sidebar-toggle");
     assert.equal(await js("document.querySelector('#sidebar-toggle').getAttribute('aria-expanded')"), "false");
-    await js("document.querySelector('#sidebar-toggle').click();document.querySelector('#sidebar nav a[href=\"#settings\"]').click()");
+    await js("document.querySelector('#sidebar-toggle').click();document.querySelector('#open-settings').focus();document.querySelector('#open-settings').click()");
+    await until(() => js("document.querySelector('#settings-dialog').open"));
+    await wait(100); // A clean settings draft is refreshed before interacting with its tabs.
     assert.equal(await js("document.querySelector('#sidebar-toggle').getAttribute('aria-expanded')"), "false");
-    assert.equal(await js("document.querySelector('#sidebar nav a[href=\"#settings\"]').getAttribute('aria-current')"), "location");
-    assert.equal(await js("document.activeElement.id"), "settings");
-    await js("document.querySelector('#sidebar-toggle').click();document.querySelector('#sidebar-overlay').click();scrollTo({top:0,behavior:'instant'})");
-    assert.equal(await js("document.querySelector('#sidebar').inert"), true);
+    assert.equal(await js("document.querySelector('#main-content').inert"), false);
+    assert.equal(await js("document.activeElement.id"), "close-settings");
     await js("document.querySelector('#settings-tab-0').click()");
     await key("ArrowRight");
     assert.equal(await js("document.activeElement.id"), "settings-tab-1");
@@ -440,8 +514,11 @@ app
       await js("document.documentElement.scrollWidth <= innerWidth"),
       true,
     );
+    await capture("settings-mobile.png");
+    await closeSettings(true);
+    assert.equal(await js("document.activeElement.id"), "sidebar-toggle");
     await capture("mobile.png");
-    window.setSize(430, 1300);
+    await resize(430, 1300);
     await js("scrollTo({top: document.querySelector('.chat-panel').getBoundingClientRect().top + scrollY - document.querySelector('.topbar').offsetHeight - 16, behavior:'instant'})");
     await wait(100);
     assert.equal(await js("document.documentElement.scrollWidth <= innerWidth"), true);
@@ -459,7 +536,7 @@ app
     const thinkingBefore = readJSON("state.json").thinkingStartedAt;
     emit("token_count", { payload: { type: "token_count", info: { total_token_usage: { input_tokens: 90000, output_tokens: 7200, reasoning_output_tokens: 1200 } } } }, 19000);
     assert.equal(readJSON("state.json").thinkingStartedAt, thinkingBefore);
-    window.setSize(1440, 1100);
+    await resize(1440, 1100);
     await reload();
     await until(() => js("document.querySelector('#live-action').textContent.startsWith('Pondering solution...')"));
     assert.equal(await js("fetch('/api/presence').then(r=>r.json()).then(a=>a.timestamps.start)"), Math.floor(thinkingBefore / 1000));
@@ -480,30 +557,34 @@ app
     assert.equal(stateAPI.linesRemoved, 1);
     assert.ok(!JSON.stringify(stateAPI).includes("TELEMETRY_SECRET_BODY"));
     assert.equal(await js("document.querySelector('#pet').getAttribute('src')"), "/assets/pet/codex-pet-patching.gif");
+    await openSettings();
     for (const timer of ["session", "operation"]) {
       await js(`(()=>{const field=document.querySelector('[data-key="presence.timer"]');field.value=${JSON.stringify(timer)};field.dispatchEvent(new Event('change'));document.querySelector('#settings-form').requestSubmit()})()`);
       await until(() => config().presence.timer === timer);
       const expected = timer === "session" ? readJSON("state.json").startedAt : readJSON("state.json").operationStartedAt;
       assert.equal(await js("fetch('/api/presence').then(r=>r.json()).then(a=>a.timestamps.start)"), Math.floor(expected / 1000));
     }
+    await openSettings();
     await js("document.querySelector('#settings-tab-2').click()");
     await js("(()=>{const field=document.querySelector('[data-key=\"assets.patching\"]');field.value='anim_patch_large';field.dispatchEvent(new Event('change'));document.querySelector('#settings-form').requestSubmit()})()");
     await until(() => config().assets.patching === "anim_patch_large");
     assert.equal(await js("fetch('/api/presence').then(r=>r.json()).then(a=>a.assets.large_image)"), "anim_patch_large");
-    assert.equal(await js("document.querySelector('#pet').getAttribute('src')"), "/assets/pet/codex-pet-patching.gif");
+    assert.equal(await js("document.querySelector('#pet').getAttribute('src')"), "/assets/pet/codex-pet-patching.svg");
     // A custom URL within our own repository still selects that exact artwork.
     await js("(()=>{const field=document.querySelector('[data-key=\"assets.patching\"]');field.value='https://raw.githubusercontent.com/alphasayshello/codex-rpc/main/assets/pet/codex-pet-idle.gif';field.dispatchEvent(new Event('change'));document.querySelector('#settings-form').requestSubmit()})()");
-    await until(() => js("document.querySelector('#pet').getAttribute('src')==='/assets/pet/codex-pet-idle.gif'"));
+    await until(() => js("document.querySelector('#pet').getAttribute('src')==='/assets/pet/codex-pet-idle.svg'"));
     assert.match(await js("fetch('/api/presence').then(r=>r.json()).then(a=>a.assets.large_image)"), /codex-pet-idle.gif$/);
     await js("(()=>{const field=document.querySelector('[data-key=\"assets.patching\"]');field.value='anim_patch_large';field.dispatchEvent(new Event('change'));document.querySelector('#settings-form').requestSubmit()})()");
+    await until(() => js("document.querySelector('#pet').getAttribute('src')==='/assets/pet/codex-pet-patching.svg'"));
+    await closeSettings();
     await until(() => js("document.querySelector('#pet').getAttribute('src')==='/assets/pet/codex-pet-patching.gif'"));
     await js("scrollTo({top:0,behavior:'instant'})");
     await capture("telemetry.png");
-    window.setSize(430, 1050);
+    await resize(430, 1050);
     await js("scrollTo({top:0,behavior:'instant'})");
     assert.equal(await js("document.documentElement.scrollWidth<=innerWidth"), true);
     await capture("telemetry-mobile.png");
-    window.setSize(1440, 1100);
+    await resize(1440, 1100);
     writeJSON("config.json", { ...config(), privacy: "private" });
     await until(() => js("!document.querySelector('#live-model').textContent.includes('telemetry-client.js')"));
     const privatePatch = await js("Promise.all(['/api/state','/api/chat','/api/presence','/api/timeline'].map(url=>fetch(url).then(r=>r.json())))");
@@ -552,6 +633,7 @@ app
     }
     // Choosing artwork changes the settings draft, never the persisted config
     // until the existing Save changes action is used.
+    await openSettings();
     await js("document.querySelector('#settings-tab-2').click()");
     assert.equal(await js("document.querySelectorAll('.animation-option').length"), 19);
     assert.equal(await js("document.querySelector('#animation-target').value"), "writing");
@@ -566,13 +648,43 @@ app
     emit("writing");
     await until(() => js("document.querySelector('#pet').getAttribute('src')==='/assets/pet/codex-pet-reading.svg'"));
     await reload();
+    await openSettings();
     await js("document.querySelector('#settings-tab-2').click()");
     assert.equal(await js("document.querySelector('[data-key=\"assets.writing\"]').value"), chosenURL);
     assert.equal(await js("document.querySelector('.animation-option[data-animation=reading]').getAttribute('aria-pressed')"), "true");
     assert.equal(await js("[...document.querySelectorAll('.animation-option img')].every(image=>image.getAttribute('src').endsWith('.svg'))"), true);
+    await closeSettings();
     await js("document.querySelector('#motion-toggle').click()");
-    await until(() => js("[...document.querySelectorAll('.animation-option img')].every(image=>image.getAttribute('src').endsWith('.gif'))"));
+    await openSettings();
+    await js("document.querySelector('.animation-picker').scrollIntoView({block:'start',behavior:'instant'})");
+    await until(() => js("document.querySelector('.animation-option img').getAttribute('src').endsWith('.gif')"));
+    assert.equal(await js("[...document.querySelectorAll('.animation-option img')].every(image=>image.dataset.animated.endsWith('.gif') && image.dataset.still.endsWith('.svg'))"), true);
+    await closeSettings();
+    await js("scrollTo({top:0,behavior:'instant'})");
     await until(() => js("document.querySelector('#pet').getAttribute('src')==='/assets/pet/codex-pet-reading.gif'"));
+    // Studio is lazy, keeps its document/draft across routes, and follows the shell.
+    assert.equal(await js("document.querySelector('#studio-frame').getAttribute('src')"), null);
+    await route("studio");
+    await until(() => js("document.querySelector('#studio-frame').contentDocument?.querySelectorAll('.scene-card').length===19 && document.querySelector('#studio-frame').contentDocument?.documentElement.dataset.embedded==='true'"));
+    await js("window.studioDocument=document.querySelector('#studio-frame').contentDocument;studioDocument.querySelector('#pet-brief').value='A tiny gold notebook';studioDocument.querySelector('#pet-brief').dispatchEvent(new Event('input'))");
+    assert.equal(await js("window.studioDocument.documentElement.dataset.embedded"), "true");
+    await js("document.querySelector('#theme-toggle').click()");
+    await until(() => js("window.studioDocument.documentElement.dataset.theme==='light'"));
+    await js("document.querySelector('#theme-toggle').click();document.querySelector('#motion-toggle').click()");
+    await until(() => js("window.studioDocument.querySelector('#reduce-motion').checked"));
+    await route("overview");
+    await route("studio");
+    assert.equal(await js("document.querySelector('#studio-frame').contentDocument===window.studioDocument"), true);
+    assert.equal(await js("window.studioDocument.querySelector('#pet-brief').value"), "A tiny gold notebook");
+    await js("document.querySelector('#motion-toggle').click();window.studioDocument.querySelector('.preview-panel').scrollIntoView({block:'center',behavior:'instant'})");
+    await until(() => js("window.studioDocument.querySelector('#preview-image').getAttribute('src').endsWith('.gif')"));
+    await js("scrollTo({top:0,behavior:'instant'})");
+    await capture("studio-embedded.png");
+    await openSettings();
+    await until(() => js("window.studioDocument.querySelector('#preview-image').getAttribute('src').endsWith('.svg')"));
+    await closeSettings();
+    await until(() => js("window.studioDocument.querySelector('#preview-image').getAttribute('src').endsWith('.gif')"));
+    await route("overview");
     // The full animation studio remains local: controls, filters, keyboard
     // navigation, copy feedback and motion/background preferences are real DOM.
     await window.loadURL(`http://127.0.0.1:${dashboard.address().port}/assets/pet/animation-gallery.html`);
@@ -650,6 +762,8 @@ app
     assert.equal(await js("document.activeElement.dataset.scene"), "idle");
     await js("document.querySelector('#reduce-motion').checked=false;document.querySelector('#reduce-motion').dispatchEvent(new Event('change'))");
     if (await js("document.querySelector('#play-toggle').textContent==='Play animations'")) await js("document.querySelector('#play-toggle').click()");
+    await js("document.querySelector('.preview-panel').scrollIntoView({block:'center',behavior:'instant'})");
+    await until(() => js("document.querySelector('#preview-image').getAttribute('src').endsWith('.gif')"));
     assert.match(await js("document.querySelector('#preview-image').getAttribute('src')"), /\.gif$/);
     await js("document.querySelector('#play-toggle').click()");
     assert.match(await js("document.querySelector('#preview-image').getAttribute('src')"), /\.svg$/);
@@ -668,24 +782,25 @@ app
     // show the complete bonus collection so distinct scenes remain visible.
     await js("document.querySelector('[data-filter=all]').click();document.querySelector('#family-filter').value='all';document.querySelector('#family-filter').dispatchEvent(new Event('change'));document.querySelector('#scene-search').value='';document.querySelector('#scene-search').dispatchEvent(new Event('input'));document.querySelector('#background-select').value='dark';document.querySelector('#background-select').dispatchEvent(new Event('change'));document.querySelector('#reduce-motion').checked=false;document.querySelector('#reduce-motion').dispatchEvent(new Event('change'));document.querySelector('.scene-card[data-scene=writing]').click()");
     if (await js("document.querySelector('#play-toggle').textContent==='Play animations'")) await js("document.querySelector('#play-toggle').click()");
-    assert.equal(await js("[...document.querySelectorAll('.scene-image')].every(image=>image.getAttribute('src').endsWith('.gif'))"), true);
-    window.setSize(1440, 1100);
+    await until(() => js("document.querySelector('#preview-image').getAttribute('src').endsWith('.gif')"));
+    assert.equal(await js("[...document.querySelectorAll('.scene-image')].every(image=>['gif','svg'].some(extension=>new URL(image.src).pathname.endsWith('/codex-pet-'+image.dataset.scene+'.'+extension)))"), true);
+    await resize(1440, 1100);
     await js("scrollTo({top:0,behavior:'instant'});new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))");
     assert.equal(await js("scrollY"), 0);
     await capture("pet-studio.png");
-    window.setSize(430, 1050);
+    await resize(430, 1050);
     await js("scrollTo({top:0,behavior:'instant'});new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))");
     assert.equal(await js("document.documentElement.scrollWidth<=innerWidth"), true);
     assert.equal(await js("scrollY"), 0);
     await capture("pet-studio-mobile.png");
-    window.setSize(1440, 1100);
+    await resize(1440, 1100);
     await js("scrollTo({top:document.querySelector('.scene-section[data-section=bonus]').getBoundingClientRect().top+scrollY-20,behavior:'instant'})");
     await until(() => js("[...document.querySelectorAll('.scene-card[data-kind=bonus] img')].every(image=>image.complete&&image.naturalWidth>0)"));
     assert.equal(await js("[...document.querySelectorAll('.scene-card[data-kind=bonus]')].every(card=>{const box=card.getBoundingClientRect();return box.top>=0&&box.bottom<=innerHeight})"), true);
     await capture("pet-collection.png");
     await js("scrollTo({top:document.querySelector('#create-pet').getBoundingClientRect().top+scrollY-24,behavior:'instant'});new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))");
     await capture("pet-prompt.png");
-    window.setSize(430, 1050);
+    await resize(430, 1050);
     await js("scrollTo({top:document.querySelector('#create-pet').getBoundingClientRect().top+scrollY-24,behavior:'instant'});new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))");
     assert.equal(await js("document.documentElement.scrollWidth<=innerWidth"), true);
     await capture("pet-prompt-mobile.png");
@@ -694,15 +809,18 @@ app
     writeJSON("selection.json", {});
     writeJSON("config.json", { ...config(), enabled: true });
     writeJSON("state.json", { status: "working", tool: "apply_patch", source: "codex", updatedAt: Date.now() });
-    window.setSize(1440, 1100);
+    await resize(1440, 1100);
     await window.loadURL(`http://127.0.0.1:${dashboard.address().port}/`);
     await until(() => js("document.querySelector('#connection').textContent==='Live on this device'"));
+    await openSettings();
     await js("document.querySelector('#settings-tab-2').click()");
     assert.equal(await js("document.querySelector('[data-key=\"pet.id\"]').options.length"), 2);
     await js("document.querySelector('[data-key=\"pet.id\"]').value='codex-bloom';document.querySelector('[data-key=\"pet.id\"]').dispatchEvent(new Event('change'))");
     assert.equal(config().pet.id, "codex");
     await js("document.querySelector('#restore-pet-scenes').click();document.querySelector('#settings-form').requestSubmit()");
     await until(() => config().pet.id === "codex-bloom");
+    await closeSettings();
+    await js("scrollTo({top:0,behavior:'instant'})");
     await until(() => js("document.querySelector('#pet').getAttribute('src')==='/assets/pets/codex-bloom/coding.gif'"));
     assert.equal(await js("document.querySelector('#pet').style.imageRendering"), "auto");
     await js("document.querySelector('#motion-toggle').click()");
