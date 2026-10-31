@@ -8,6 +8,15 @@ import { conversationName } from "./threads.js";
 const sourceOK = (source) => source === "codex" || source === "chatgpt";
 const key = (id, source) => JSON.stringify([source, id]);
 const clean = (value) => typeof value === "string" ? value.replace(/[\x00-\x1f\x7f]/g, " ").trim().slice(0, 128) : "";
+let historyCache = { key: "", sessions: {} };
+function histories() {
+  try {
+    const target = file("sessions.json"), stat = fs.statSync(target);
+    const next = `${target}:${stat.dev}:${stat.ino}:${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`;
+    if (historyCache.key !== next) historyCache = { key: next, sessions: readJSON("sessions.json").sessions || {} };
+    return historyCache.sessions;
+  } catch (error) { if (error.code === "ENOENT") return {}; throw error; }
+}
 function pin() {
   const value = readJSON("selection.json");
   return typeof value.sessionId === "string" && value.sessionId && sourceOK(value.source) ? value : null;
@@ -51,6 +60,21 @@ function redact(state, settings) {
   }
   return next;
 }
+// A dashboard can inspect another chat without changing Discord's pin. Missing
+// source tags belong to legacy Codex records, never to a same-ID ChatGPT chat.
+export function stateForChat(id, source = "codex", settings = config()) {
+  if (typeof id !== "string" || !id.trim() || id.length > 256 || /[\x00-\x1f\x7f]/.test(id) || !sourceOK(source)) return null;
+  const saved = readLiveSession(id, source), latest = readJSON("state.json");
+  let state = saved.sessionId === id && (saved.source || "codex") === source ? { ...saved, source } : null;
+  if (latest.sessionId === id && (latest.source || "codex") === source && (!state || (latest.updatedAt || 0) > (state.updatedAt || 0))) state = { ...latest, source };
+  if (!state) {
+    const records = histories();
+    const candidate = Object.hasOwn(records, id) ? records[id] : null;
+    if (!candidate || (candidate.source || "codex") !== source) return null;
+    state = { sessionId: id, source, status: "idle", model: candidate.model, startedAt: candidate.startedAt, updatedAt: candidate.lastActivityAt };
+  }
+  return redact(state, settings);
+}
 export function selectedState(settings = config()) {
   const pinned = pin(), latest = readJSON("state.json", { status: "idle" });
   if (!pinned) return redact(latest, settings);
@@ -59,22 +83,22 @@ export function selectedState(settings = config()) {
   if (latest.sessionId === pinned.sessionId && latest.source === pinned.source &&
     (!state || (latest.updatedAt || 0) > (state.updatedAt || 0))) state = latest;
   if (!state) {
-    const histories = readJSON("sessions.json").sessions || {};
-    const history = Object.hasOwn(histories, pinned.sessionId) ? histories[pinned.sessionId] : null;
-    const record = history && (!history.source || history.source === pinned.source) ? history : {};
+    const records = histories();
+    const history = Object.hasOwn(records, pinned.sessionId) ? records[pinned.sessionId] : null;
+    const record = history && (history.source || "codex") === pinned.source ? history : {};
     state = { sessionId: pinned.sessionId, source: pinned.source, status: "idle", model: record.model,
       startedAt: record.startedAt, updatedAt: record.lastActivityAt };
   }
   return redact(state, settings);
 }
 export function listChats(settings = config()) {
-  const histories = readJSON("sessions.json").sessions || {}, entries = new Map();
+  const records = histories(), entries = new Map();
   const add = (id, source, live, record) => {
     if (typeof id !== "string" || !id || !sourceOK(source)) return;
     const idKey = key(id, source), old = entries.get(idKey) || {};
     entries.set(idKey, { id, source, live: live && (!old.live || (live.updatedAt || 0) >= (old.live.updatedAt || 0)) ? live : old.live, record: record || old.record });
   };
-  for (const [id, record] of Object.entries(histories)) add(id, record.source || "codex", null, record);
+  for (const [id, record] of Object.entries(records)) add(id, record.source || "codex", null, record);
   let names = [];
   try { names = fs.readdirSync(file("live")); } catch (e) { if (e.code !== "ENOENT") throw e; }
   for (const name of names) {
@@ -88,7 +112,7 @@ export function listChats(settings = config()) {
   const result = [...entries.values()].map(({ id, source, live = {}, record = {} }) => {
     const updatedAt = Math.max(live.updatedAt || 0, record.lastActivityAt || 0);
     const visible = settings.privacy === "public" && settings.presence?.showTask !== false;
-    return { id, source, title: visible ? clean(conversationName(id)) || clean(live.taskSource && live.task) || clean(live.project) || (source === "chatgpt" ? "ChatGPT conversation" : "Codex conversation") : "Private conversation",
+    return { id, source, title: visible ? clean(source === "codex" && conversationName(id)) || clean(live.taskSource && live.task) || clean(live.project) || (source === "chatgpt" ? "ChatGPT conversation" : "Codex conversation") : "Private conversation",
       status: live.status && Date.now() - (live.updatedAt || 0) <= settings.timing.idleMs ? live.status : "idle",
       model: live.model || record.model || null, lastActivityAt: updatedAt || null,
       output: live.usage?.output != null || (record.usageKnown && record.totals?.output != null) ? Math.max(live.usage?.output || 0, record.usageKnown ? record.totals?.output || 0 : 0) : null,
@@ -105,11 +129,11 @@ export function listChats(settings = config()) {
   return chosen.sort((a,b) => (b.lastActivityAt || 0) - (a.lastActivityAt || 0));
 }
 export function pinChat(id, source = "codex") {
-  const histories = readJSON("sessions.json").sessions || {};
-  const history = typeof id === "string" && Object.hasOwn(histories, id) ? histories[id] : null;
+  const records = histories();
+  const history = typeof id === "string" && Object.hasOwn(records, id) ? records[id] : null;
   const snapshot = typeof id === "string" ? readLiveSession(id, source) : {};
   const latest = readJSON("state.json");
-  const exists = (history && (!history.source || history.source === source)) ||
+  const exists = (history && (history.source || "codex") === source) ||
     (snapshot.sessionId === id && snapshot.source === source) ||
     (latest.sessionId === id && (latest.source || "codex") === source);
   if (typeof id !== "string" || !id.trim() || id.length > 256 || !sourceOK(source) ||

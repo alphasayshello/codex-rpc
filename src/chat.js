@@ -1,4 +1,4 @@
-import { safeFilePath } from "./paths.js";
+import { presenceFilePath } from "./paths.js";
 import fs from "node:fs";
 import { config, file, readJSON } from "./store.js";
 import { readLiveSession } from "./live.js";
@@ -18,10 +18,10 @@ const number = (v) => Number.isFinite(Number(v)) && v != null ? Math.max(0, Numb
 // aggregates deliberately never enter this view.
 export function getChatStats(state = readJSON("state.json"), settings = config()) {
   const id = state.sessionId || null, source = state.source || "codex";
-  const index = history(), candidate = id ? index.sessions?.[id] : null;
-  const record = candidate && (!candidate.source || candidate.source === source) ? candidate : {};
+  const index = history(), candidate = id && Object.hasOwn(index.sessions || {}, id) ? index.sessions[id] : null;
+  const record = candidate && (candidate.source || "codex") === source ? candidate : {};
   const snapshot = readLiveSession(id, source);
-  const live = snapshot.sessionId === id && (!snapshot.source || snapshot.source === source) && (snapshot.updatedAt || 0) > (state.updatedAt || 0) ? snapshot : state;
+  const live = snapshot.sessionId === id && (snapshot.source || "codex") === source && (snapshot.updatedAt || 0) > (state.updatedAt || 0) ? snapshot : state;
   const totals = record.totals || {}, usage = live.usage || {};
   const known = !!record.usageKnown;
   const count = (key, liveValue) => {
@@ -46,12 +46,18 @@ export function getChatStats(state = readJSON("state.json"), settings = config()
     const clean = {};
     for (const field of ["name", "callId", "startedAt", "endedAt", "durationMs", "status", "exitCode"])
       if (tool?.[field] !== undefined) clean[field] = tool[field];
-    if (!privateMode && safeFilePath(tool?.file)) clean.file = tool.file;
+    const file = !privateMode && presenceFilePath(tool?.file);
+    if (file) clean.file = file;
     return clean;
   };
   const contextWindow = number(live.contextWindow), lastRequestTokens = number(live.lastUsage?.total);
+  const files = new Map();
+  if (!privateMode) for (const [name, count] of Object.entries(totals.files || {})) {
+    const normalized = presenceFilePath(name);
+    if (normalized) files.set(normalized, (files.get(normalized) || 0) + (Number.isFinite(count) ? Math.max(0, count) : 0));
+  }
   return {
-    id, source, title: privateMode ? "Private conversation" : conversationName(id) || (live.taskSource ? live.task : null) || live.project || "Current chat",
+    id, source, title: privateMode ? "Private conversation" : (source === "codex" ? conversationName(id) : null) || (live.taskSource ? live.task : null) || live.project || "Current chat",
     model, status: live.status || "idle", startedAt: record.startedAt || live.startedAt || null,
     lastActivityAt: live.updatedAt || record.lastActivityAt || null,
     historyUpdatedAt: index.updatedAt || null, liveUpdatedAt: live.updatedAt || null,
@@ -61,7 +67,7 @@ export function getChatStats(state = readJSON("state.json"), settings = config()
     prompts: record.id ? number(totals.prompts) : null,
     toolCalls: record.id || live.observedToolCalls != null ? Math.max(totals.toolCalls || 0, live.observedToolCalls || 0) : null,
     tools: totals.tools || {}, languages: totals.languages || {},
-    files: privateMode ? {} : Object.fromEntries(Object.entries(totals.files || {}).filter(([name]) => safeFilePath(name))),
+    files: Object.fromEntries(files),
     linesAdded: record.id ? number(totals.linesAdded) : null, linesRemoved: record.id ? number(totals.linesRemoved) : null,
     activeSeconds: record.id ? number(totals.activeSeconds) : null,
     activeHours: record.id ? (totals.activeSeconds || 0) / 3600 : null,

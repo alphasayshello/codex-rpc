@@ -7,13 +7,12 @@ import fs from "node:fs";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { config, validateConfig, readJSON, writeJSON, home } from "./store.js";
 import { buildActivity, statusBadgeKind, getVisualState } from "./presence.js";
-import { rangeAggregate } from "./tui.js";
-import { emptyStats } from "./scanner.js";
 import { statsSVG, heatmapSVG, badgeSVG } from "./statcards.js";
 import { startDaemon, stopDaemon } from "./service.js";
 import { watchDirectory } from "./directory-watch.js";
 import { animationCatalog } from "./assets/generate-pet-gifs.js";
 import { listPets, importPet, selectPet, exportPet, downloadPet, readPetAsset } from "./pets.js";
+import { createDashboardReader } from "./dashboard.js";
 const animationIds = new Set(animationCatalog.map(({ id }) => id));
 const appVersion = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 let petUpload = false;
@@ -31,8 +30,18 @@ async function requestText(req, limit) {
 }
 export function createServer() {
   const token = randomBytes(24).toString("hex"),
-    clients = new Set();
-  let watcher, interval, closing;
+    clients = new Set(), dashboard = createDashboardReader();
+  let watcher, interval, closing, updateTimer;
+  const scheduleUpdate = () => {
+    if (closing || updateTimer) return;
+    updateTimer = setTimeout(() => {
+      updateTimer = null;
+      if (closing) return;
+      for (const client of clients)
+        if (!client.destroyed && client.writableLength < 65536) client.write("event: update\ndata: {}\n\n");
+    }, 80);
+    updateTimer.unref?.();
+  };
   const server = http.createServer(async (req, res) => {
     const address = server.address();
     if (!address) { res.writeHead(503).end("Dashboard is closing"); return; }
@@ -47,7 +56,7 @@ export function createServer() {
     res.setHeader("Cache-Control", "no-store");
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'self'; img-src 'self' data: https:; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'",
+      "default-src 'self'; img-src 'self' data: https:; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'",
     );
     let url;
     try {
@@ -60,15 +69,7 @@ export function createServer() {
       res.writeHead(code, { "Content-Type": "application/json" });
       res.end(JSON.stringify(data));
     };
-    const aggregate = () =>
-      rangeAggregate(
-        readJSON("aggregate.json", {
-          totals: emptyStats(),
-          days: {},
-          streak: { current: 0, longest: 0 },
-        }),
-        url.searchParams.get("range") || "all",
-      );
+    const aggregate = () => dashboard.aggregate(url.searchParams.get("range") || "all");
     try {
       if (req.method === "POST") {
         const origin = req.headers.origin;
@@ -92,7 +93,7 @@ export function createServer() {
           try {
             const text = await requestText(req, 65 * 1024 * 1024);
             clearTimeout(timeout);
-            json(200, await importPet(JSON.parse(text)));
+            const imported = await importPet(JSON.parse(text)); scheduleUpdate(); json(200, imported);
           } finally { clearTimeout(timeout); petUpload = false; }
           return;
         }
@@ -134,6 +135,12 @@ export function createServer() {
       }
       if (req.method !== "GET") {
         res.writeHead(405).end();
+        return;
+      }
+      if (url.pathname === "/api/dashboard") {
+        json(200, dashboard.snapshot({ range: url.searchParams.get("range") || "30d",
+          chatId: url.searchParams.has("chatId") ? url.searchParams.get("chatId") : undefined,
+          source: url.searchParams.has("source") ? url.searchParams.get("source") : "codex" }));
         return;
       }
       if (url.pathname === "/api/pets") {
@@ -257,6 +264,7 @@ export function createServer() {
         "/": ["../web/index.html", "text/html"],
         "/app.js": ["../web/app.js", "text/javascript"],
         "/style.css": ["../web/style.css", "text/css"],
+        "/assets/ui/tokens.css": ["../assets/ui/tokens.css", "text/css"],
         "/assets/pet/animation-gallery.js": ["../assets/pet/animation-gallery.js", "text/javascript"],
         "/assets/pet/source/codex-spritesheet-v4.png": ["../assets/pet/source/codex-spritesheet-v4.png", "image/png"],
         "/assets/pet/manifest.json": ["../assets/pet/manifest.json", "application/json"],
@@ -307,10 +315,7 @@ export function createServer() {
   server.on("listening", () => {
     fs.mkdirSync(home(), { recursive: true, mode: 0o700 });
     watcher = watchDirectory(home(),
-      ["state.json", "aggregate.json", "sessions.json", "selection.json", "config.json", "daemon.json"], () => {
-        for (const c of clients)
-          if (c.writableLength < 65536) c.write("event: update\ndata: {}\n\n");
-    });
+      ["state.json", "aggregate.json", "sessions.json", "selection.json", "config.json", "daemon.json"], scheduleUpdate);
     interval = setInterval(() => {
       for (const c of clients) c.write(": heartbeat\n\n");
     }, 20000);
@@ -319,6 +324,7 @@ export function createServer() {
   server.on("close", () => {
     watcher?.close();
     clearInterval(interval);
+    clearTimeout(updateTimer); updateTimer = null;
     for (const c of clients) c.end();
     clients.clear();
   });
@@ -327,6 +333,7 @@ export function createServer() {
     // callers may remove the data directory as soon as shutdown begins.
     watcher?.close();
     clearInterval(interval);
+    clearTimeout(updateTimer); updateTimer = null;
     for (const c of clients) c.end();
     clients.clear();
     closing ||= new Promise((resolve, reject) => {

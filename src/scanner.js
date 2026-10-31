@@ -42,15 +42,24 @@ export function emptyStats() {
 }
 export function mergeStats(to, from) {
   for (const [k, v] of Object.entries(from)) {
-    if (typeof v === "number") to[k] = (to[k] || 0) + v;
-    else if (Array.isArray(v)) v.forEach((n, i) => (to[k][i] += n));
-    else if (v && typeof v === "object")
-      for (const [a, b] of Object.entries(v)) to[k][a] = (to[k][a] || 0) + b;
+    if (typeof v === "number") increment(to, k, v);
+    else if (v && typeof v === "object") {
+      const array = Array.isArray(v);
+      if (!Object.hasOwn(to, k) || !to[k] || typeof to[k] !== "object" || Array.isArray(to[k]) !== array)
+        Object.defineProperty(to, k, { value: array ? [] : {}, writable: true, enumerable: true, configurable: true });
+      for (const [a, b] of Object.entries(v)) increment(to[k], a, b);
+    }
   }
   return to;
 }
+function increment(obj, key, amount) {
+  if (!Number.isFinite(amount)) return;
+  const own = Object.hasOwn(obj, key), previous = own && Number.isFinite(obj[key]) ? obj[key] : 0;
+  if (own) obj[key] = previous + amount;
+  else Object.defineProperty(obj, key, { value: previous + amount, writable: true, enumerable: true, configurable: true });
+}
 function bump(obj, k, n = 1) {
-  if (k) obj[k] = (obj[k] || 0) + n;
+  if (k) increment(obj, k, n);
 }
 export function walk(dir) {
   try {

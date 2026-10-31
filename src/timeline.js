@@ -9,7 +9,7 @@ export function getToolTimeline(state = readJSON("state.json"), settings = confi
   if (!state.sessionId) return [];
   const source = state.source || "codex";
   const snapshot = readLiveSession(state.sessionId, source);
-  const matches = snapshot.sessionId === state.sessionId && (!snapshot.source || snapshot.source === source);
+  const matches = snapshot.sessionId === state.sessionId && (snapshot.source || "codex") === source;
   const effectiveClosed = ["idle", "waiting"].includes(state.status);
   // The caller's effective state may already have applied idle/privacy policy.
   // Equal-time raw snapshots must not undo that projection.

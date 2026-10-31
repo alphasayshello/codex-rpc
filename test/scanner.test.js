@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { sandbox, jsonl } from "./helpers.js";
-import { parseFile, scan, streaks, emptyStats } from "../src/scanner.js";
+import { parseFile, scan, streaks, emptyStats, mergeStats } from "../src/scanner.js";
 import { estimateCost } from "../src/pricing.js";
 import { config, readJSON, writeJSON } from "../src/store.js";
 import { LogWatcher } from "../src/log-watcher.js";
@@ -16,6 +16,24 @@ const row = (type, payload, day = date(), seconds = 0) => ({
   type,
   timestamp: `${day}T10:00:${String(seconds).padStart(2, "0")}Z`,
   payload,
+});
+test("special filenames and tool names accumulate as literal own JSON keys", async (t) => {
+  const { codex } = sandbox(t);
+  const names = ["constructor", "__proto__", "toString"];
+  const records = [row("session_meta", { id: "literal-keys" })];
+  names.forEach((name, index) => records.push(row("response_item", { type: "function_call", call_id: `special-${index}`, name, arguments: JSON.stringify({ file_path: name, command: name }) }, date(), index + 1)));
+  const result = await parseFile(jsonl(path.join(codex, "sessions/special-keys.jsonl"), records));
+  for (const field of ["files", "tools", "commands"]) {
+    assert.equal(Object.getPrototypeOf(result.totals[field]), Object.prototype);
+    for (const name of names) { assert.equal(Object.hasOwn(result.totals[field], name), true); assert.equal(result.totals[field][name], 1); }
+  }
+  const combined = mergeStats(emptyStats(), result.totals); mergeStats(combined, result.totals);
+  const roundTrip = JSON.parse(JSON.stringify(combined));
+  for (const field of ["files", "tools", "commands"]) for (const name of names) assert.equal(roundTrip[field][name], 2);
+  const arbitrary = mergeStats({}, JSON.parse('{"__proto__":{"constructor":2},"constructor":3,"toString":[1,2]}'));
+  assert.equal(Object.getPrototypeOf(arbitrary), Object.prototype);
+  assert.equal(Object.hasOwn(arbitrary, "__proto__"), true); assert.equal(arbitrary.__proto__.constructor, 2);
+  assert.equal(arbitrary.constructor, 3); assert.deepEqual(arbitrary.toString, [1, 2]);
 });
 function fixture(codex) {
   return jsonl(path.join(codex, "sessions/2026/10/sample.jsonl"), [

@@ -140,7 +140,7 @@ export function buildActivity(state = {}, aggregate = {}, c = {}, chat = getChat
   };
   const namedTitle =
     options.showTask && !privateMode
-      ? conversationName(state.sessionId) ||
+      ? (state.source !== "chatgpt" ? conversationName(state.sessionId) : undefined) ||
         (!state.sessionId || state.taskSource
           ? taskTitle(state.task)
           : undefined)
